@@ -31,16 +31,15 @@ export default async function handler(req, res) {
   }
 
   // Si missingChannels tiene elementos, el usuario no está en todos los canales
+  // ... (parte anterior del código)
+
   if (missingChannels.length > 0) {
     return res.status(200).json({ 
       is_member: false, 
-      missing_channels: missingChannels 
+      missing_channels: missingChannels,
+      debug_info: `Faltan ${missingChannels.length} canales: ${missingChannels.join(', ')}`
     });
   } else {
-    // Está en los 4 canales
-    return res.status(200).json({ 
-      is_member: true, 
-      missing_channels: [] 
-    });
+    return res.status(200).json({ is_member: true });
   }
 }
