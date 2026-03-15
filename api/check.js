@@ -1,45 +1,33 @@
 export default async function handler(req, res) {
-  // Obtenemos el ID del usuario desde la URL (ej: /api/check?user_id=123456789)
-  const { user_id } = req.query;
-
-  // Tu token del bot y los canales deben estar en las variables de entorno de Vercel
+  // Ahora recibimos user_id y la lista de canales (separados por coma)
+  const { user_id, channels } = req.query;
   const BOT_TOKEN = process.env.BOT_TOKEN;
-  
-  // Lista de tus 4 canales (pueden ser @nombres o IDs numéricos como -100123456)
-  const channels = ['@tuCanal1', '@tuCanal2', '@tuCanal3', '@tuCanal4'];
 
-  if (!user_id) {
-    return res.status(400).json({ error: "Falta el parámetro user_id" });
+  if (!user_id || !channels) {
+    return res.status(400).json({ error: "Faltan parámetros: user_id o channels" });
   }
 
+  // Convertimos el string de canales en una lista (Array)
+  const channelsList = channels.split(',');
   let missingChannels = [];
 
-  for (let channel of channels) {
+  for (let channel of channelsList) {
+    const cleanChannel = channel.trim();
     try {
-      // Llamada a la API oficial de Telegram
-      const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${channel}&user_id=${user_id}`);
+      const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${cleanChannel}&user_id=${user_id}`);
       const data = await response.json();
 
-      // Si la API de Telegram da error, o el estado del usuario es 'left' o 'kicked', no está en el canal
       if (!data.ok || data.result.status === 'left' || data.result.status === 'kicked') {
-        missingChannels.push(channel);
+        missingChannels.push(cleanChannel);
       }
     } catch (error) {
-      // Si hay un error de conexión, asumimos que falló la verificación de ese canal
-      missingChannels.push(channel);
+      missingChannels.push(cleanChannel);
     }
   }
 
-  // Si missingChannels tiene elementos, el usuario no está en todos los canales
-  // ... (parte anterior del código)
-
-  if (missingChannels.length > 0) {
-    return res.status(200).json({ 
-      is_member: false, 
-      missing_channels: missingChannels,
-      debug_info: `Faltan ${missingChannels.length} canales: ${missingChannels.join(', ')}`
-    });
-  } else {
-    return res.status(200).json({ is_member: true });
-  }
+  const isMember = missingChannels.length === 0;
+  return res.status(200).json({ 
+    is_member: isMember, 
+    missing_channels: missingChannels 
+  });
 }
