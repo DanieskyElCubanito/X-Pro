@@ -1,29 +1,31 @@
 export default async function handler(req, res) {
-  const { user_id, channels } = req.query;
-  const BOT_TOKEN = process.env.BOT_TOKEN;
+  // Ahora también pedimos el 'token' por la URL
+  const { user_id, channels, token } = req.query;
 
-  if (!user_id || !channels) {
-    return res.status(400).json({ error: "Faltan parámetros" });
+  if (!user_id || !channels || !token) {
+    return res.status(400).json({ 
+      error: "Faltan parámetros", 
+      ayuda: "Debes enviar user_id, channels y token" 
+    });
   }
 
   const channelsList = channels.split(',');
   let missingChannels = [];
-  let debugLog = []; // Para saber qué responde Telegram exactamente
+  let debugLog = [];
 
   for (let channel of channelsList) {
     let cleanChannel = channel.trim();
-    // Si el canal no empieza con @ ni con -100, le ponemos el @ por defecto
     if (!cleanChannel.startsWith('@') && !cleanChannel.startsWith('-100')) {
       cleanChannel = '@' + cleanChannel;
     }
 
     try {
-      const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${cleanChannel}&user_id=${user_id}`);
+      // Usamos el token que viene en la URL
+      const response = await fetch(`https://api.telegram.org/bot${token}/getChatMember?chat_id=${cleanChannel}&user_id=${user_id}`);
       const data = await response.json();
 
-      debugLog.push({ channel: cleanChannel, status: data.result?.status, ok: data.ok });
+      debugLog.push({ channel: cleanChannel, ok: data.ok, status: data.result?.status });
 
-      // Verificamos si el usuario es miembro, administrador o creador
       const isMember = data.ok && ['member', 'administrator', 'creator'].includes(data.result.status);
 
       if (!isMember) {
@@ -37,6 +39,6 @@ export default async function handler(req, res) {
   return res.status(200).json({ 
     is_member: missingChannels.length === 0, 
     missing_channels: missingChannels,
-    debug: debugLog 
+    debug: debugLog
   });
-        }
+}
