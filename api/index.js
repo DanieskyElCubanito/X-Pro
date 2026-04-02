@@ -179,4 +179,30 @@ app.post('/api/withdraw', async (req, res) => {
   }
 });
 
+// NUEVA RUTA PARA EL HISTORIAL
+app.get('/api/history', async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, error: "Falta el ID de usuario" });
+    }
+
+    // Buscamos en la tabla 'withdrawals' los retiros de este usuario
+    const { data: history, error } = await supabase
+      .from('withdrawals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }); // Los más recientes primero
+
+    if (error) throw error;
+
+    return res.json({ success: true, history: history || [] });
+
+  } catch (error) {
+    console.error("Error en historial:", error.message);
+    return res.status(500).json({ success: false, error: "Error al obtener historial" });
+  }
+});
+
 module.exports = app;
