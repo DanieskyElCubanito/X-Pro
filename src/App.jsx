@@ -4,84 +4,94 @@ import axios from 'axios';
 
 function App() {
   const [status, setStatus] = useState('loading');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // 1. Inicializar el SDK de Telegram
     WebApp.ready();
     WebApp.expand();
+    
+    // Cambiar color de fondo de la app para que parezca nativa
+    WebApp.setHeaderColor('#1a1a1a');
 
-    const user = WebApp.initDataUnsafe.user;
+    const tgUser = WebApp.initDataUnsafe.user;
     const startParam = WebApp.initDataUnsafe.start_param;
 
-    // Si abres la app fuera de Telegram, esto saltará
-    if (!user) {
-      setStatus('error');
-      setErrorMsg('Por favor, abre esta app desde el bot de Telegram.');
-      return;
+    if (tgUser) {
+      setUser(tgUser);
+      axios.post('/api/verify', { user: tgUser, start_param: startParam })
+        .then(res => {
+          if (res.data.success) setStatus('member');
+          else setStatus('guest');
+        })
+        .catch(() => setStatus('error'));
     }
-
-    // 2. Llamada al Backend
-    axios.post('/api/verify', { 
-      user: user, 
-      start_param: startParam 
-    })
-    .then(res => {
-      if (res.data.success) {
-        setStatus('member');
-      } else {
-        setStatus('guest');
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      setStatus('error');
-      // Esto nos dirá si el problema es el Token, la DB o la Red
-      setErrorMsg(err.response?.data?.error || err.message);
-    });
   }, []);
 
-  if (status === 'loading') {
-    return (
-      <div style={{ textAlign: 'center', marginTop: '50px', color: 'white' }}>
-        <p>Conectando con el servidor...</p>
-        <small>Si tarda mucho, verifica que el bot sea ADMIN del canal.</small>
-      </div>
-    );
-  }
+  // Generar link de referido
+  const referralLink = `https://t.me/IAProfitTonBot/app?startapp=${user?.id}`;
 
-  if (status === 'error') {
-    return (
-      <div style={{ padding: '20px', color: '#ff5555', textAlign: 'center' }}>
-        <h3>⚠️ Error de Conexión</h3>
-        <p>{errorMsg}</p>
-        <button onClick={() => window.location.reload()}>Reintentar</button>
-      </div>
-    );
-  }
+  const handleShare = () => {
+    const text = `¡Únete a esta app y gana recompensas! 🚀`;
+    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`);
+  };
+
+  if (status === 'loading') return <div style={styles.container}>Cargando...</div>;
 
   return (
-    <div style={{ padding: '20px', textAlign: 'center', color: 'white' }}>
+    <div style={styles.container}>
       {status === 'guest' ? (
-        <div>
-          <h2>¡Hola, {WebApp.initDataUnsafe.user?.first_name}!</h2>
-          <p>Para entrar, debes unirte a nuestro canal oficial.</p>
-          <button 
-            style={{ padding: '12px 24px', backgroundColor: '#0088cc', border: 'none', borderRadius: '8px', color: 'white' }}
-            onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')} // CAMBIA ESTO POR TU CANAL
-          >
-            Unirme al Canal
+        <div style={styles.card}>
+          <h2>📢 ¡Falta un paso!</h2>
+          <p>Para acceder, debes estar unido a nuestro canal oficial.</p>
+          <button style={styles.buttonMain} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>
+            Unirme ahora
           </button>
         </div>
       ) : (
-        <div>
-          <h2>✅ Verificado</h2>
-          <p>¡Bienvenido a la Mini App!</p>
-          {/* Aquí va el resto de tu app de referidos */}
+        <div style={styles.main}>
+          <div style={styles.header}>
+             <img src={user?.photo_url || 'https://via.placeholder.com/80'} style={styles.avatar} />
+             <h3>Hola, {user?.first_name} 👋</h3>
+             <span style={styles.badge}>Usuario Verificado</span>
+          </div>
+
+          <div style={styles.card}>
+            <h4>SISTEMA DE REFERIDOS</h4>
+            <p style={{fontSize: '14px', color: '#aaa'}}>Comparte tu enlace y gana por cada amigo invitado.</p>
+            
+            <div style={styles.linkBox}>
+              <code style={styles.code}>{referralLink}</code>
+            </div>
+
+            <button style={styles.buttonSuccess} onClick={handleShare}>
+              🚀 Compartir con amigos
+            </button>
+            
+            <button style={styles.buttonSecondary} onClick={() => {
+              navigator.clipboard.writeText(referralLink);
+              WebApp.showAlert('¡Enlace copiado!');
+            }}>
+              📋 Copiar Enlace
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
+
+// Estilos rápidos para que se vea profesional
+const styles = {
+  container: { backgroundColor: '#1a1a1a', color: 'white', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif' },
+  header: { textAlign: 'center', marginBottom: '30px' },
+  avatar: { width: '80px', height: '80px', borderRadius: '50%', border: '2px solid #0088cc', marginBottom: '10px' },
+  badge: { backgroundColor: '#00c853', padding: '4px 12px', borderRadius: '20px', fontSize: '12px' },
+  card: { backgroundColor: '#252525', padding: '20px', borderRadius: '15px', textAlign: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' },
+  linkBox: { backgroundColor: '#111', padding: '10px', borderRadius: '8px', margin: '15px 0', overflowX: 'auto' },
+  code: { color: '#0088cc', fontSize: '12px' },
+  buttonMain: { width: '100%', padding: '15px', backgroundColor: '#0088cc', border: 'none', borderRadius: '10px', color: 'white', fontWeight: 'bold', cursor: 'pointer' },
+  buttonSuccess: { width: '100%', padding: '15px', backgroundColor: '#00c853', border: 'none', borderRadius: '10px', color: 'white', fontWeight: 'bold', marginBottom: '10px' },
+  buttonSecondary: { width: '100%', padding: '10px', backgroundColor: 'transparent', border: '1px solid #444', borderRadius: '10px', color: '#aaa' }
+};
 
 export default App;
