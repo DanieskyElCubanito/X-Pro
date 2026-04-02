@@ -136,6 +136,16 @@ function App() {
     </div>
   );
 
+  const loadHistory = async () => {
+    try {
+      const res = await axios.get(`/api/history?userId=${userData.id}`);
+      setHistory(res.data.history || []);
+      setShowHistory(true);
+    } catch (e) {
+      WebApp.showAlert('No se pudo cargar el historial');
+    }
+  };
+  
   return (
     <div style={s.container}>
       {status === 'guest' ? (
