@@ -27,7 +27,6 @@ function App() {
       });
   };
 
-  /* */
   useEffect(() => {
     try {
       WebApp.ready();
@@ -55,11 +54,8 @@ function App() {
   const handleCheckSubscription = () => {
     const user = WebApp.initDataUnsafe?.user;
     const startParam = WebApp.initDataUnsafe?.start_param;
-    
-    // Mostramos un feedback visual rápido
     setStatus('loading');
     
-    // Intentamos verificar de nuevo
     axios.post('/api/verify', { user, start_param: startParam })
       .then(res => {
         if (res.data.success) {
@@ -69,43 +65,56 @@ function App() {
           WebApp.HapticFeedback.notificationOccurred('success');
         } else {
           setStatus('guest');
-          WebApp.showAlert('❌ Aún no detectamos tu suscripción. Asegúrate de haberte unido al canal.');
+          WebApp.showAlert('❌ Aún no detectamos tu suscripción. Únete al canal y espera unos segundos.');
           WebApp.HapticFeedback.notificationOccurred('error');
         }
       })
       .catch(() => {
         setStatus('guest');
-        WebApp.showAlert('Hubo un error al verificar. Intenta de nuevo.');
+        WebApp.showAlert('Error al conectar con el servidor.');
       });
   };
 
+  /* */
   const handleShare = () => {
     const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = `¡Gana TON en 3 niveles con IA Profit! 🚀`;
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   };
 
+  /* */
   const handleWithdraw = async () => {
     if (!userData || userData.balance < 0.1) {
-      WebApp.showAlert('Necesitas al menos 0.1 TON');
+      WebApp.showAlert('❌ Necesitas al menos 0.1 TON para retirar.');
       return;
     }
-    WebApp.showPrompt('Pega tu dirección de Wallet TON:', async (addr) => {
-      if (!addr) return;
-      try {
-        const res = await axios.post('/api/withdraw', { userId: userData.id, address: addr });
-        if (res.data.success) {
-          WebApp.showAlert('✅ Retiro enviado con éxito');
-          window.location.reload();
-        } else {
-          WebApp.showAlert('❌ Error: ' + res.data.error);
+
+    WebApp.showConfirm("¿Deseas retirar 0.1 TON a tu wallet?", (confirmed) => {
+      if (!confirmed) return;
+
+      WebApp.showPrompt('Pega tu dirección de Wallet TON:', async (addr) => {
+        if (!addr || addr.length < 10) {
+          if(addr) WebApp.showAlert('Dirección inválida');
+          return;
         }
-      } catch (e) {
-        WebApp.showAlert('Error en la red de retiro');
-      }
+
+        try {
+          const res = await axios.post('/api/withdraw', { userId: userData.id, address: addr });
+          if (res.data.success) {
+            WebApp.showAlert('✅ ¡Pago enviado! Se publicará en @PagosEnCrypto en breve.');
+            window.location.reload();
+          } else {
+            // Aquí se mostrará el error de "Espera X minutos" del backend
+            WebApp.showAlert('❌ ' + res.data.error);
+          }
+        } catch (e) {
+          WebApp.showAlert('Error en el proceso de retiro.');
+        }
+      });
     });
   };
 
+  /* */
   if (status === 'loading') return <div style={s.center}>🛰️ Conectando con IA Profit...</div>;
   
   if (status === 'error') return (
@@ -123,32 +132,27 @@ function App() {
           <div style={s.card}>
             <h2 style={{fontSize: '22px', marginBottom: '10px'}}>📢 ¡Únete al Canal!</h2>
             <p style={{color: '#aaa', fontSize: '14px', marginBottom: '20px'}}>
-              Para activar tu cuenta y empezar a ganar TON, debes ser miembro de nuestra comunidad oficial.
+              Debes ser miembro de @CryptosBitcoins para activar tus ganancias.
             </p>
-            
-            <button 
-              style={{...s.btnBlue, marginBottom: '12px'}} 
-              onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}
-            >
+            <button style={{...s.btnBlue, marginBottom: '12px'}} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>
               1. UNIRME AL CANAL
             </button>
-
-            <button 
-              style={s.btnOutline} 
-              onClick={handleCheckSubscription}
-            >
-              2. YA ME UNÍ, CONTINUAR →
+            <button style={s.btnOutline} onClick={handleCheckSubscription}>
+              2. CONTINUAR →
             </button>
           </div>
         </div>
       ) : (
         <div style={s.main}>
+           {/* Sección de Balance */}
            <div style={s.cardBalance}>
               <p style={{margin: 0, opacity: 0.8}}>Balance Disponible</p>
-              <h1 style={{fontSize: '40px', margin: '10px 0'}}>{userData?.balance || '0.00'} <span style={{fontSize: '18px'}}>TON</span></h1>
+              <h1 style={{fontSize: '40px', margin: '10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize: '18px'}}>TON</span></h1>
               <button style={s.btnWhite} onClick={handleWithdraw}>RETIRAR 0.1 TON</button>
+              <p style={{fontSize: '10px', marginTop: '10px', color: '#e0f4ff'}}>Límite: 1 retiro cada 60 min</p>
            </div>
 
+           {/* Sección de Referidos */}
            <div style={s.card}>
               <h4 style={{marginTop: 0}}>Sistema de Referidos</h4>
               <div style={s.row}>
@@ -159,29 +163,30 @@ function App() {
               <button style={s.btnGreen} onClick={handleShare}>🚀 Invitar Amigos</button>
            </div>
 
+           {/* Estadísticas de Red */}
            <div style={{...s.card, marginTop: '20px', border: '1px solid #333'}}>
-              <h4 style={{marginBottom: '15px', color: '#0088cc', textAlign: 'left'}}>Ganancias por referencias</h4>
+              <h4 style={{marginBottom: '15px', color: '#0088cc', textAlign: 'left'}}>Ganancias por red</h4>
               <div style={s.statsGrid}>
                 <div style={s.statCol}>
                   <p style={s.statLabel}>Nivel 1</p>
-                  <p style={s.statValue}>{stats.n1} <small style={{fontSize: '10px', color: '#666'}}>Users</small></p>
+                  <p style={s.statValue}>{stats.n1}</p>
                   <p style={s.statCom}>{stats.c1} TON</p>
                 </div>
                 <div style={s.statCol}>
                   <p style={s.statLabel}>Nivel 2</p>
-                  <p style={s.statValue}>{stats.n2} <small style={{fontSize: '10px', color: '#666'}}>Users</small></p>
+                  <p style={s.statValue}>{stats.n2}</p>
                   <p style={s.statCom}>{stats.c2} TON</p>
                 </div>
                 <div style={s.statCol}>
                   <p style={s.statLabel}>Nivel 3</p>
-                  <p style={s.statValue}>{stats.n3} <small style={{fontSize: '10px', color: '#666'}}>Users</small></p>
+                  <p style={s.statValue}>{stats.n3}</p>
                   <p style={s.statCom}>{stats.c3} TON</p>
                 </div>
               </div>
               <div style={s.totalRow}>
-                <p style={{fontSize: '12px', color: '#888'}}>Total acumulado en red:</p>
+                <p style={{fontSize: '12px', color: '#888'}}>Total acumulado:</p>
                 <p style={{fontSize: '14px', fontWeight: 'bold', color: '#28a745'}}>
-                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(2)} TON
+                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
                 </p>
               </div>
            </div>
@@ -193,7 +198,7 @@ function App() {
 
 const s = {
   container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif', margin: 0 },
-  center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', margin: 0 },
+  center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' },
   cardBalance: { backgroundColor: '#0088cc', padding: '25px', borderRadius: '20px', textAlign: 'center', marginBottom: '20px' },
   card: { backgroundColor: '#1c1c1c', padding: '20px', borderRadius: '20px', textAlign: 'center' },
   btnBlue: { width: '100%', padding: '15px', backgroundColor: '#0088cc', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
