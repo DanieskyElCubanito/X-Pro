@@ -84,38 +84,46 @@ function App() {
 
   /* */
   const handleWithdraw = async () => {
+    // 1. Validación rápida de saldo
     if (!userData || userData.balance < 0.1) {
       WebApp.showAlert('❌ Necesitas al menos 0.1 TON para retirar.');
       return;
     }
 
-    WebApp.showConfirm("¿Deseas retirar 0.1 TON a tu wallet?", (confirmed) => {
-      if (!confirmed) return;
+    // 2. Pedir la Wallet directamente (Sin el showConfirm que bloquea)
+    WebApp.showPrompt('Pega tu dirección de Wallet TON:', async (addr) => {
+      // Si el usuario cancela o deja vacío, no hacemos nada
+      if (!addr || addr.trim().length < 10) {
+        if(addr) WebApp.showAlert('⚠️ Dirección inválida o muy corta.');
+        return;
+      }
 
-      WebApp.showPrompt('Pega tu dirección de Wallet TON:', async (addr) => {
-        if (!addr || addr.length < 10) {
-          if(addr) WebApp.showAlert('Dirección inválida');
-          return;
-        }
+      // Feedback visual: deshabilitamos interacción mientras procesa
+      WebApp.MainButton.setText("PROCESANDO PAGO...");
+      WebApp.MainButton.show();
 
-        try {
-          const res = await axios.post('/api/withdraw', { userId: userData.id, address: addr });
-          if (res.data.success) {
-            WebApp.showAlert('✅ ¡Pago enviado! Se publicará en @PagosEnCrypto en breve.');
-            window.location.reload();
-          } else {
-            // Aquí se mostrará el error de "Espera X minutos" del backend
-            WebApp.showAlert('❌ ' + res.data.error);
-          }
-        } catch (e) {
-          WebApp.showAlert('Error en el proceso de retiro.');
+      try {
+        const res = await axios.post('/api/withdraw', { 
+          userId: userData.id, 
+          address: addr.trim() 
+        });
+
+        if (res.data.success) {
+          WebApp.showAlert('✅ ¡Retiro exitoso! Revisa el canal de pagos.');
+          window.location.reload();
+        } else {
+          // Aquí capturamos el error de "Espera 60 min" del backend
+          WebApp.showAlert('❌ ' + res.data.error);
         }
-      });
+      } catch (e) {
+        WebApp.showAlert('❌ Error de red. Intenta más tarde.');
+      } finally {
+        WebApp.MainButton.hide();
+      }
     });
   };
-
   /* */
-  if (status === 'loading') return <div style={s.center}>🛰️ Conectando con IA Profit...</div>;
+  if (status === 'loading') return <div style={s.center}>🪫 Cargando...</div>;
   
   if (status === 'error') return (
     <div style={s.center}>
