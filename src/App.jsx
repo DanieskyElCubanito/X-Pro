@@ -68,7 +68,7 @@ function App() {
           <p>Para entrar, debes unirte a nuestro canal oficial.</p>
           <button 
             style={{ padding: '12px 24px', backgroundColor: '#0088cc', border: 'none', borderRadius: '8px', color: 'white' }}
-            onClick={() => WebApp.openTelegramLink('https://t.me/TU_CANAL')} // CAMBIA ESTO POR TU CANAL
+            onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')} // CAMBIA ESTO POR TU CANAL
           >
             Unirme al Canal
           </button>
