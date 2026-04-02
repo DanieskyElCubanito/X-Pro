@@ -17,7 +17,9 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const PAYMENTS_CHANNEL = "-1002352835078"; 
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5";
-const CLOUDFLARE_SECRET = "CLOUDFLARE_SECRET"; // Reemplaza con tu Secret Key (no la Site Key)
+
+// ACTUALIZACIÓN: Ahora lee la variable configurada en Vercel
+const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_SECRET;
 
 const REWARDS = { level1: 0.03, level2: 0.02, level3: 0.01 };
 const WITHDRAW_FIXED = 0.1; 
@@ -28,6 +30,9 @@ const COOLDOWN_MS = 60 * 60 * 1000;
 // Función para verificar el token de Cloudflare Turnstile
 async function verifyTurnstile(token) {
   try {
+    // Si la clave no está configurada, fallamos por seguridad
+    if (!CLOUDFLARE_SECRET) return false;
+
     const response = await axios.post(
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
       `secret=${CLOUDFLARE_SECRET}&response=${token}`,
