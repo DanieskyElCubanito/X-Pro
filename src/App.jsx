@@ -11,7 +11,9 @@ function App() {
   // Estados para controlar la ventana de ingreso de Wallet
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [walletAddr, setWalletAddr] = useState('');
-
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState([]);
+  
   const verifyUser = (user, startParam) => {
     axios.post('/api/verify', { user, start_param: startParam })
       .then(res => {
