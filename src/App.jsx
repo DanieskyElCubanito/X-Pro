@@ -55,7 +55,24 @@ function App() {
     const user = WebApp.initDataUnsafe?.user;
     const startParam = WebApp.initDataUnsafe?.start_param;
     setStatus('loading');
-    verifyUser(user, startParam);
+    
+    axios.post('/api/verify', { user, start_param: startParam })
+      .then(res => {
+        if (res.data.success) {
+          setUserData(res.data.user);
+          setStats(res.data.stats);
+          setStatus('member');
+          WebApp.HapticFeedback.notificationOccurred('success');
+        } else {
+          setStatus('guest');
+          WebApp.showAlert('❌ Aún no detectamos tu suscripción. Únete al canal y espera unos segundos.');
+          WebApp.HapticFeedback.notificationOccurred('error');
+        }
+      })
+      .catch(() => {
+        setStatus('guest');
+        WebApp.showAlert('Error al conectar con el servidor.');
+      });
   };
 
   /* */
@@ -65,63 +82,70 @@ function App() {
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   };
 
-  /* */
-  const handleWithdraw = () => {
+/* */
+  const handleWithdraw = async () => {
+    // 1. Validación de saldo
     if (!userData || userData.balance < 0.1) {
-      WebApp.showAlert('❌ Necesitas al menos 0.1 TON.');
+      WebApp.showAlert('❌ Necesitas al menos 0.1 TON para retirar.');
       return;
     }
 
-    // Usamos un pequeño delay para asegurar que el SDK procese el clic
-    setTimeout(() => {
-      WebApp.showPrompt('Pega tu dirección de Wallet TON:', async (addr) => {
-        if (!addr || addr.trim().length < 10) {
-          if(addr) WebApp.showAlert('⚠️ Dirección no válida.');
-          return;
-        }
+    // 2. Pedir la Wallet
+    WebApp.showPrompt('Pega tu dirección de Wallet TON:', (addr) => {
+      if (!addr || addr.trim().length < 10) return;
 
-        const walletAddr = addr.trim();
+      const walletAddr = addr.trim();
 
-        // Configuramos el MainButton como confirmación final (Evita errores de UI)
-        WebApp.MainButton.setText(`CONFIRMAR RETIRO A: ${walletAddr.substring(0,6)}...`);
-        WebApp.MainButton.show();
-        
-        // Limpiamos cualquier evento anterior
-        WebApp.MainButton.offClick(); 
+      // 3. Configurar el MainButton (Botón nativo inferior)
+      WebApp.MainButton.setText(`CONFIRMAR RETIRO DE 0.1 TON`);
+      WebApp.MainButton.setParams({
+        is_visible: true,
+        is_active: true,
+        color: '#28a745', // Color verde para confirmar
+        text_color: '#ffffff'
+      });
 
-        WebApp.MainButton.onClick(async () => {
-          WebApp.MainButton.showProgress();
-          try {
-            const res = await axios.post('/api/withdraw', { 
-              userId: userData.id, 
-              address: walletAddr 
-            });
+      // Definimos la función de envío
+      const sendRequest = async () => {
+        WebApp.MainButton.showProgress(); // Animación de carga nativa
+        WebApp.MainButton.disable(); // Evitar múltiples clics
 
-            if (res.data.success) {
-              WebApp.showAlert('✅ Pago enviado. Revisa @PagosEnCrypto');
-              WebApp.MainButton.hide();
-              window.location.reload();
-            } else {
-              WebApp.showAlert('❌ ' + res.data.error);
-              WebApp.MainButton.hide();
-            }
-          } catch (e) {
-            WebApp.showAlert('❌ Error al procesar retiro.');
+        try {
+          const res = await axios.post('/api/withdraw', { 
+            userId: userData.id, 
+            address: walletAddr 
+          });
+
+          if (res.data.success) {
+            WebApp.showAlert('✅ ¡Pago enviado! Revisa el canal de pagos.');
+            WebApp.MainButton.hide();
+            window.location.reload();
+          } else {
+            WebApp.showAlert('❌ ' + (res.data.error || 'Error desconocido'));
             WebApp.MainButton.hide();
           }
-        });
-      });
-    }, 100);
-  };
+        } catch (e) {
+          WebApp.showAlert('❌ Error de red al procesar el retiro.');
+          WebApp.MainButton.hide();
+        } finally {
+          // Importante: Limpiamos el evento para que no se repita en el próximo intento
+          WebApp.MainButton.offClick(sendRequest);
+        }
+      };
 
+      // Limpiar cualquier clic previo y asignar el nuevo
+      WebApp.MainButton.offClick(sendRequest);
+      WebApp.MainButton.onClick(sendRequest);
+    });
+  };
   /* */
-  if (status === 'loading') return <div style={s.center}>🛰️ Conectando...</div>;
+  if (status === 'loading') return <div style={s.center}>🪫 Cargando...</div>;
   
   if (status === 'error') return (
     <div style={s.center}>
       <h2 style={{color: '#ff4444'}}>⚠️ Error</h2>
       <p>{errorInfo}</p>
-      <button style={s.btnBlue} onClick={() => window.location.reload()}>Reintentar</button>
+      <button onClick={() => window.location.reload()}>Reintentar</button>
     </div>
   );
 
@@ -131,36 +155,63 @@ function App() {
         <div style={s.main}>
           <div style={s.card}>
             <h2 style={{fontSize: '22px', marginBottom: '10px'}}>📢 ¡Únete al Canal!</h2>
-            <p style={{color: '#aaa', fontSize: '14px', marginBottom: '20px'}}>Debes ser miembro de @CryptosBitcoins.</p>
-            <button style={{...s.btnBlue, marginBottom: '12px'}} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>1. UNIRME</button>
-            <button style={s.btnOutline} onClick={handleCheckSubscription}>2. CONTINUAR →</button>
+            <p style={{color: '#aaa', fontSize: '14px', marginBottom: '20px'}}>
+              Debes ser miembro de @CryptosBitcoins para activar tus ganancias.
+            </p>
+            <button style={{...s.btnBlue, marginBottom: '12px'}} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>
+              1. UNIRME AL CANAL
+            </button>
+            <button style={s.btnOutline} onClick={handleCheckSubscription}>
+              2. CONTINUAR →
+            </button>
           </div>
         </div>
       ) : (
         <div style={s.main}>
+           {/* Sección de Balance */}
            <div style={s.cardBalance}>
               <p style={{margin: 0, opacity: 0.8}}>Balance Disponible</p>
               <h1 style={{fontSize: '40px', margin: '10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize: '18px'}}>TON</span></h1>
               <button style={s.btnWhite} onClick={handleWithdraw}>RETIRAR 0.1 TON</button>
-              <p style={{fontSize: '10px', marginTop: '10px', color: '#e0f4ff'}}>Límite: 1 cada 60 min</p>
+              <p style={{fontSize: '10px', marginTop: '10px', color: '#e0f4ff'}}>Límite: 1 retiro cada 60 min</p>
            </div>
 
+           {/* Sección de Referidos */}
            <div style={s.card}>
-              <h4 style={{marginTop: 0}}>Referidos</h4>
+              <h4 style={{marginTop: 0}}>Sistema de Referidos</h4>
               <div style={s.row}>
-                <div style={s.box}>Lvl 1<br/><b>$0.03</b></div>
-                <div style={s.box}>Lvl 2<br/><b>$0.02</b></div>
-                <div style={s.box}>Lvl 3<br/><b>$0.01</b></div>
+                <div style={s.box}>Lvl 1<br/><b style={{color: '#fff'}}>$0.03</b></div>
+                <div style={s.box}>Lvl 2<br/><b style={{color: '#fff'}}>$0.02</b></div>
+                <div style={s.box}>Lvl 3<br/><b style={{color: '#fff'}}>$0.01</b></div>
               </div>
-              <button style={s.btnGreen} onClick={handleShare}>🚀 Invitar</button>
+              <button style={s.btnGreen} onClick={handleShare}>🚀 Invitar Amigos</button>
            </div>
 
+           {/* Estadísticas de Red */}
            <div style={{...s.card, marginTop: '20px', border: '1px solid #333'}}>
-              <h4 style={{marginBottom: '15px', color: '#0088cc', textAlign: 'left'}}>Estadísticas</h4>
+              <h4 style={{marginBottom: '15px', color: '#0088cc', textAlign: 'left'}}>Ganancias por red</h4>
               <div style={s.statsGrid}>
-                <div style={s.statCol}><p style={s.statLabel}>Lvl 1</p><p style={s.statValue}>{stats.n1}</p><p style={s.statCom}>{stats.c1} T</p></div>
-                <div style={s.statCol}><p style={s.statLabel}>Lvl 2</p><p style={s.statValue}>{stats.n2}</p><p style={s.statCom}>{stats.c2} T</p></div>
-                <div style={s.statCol}><p style={s.statLabel}>Lvl 3</p><p style={s.statValue}>{stats.n3}</p><p style={s.statCom}>{stats.c3} T</p></div>
+                <div style={s.statCol}>
+                  <p style={s.statLabel}>Nivel 1</p>
+                  <p style={s.statValue}>{stats.n1}</p>
+                  <p style={s.statCom}>{stats.c1} TON</p>
+                </div>
+                <div style={s.statCol}>
+                  <p style={s.statLabel}>Nivel 2</p>
+                  <p style={s.statValue}>{stats.n2}</p>
+                  <p style={s.statCom}>{stats.c2} TON</p>
+                </div>
+                <div style={s.statCol}>
+                  <p style={s.statLabel}>Nivel 3</p>
+                  <p style={s.statValue}>{stats.n3}</p>
+                  <p style={s.statCom}>{stats.c3} TON</p>
+                </div>
+              </div>
+              <div style={s.totalRow}>
+                <p style={{fontSize: '12px', color: '#888'}}>Total acumulado:</p>
+                <p style={{fontSize: '14px', fontWeight: 'bold', color: '#28a745'}}>
+                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
+                </p>
               </div>
            </div>
         </div>
@@ -170,22 +221,25 @@ function App() {
 }
 
 const s = {
-  container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif' },
-  center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' },
+  container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif', margin: 0 },
+  center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' },
   cardBalance: { backgroundColor: '#0088cc', padding: '25px', borderRadius: '20px', textAlign: 'center', marginBottom: '20px' },
   card: { backgroundColor: '#1c1c1c', padding: '20px', borderRadius: '20px', textAlign: 'center' },
-  btnBlue: { width: '100%', padding: '15px', backgroundColor: '#0088cc', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold' },
-  btnOutline: { width: '100%', padding: '15px', backgroundColor: 'transparent', border: '2px solid #0088cc', borderRadius: '12px', color: '#0088cc', fontWeight: 'bold' },
-  btnWhite: { width: '100%', padding: '12px', backgroundColor: '#fff', color: '#0088cc', border: 'none', borderRadius: '12px', fontWeight: 'bold' },
-  btnGreen: { width: '100%', padding: '15px', backgroundColor: '#28a745', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold' },
+  btnBlue: { width: '100%', padding: '15px', backgroundColor: '#0088cc', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
+  btnOutline: { width: '100%', padding: '15px', backgroundColor: 'transparent', border: '2px solid #0088cc', borderRadius: '12px', color: '#0088cc', fontWeight: 'bold', cursor: 'pointer' },
+  btnWhite: { width: '100%', padding: '12px', backgroundColor: '#fff', color: '#0088cc', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' },
+  btnGreen: { width: '100%', padding: '15px', backgroundColor: '#28a745', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
   row: { display: 'flex', justifyContent: 'space-around', margin: '15px 0' },
   box: { fontSize: '11px', color: '#aaa' },
   main: { display: 'flex', flexDirection: 'column' },
-  statsGrid: { display: 'flex', justifyContent: 'space-between' },
+  statsGrid: { display: 'flex', justifyContent: 'space-between', marginTop: '10px' },
   statCol: { flex: 1, textAlign: 'center' },
-  statLabel: { fontSize: '11px', color: '#888' },
-  statValue: { fontSize: '16px', fontWeight: 'bold' },
-  statCom: { fontSize: '12px', color: '#28a745' }
+  statLabel: { fontSize: '11px', color: '#888', margin: '0 0 5px 0' },
+  statValue: { fontSize: '16px', fontWeight: 'bold', margin: '0 0 5px 0' },
+  statCom: { fontSize: '12px', color: '#28a745', fontWeight: 'bold', margin: 0 },
+  totalRow: { marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
 };
 
-export default App;
+export default App; 
+
+solo actualiza la función de retiro no cambies lo demás. 
