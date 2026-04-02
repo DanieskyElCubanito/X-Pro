@@ -35,25 +35,27 @@ function App() {
   /* --- [FUNCIONES DE VERIFICACIÓN] --- */
   
   const verifyUser = (user, startParam) => {
-    // Registro de actividad inicial
     axios.post('/api/verify', { user, start_param: startParam })
       .then(res => {
         if (res.data.success) {
-          if (res.data.user.is_banned) {
-            setStatus('error');
-            setErrorInfo('SISTEMA DE SEGURIDAD: Tu cuenta ha sido suspendida permanentemente por detección de fraude o multicuentas.');
-            return;
-          }
+          // ... lógica de éxito ...
           setUserData(res.data.user);
           setStats(res.data.stats);
           setStatus('member');
         } else {
-          setStatus('guest');
+          // Si el error es USER_BANNED o NOT_MEMBER
+          if(res.data.error === 'USER_BANNED') {
+             setStatus('error');
+             setErrorInfo('Cuenta suspendida.');
+          } else {
+             setStatus('guest'); // Muestra la pantalla de unirse al canal
+          }
         }
       })
       .catch(err => {
+        console.error(err);
         setStatus('error');
-        setErrorInfo(err.response?.data?.error || 'Error de conexión con el nodo central.');
+        setErrorInfo('Error de conexión con el servidor. Reintenta en unos minutos.');
       });
   };
 
