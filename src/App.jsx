@@ -84,42 +84,44 @@ function App() {
 
   /* */
   const handleWithdraw = async () => {
-    // 1. Validación rápida de saldo
+    // 1. Validación de saldo
     if (!userData || userData.balance < 0.1) {
       WebApp.showAlert('❌ Necesitas al menos 0.1 TON para retirar.');
       return;
     }
 
-    // 2. Pedir la Wallet directamente (Sin el showConfirm que bloquea)
+    // 2. Abrir el cuadro para pegar la Wallet
     WebApp.showPrompt('Pega tu dirección de Wallet TON:', async (addr) => {
-      // Si el usuario cancela o deja vacío, no hacemos nada
-      if (!addr || addr.trim().length < 10) {
-        if(addr) WebApp.showAlert('⚠️ Dirección inválida o muy corta.');
-        return;
-      }
+      if (!addr || addr.trim().length < 10) return;
 
-      // Feedback visual: deshabilitamos interacción mientras procesa
-      WebApp.MainButton.setText("PROCESANDO PAGO...");
+      // 3. Configurar el Botón Principal de Telegram para el paso final
+      WebApp.MainButton.setText(`CONFIRMAR RETIRO DE 0.1 TON`);
       WebApp.MainButton.show();
+      WebApp.MainButton.enable();
 
-      try {
-        const res = await axios.post('/api/withdraw', { 
-          userId: userData.id, 
-          address: addr.trim() 
-        });
+      // Al tocar el botón de abajo de Telegram, se envía el dinero
+      WebApp.MainButton.onClick(async () => {
+        WebApp.MainButton.showProgress(); // Animación de carga
+        
+        try {
+          const res = await axios.post('/api/withdraw', { 
+            userId: userData.id, 
+            address: addr.trim() 
+          });
 
-        if (res.data.success) {
-          WebApp.showAlert('✅ ¡Retiro exitoso! Revisa el canal de pagos.');
-          window.location.reload();
-        } else {
-          // Aquí capturamos el error de "Espera 60 min" del backend
-          WebApp.showAlert('❌ ' + res.data.error);
+          if (res.data.success) {
+            WebApp.showAlert('✅ ¡Pago enviado! Revisa el canal de pagos.');
+            WebApp.MainButton.hide();
+            window.location.reload();
+          } else {
+            WebApp.showAlert('❌ ' + res.data.error);
+            WebApp.MainButton.hide();
+          }
+        } catch (e) {
+          WebApp.showAlert('❌ Error de conexión al procesar el retiro.');
+          WebApp.MainButton.hide();
         }
-      } catch (e) {
-        WebApp.showAlert('❌ Error de red. Intenta más tarde.');
-      } finally {
-        WebApp.MainButton.hide();
-      }
+      });
     });
   };
   /* */
