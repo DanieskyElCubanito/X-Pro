@@ -5,7 +5,7 @@ const app = express();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHANNEL_ID = "@TuCanal"; // O ID numérico
+const CHANNEL_ID = "@CryptosBitcoins"; // O ID numérico
 
 app.use(express.json());
 
