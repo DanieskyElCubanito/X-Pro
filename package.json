@@ -1,8 +1,0 @@
-{
-  "name": "telegram-force-sub-api",
-  "version": "1.0.0",
-  "scripts": {
-    "start": "node api/check.js"
-  },
-  "dependencies": {}
-}
