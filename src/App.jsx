@@ -13,6 +13,13 @@ function App() {
     try {
       WebApp.ready();
       WebApp.expand();
+
+      // --- 🛠️ MEJORA VISUAL: ELIMINAR ORILLAS BLANCAS 🛠️ ---
+      // 1. Cambiamos el color de la barra superior nativa de Telegram a negro
+      WebApp.setHeaderColor('#000000');
+      // 2. Cambiamos el color de fondo de la plataforma (detrás de la app) a negro
+      WebApp.setBackgroundColor('#000000');
+      // ---------------------------------------------------
       
       const user = WebApp.initDataUnsafe?.user;
       const startParam = WebApp.initDataUnsafe?.start_param;
@@ -116,15 +123,17 @@ function App() {
 
 /* */
 const s = {
-  container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif' },
-  center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' },
+  // Aseguramos que el contenedor cubra todo y tenga fondo negro
+  container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif', margin: 0 },
+  center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', margin: 0 },
   cardBalance: { backgroundColor: '#0088cc', padding: '30px', borderRadius: '20px', textAlign: 'center', marginBottom: '20px' },
   card: { backgroundColor: '#1c1c1c', padding: '20px', borderRadius: '20px', textAlign: 'center' },
   btnBlue: { width: '100%', padding: '15px', backgroundColor: '#0088cc', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold' },
   btnWhite: { width: '100%', padding: '12px', backgroundColor: '#fff', color: '#0088cc', border: 'none', borderRadius: '12px', fontWeight: 'bold' },
   btnGreen: { width: '100%', padding: '15px', backgroundColor: '#28a745', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold' },
   row: { display: 'flex', justifyContent: 'space-around', margin: '20px 0' },
-  box: { fontSize: '12px', color: '#aaa' }
+  box: { fontSize: '12px', color: '#aaa' },
+  main: { display: 'flex', flexDirection: 'column' }
 };
 
 export default App;
