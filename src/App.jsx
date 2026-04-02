@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import axios from 'axios';
 
+/* */
 function App() {
   const [status, setStatus] = useState('loading');
   const [userData, setUserData] = useState(null);
   const [errorInfo, setErrorInfo] = useState('');
 
+  /* */
   useEffect(() => {
     try {
       WebApp.ready();
@@ -21,7 +23,6 @@ function App() {
         return;
       }
 
-      // Petición al backend
       axios.post('/api/verify', { user, start_param: startParam })
         .then(res => {
           if (res.data.success) {
@@ -41,12 +42,14 @@ function App() {
     }
   }, []);
 
+  /* */
   const handleShare = () => {
     const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = `¡Gana TON en 3 niveles con IA Profit! 🚀`;
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   };
 
+  /* */
   const handleWithdraw = async () => {
     if (!userData || userData.balance < 0.1) {
       WebApp.showAlert('Necesitas al menos 0.1 TON');
@@ -69,7 +72,7 @@ function App() {
     });
   };
 
-  // --- RENDERIZADO ---
+  /* */
   if (status === 'loading') return <div style={s.center}>🛰️ Conectando con IA Profit...</div>;
   
   if (status === 'error') return (
@@ -111,6 +114,7 @@ function App() {
   );
 }
 
+/* */
 const s = {
   container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif' },
   center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' },
