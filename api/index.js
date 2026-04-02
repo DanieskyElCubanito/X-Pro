@@ -17,7 +17,7 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const PAYMENTS_CHANNEL = "-1002352835078"; 
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5";
-const CLOUDFLARE_SECRET = "0x4AAAAAACqyiN_P_Tu_Secret_Key_Aqui"; // Reemplaza con tu Secret Key (no la Site Key)
+const CLOUDFLARE_SECRET = "0x4AAAAAACqyiO0Gk6OnxaaGFcIZIYIxRnk"; // Reemplaza con tu Secret Key (no la Site Key)
 
 const REWARDS = { level1: 0.03, level2: 0.02, level3: 0.01 };
 const WITHDRAW_FIXED = 0.1; 
