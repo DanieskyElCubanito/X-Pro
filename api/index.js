@@ -39,4 +39,7 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
+// ... todo tu código anterior ...
+
+// ESTA LÍNEA ES OBLIGATORIA PARA VERCEL
 module.exports = app;
