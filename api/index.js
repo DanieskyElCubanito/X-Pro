@@ -9,20 +9,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* */
+/* --- Configuración --- */
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID; // Canal de verificación de membresía
-const PAYMENTS_CHANNEL = "-1002352835078"; // Canal de notificaciones de pago
+const CHANNEL_ID = process.env.CHANNEL_ID; 
+const PAYMENTS_CHANNEL = "-1002352835078"; 
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5";
 
 const REWARDS = { level1: 0.03, level2: 0.02, level3: 0.01 };
-const WITHDRAW_FIXED = 0.1; // Monto único de retiro
-const COOLDOWN_MS = 60 * 60 * 1000; // 1 hora en milisegundos
+const WITHDRAW_FIXED = 0.1; 
+const COOLDOWN_MS = 60 * 60 * 1000; 
 
-/* */
+/* --- Endpoint de Verificación --- */
 
 app.post('/api/verify', async (req, res) => {
   try {
@@ -59,7 +59,6 @@ app.post('/api/verify', async (req, res) => {
       }
     }
 
-    // Cálculo de Red (Nivel 1, 2 y 3)
     const { data: lvl1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
     const idsL1 = lvl1 ? lvl1.map(u => u.id) : [];
 
@@ -90,7 +89,7 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-/* */
+/* --- Endpoint de Retiro Actualizado --- */
 
 app.post('/api/withdraw', async (req, res) => {
   try {
@@ -99,13 +98,11 @@ app.post('/api/withdraw', async (req, res) => {
 
     if (!MNEMONIC) throw new Error("ADMIN_MNEMONIC no configurado");
 
-    // 1. Verificar balance y usuario
     const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
     if (!user || user.balance < WITHDRAW_FIXED) {
         return res.json({ success: false, error: `Balance insuficiente. Mínimo ${WITHDRAW_FIXED} TON` });
     }
 
-    // 2. Lógica de Cooldown (1 retiro por hora)
     const { data: lastWithdraw } = await supabase
       .from('withdrawals')
       .select('created_at')
@@ -122,14 +119,16 @@ app.post('/api/withdraw', async (req, res) => {
       }
     }
 
-    // 3. Procesar envío en Red TON
+    // 3. Procesar envío en Red TON y obtener Hash Real
     const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
     const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
     const wallet = WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey });
     const contract = client.open(wallet);
     
     const seqno = await contract.getSeqno();
-    await contract.sendTransfer({
+    
+    // Enviamos la transferencia
+    const transfer = contract.createTransfer({
       seqno,
       secretKey: keyPair.secretKey,
       sendMode: 3,
@@ -143,26 +142,34 @@ app.post('/api/withdraw', async (req, res) => {
       ]
     });
 
+    await contract.send(transfer);
+    
+    // Obtenemos el Hash de la transacción para el enlace de Tonscan
+    const txHash = transfer.hash().toString('hex');
+
     // 4. Actualizar Supabase
     await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
-    await supabase.from('withdrawals').insert([{ user_id: userId, amount: WITHDRAW_FIXED, status: 'completed' }]);
+    await supabase.from('withdrawals').insert([{ user_id: userId, amount: WITHDRAW_FIXED, status: 'completed', tx_hash: txHash }]);
 
-    // 5. Notificar al Canal de Pagos (Formato Profesional)
-    const txid = "TON_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    // 5. Notificar al Canal de Pagos con Formato Profesional (Puntos 1, 2 y 3 aplicados)
     const message = `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
-                    `👤 <b>Beneficiario:</b> ${user.username}\n` +
+                    `👤 <b>Beneficiario:</b> <a href="tg://user?id=${user.id}">${user.username}</a>\n` +
                     `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
                     `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
                     `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
-                    `🔹 <b>TXID:</b>\n<code>${txid}</code>\n\n` +
-                    `🔥 ¡Retiros procesados con total transparencia!\n\n` +
-                    `💰 <a href="https://t.me/IAProfitTonBot/app">¡QUIERO GANAR TON AHORA!</a>`;
+                    `🔹 <b>TXID:</b>\n<a href="https://tonscan.org/tx/${txHash}">${txHash}</a>\n\n` +
+                    `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
 
     await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       chat_id: PAYMENTS_CHANNEL,
       text: message,
       parse_mode: 'HTML',
-      disable_web_page_preview: true
+      disable_web_page_preview: true,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }]
+        ]
+      }
     });
 
     return res.json({ success: true });
