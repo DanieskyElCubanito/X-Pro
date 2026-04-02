@@ -8,7 +8,7 @@ function App() {
   const [stats, setStats] = useState({ n1: 0, n2: 0, n3: 0, c1: 0, c2: 0, c3: 0 });
   const [errorInfo, setErrorInfo] = useState('');
 
-  // Estados para controlar la ventana de ingreso de Wallet
+  // Estados para controlar la ventana de ingreso de Wallet e Historial
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [walletAddr, setWalletAddr] = useState('');
   const [showHistory, setShowHistory] = useState(false);
@@ -84,16 +84,24 @@ function App() {
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   };
 
-  // PASO 1: Validar saldo y abrir ventana
+  const loadHistory = async () => {
+    try {
+      const res = await axios.get(`/api/history?userId=${userData.id}`);
+      setHistory(res.data.history || []);
+      setShowHistory(true);
+    } catch (e) {
+      WebApp.showAlert('No se pudo cargar el historial');
+    }
+  };
+
   const handleStartWithdraw = () => {
     if (!userData || userData.balance < 0.1) {
       WebApp.showAlert('❌ Necesitas al menos 0.1 TON para retirar.');
       return;
     }
-    setIsWithdrawing(true); // Esto cambia la UI para pedir la wallet
+    setIsWithdrawing(true);
   };
 
-  // PASO 2: Confirmar retiro y enviar al backend
   const executeWithdraw = async () => {
     if (!walletAddr || walletAddr.trim().length < 10) {
       WebApp.showAlert('⚠️ Por favor, ingresa una dirección de wallet válida.');
@@ -136,18 +144,38 @@ function App() {
     </div>
   );
 
-  const loadHistory = async () => {
-    try {
-      const res = await axios.get(`/api/history?userId=${userData.id}`);
-      setHistory(res.data.history || []);
-      setShowHistory(true);
-    } catch (e) {
-      WebApp.showAlert('No se pudo cargar el historial');
-    }
-  };
-  
   return (
     <div style={s.container}>
+      {/* Botón de historial en la esquina */}
+      {status === 'member' && (
+        <button onClick={loadHistory} style={s.btnHistoryIcon}>📜</button>
+      )}
+
+      {/* Ventana Modal de Historial (Estilo Rojo Clásico) */}
+      {showHistory && (
+        <div style={s.modalOverlay}>
+          <div style={s.historyCard}>
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
+              <h3 style={{margin:0, color:'#ff4444'}}>HISTORIAL</h3>
+              <button onClick={() => setShowHistory(false)} style={s.btnClose}>X</button>
+            </div>
+            <div style={s.historyList}>
+              {history.length === 0 ? <p style={{fontSize:'12px', opacity:0.5}}>No hay retiros.</p> : 
+                history.map((h, i) => (
+                  <div key={i} style={s.historyItem}>
+                    <div style={{textAlign:'left'}}>
+                      <div style={{fontSize:'12px', fontWeight:'bold'}}>{new Date(h.created_at).toLocaleDateString()}</div>
+                      <div style={{fontSize:'10px', color:'#888'}}>{new Date(h.created_at).toLocaleTimeString()}</div>
+                    </div>
+                    <div style={{color:'#ff4444', fontWeight:'bold'}}>-{h.amount} TON</div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
       {status === 'guest' ? (
         <div style={s.main}>
           <div style={s.card}>
@@ -165,7 +193,6 @@ function App() {
         </div>
       ) : (
         <div style={s.main}>
-           {/* Sección Dinámica: Muestra el Balance o la Ventana de Retiro */}
            <div style={s.cardBalance}>
               {!isWithdrawing ? (
                 <>
@@ -192,7 +219,6 @@ function App() {
               )}
            </div>
 
-           {/* Sección de Referidos */}
            <div style={s.card}>
               <h4 style={{marginTop: 0}}>Sistema de Referidos</h4>
               <div style={s.row}>
@@ -203,7 +229,6 @@ function App() {
               <button style={s.btnGreen} onClick={handleShare}>🚀 Invitar Amigos</button>
            </div>
 
-           {/* Estadísticas de Red */}
            <div style={{...s.card, marginTop: '20px', border: '1px solid #333'}}>
               <h4 style={{marginBottom: '15px', color: '#0088cc', textAlign: 'left'}}>Ganancias por red</h4>
               <div style={s.statsGrid}>
@@ -237,7 +262,7 @@ function App() {
 }
 
 const s = {
-  container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif', margin: 0 },
+  container: { backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', fontFamily: 'sans-serif', margin: 0, position: 'relative' },
   center: { backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' },
   cardBalance: { backgroundColor: '#0088cc', padding: '25px', borderRadius: '20px', textAlign: 'center', marginBottom: '20px' },
   card: { backgroundColor: '#1c1c1c', padding: '20px', borderRadius: '20px', textAlign: 'center' },
@@ -254,11 +279,17 @@ const s = {
   statValue: { fontSize: '16px', fontWeight: 'bold', margin: '0 0 5px 0' },
   statCom: { fontSize: '12px', color: '#28a745', fontWeight: 'bold', margin: 0 },
   totalRow: { marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  
-  // Nuevos estilos para la ventana de retiro
   inputStyle: { width: '100%', padding: '12px', borderRadius: '8px', border: 'none', textAlign: 'center', boxSizing: 'border-box', outline: 'none', color: '#000', fontWeight: 'bold' },
   btnCancel: { flex: 1, padding: '12px', backgroundColor: '#1c1c1c', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
-  btnConfirm: { flex: 1, padding: '12px', backgroundColor: '#fff', color: '#0088cc', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }
+  btnConfirm: { flex: 1, padding: '12px', backgroundColor: '#fff', color: '#0088cc', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
+  
+  // Estilos del Historial
+  btnHistoryIcon: { position: 'absolute', top: '15px', right: '15px', backgroundColor: '#1c1c1c', border: '1px solid #333', borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer', fontSize: '18px', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' },
+  historyCard: { backgroundColor: '#121212', border: '2px solid #ff4444', borderRadius: '15px', width: '100%', maxWidth: '350px', padding: '20px', maxHeight: '70vh', overflowY: 'auto' },
+  historyList: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  historyItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #333' },
+  btnClose: { backgroundColor: 'transparent', border: 'none', color: '#ff4444', fontWeight: 'bold', fontSize: '18px', cursor: 'pointer' }
 };
 
 export default App;
