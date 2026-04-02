@@ -151,6 +151,7 @@ app.post('/api/withdraw', async (req, res) => {
   try {
     const { userId, address, captchaToken } = req.body;
     const MNEMONIC = process.env.ADMIN_MNEMONIC;
+    const cleanAddress = address.trim();
 
     // 1. Validaciones de Seguridad Iniciales
     if (!captchaToken) return res.json({ success: false, error: "Verificación de seguridad requerida." });
@@ -167,29 +168,29 @@ app.post('/api/withdraw', async (req, res) => {
         return res.json({ success: false, error: `Balance insuficiente. Mínimo ${WITHDRAW_FIXED} TON` });
     }
 
-    // 2. DETECCIÓN DE MULTICUENTA POR WALLET (Regla de Oro)
-    const { data: existingWalletUse } = await supabase
+    // 2. DETECCIÓN DE MULTICUENTA POR WALLET (CORREGIDO)
+    // Buscamos si esta wallet ya existe en CUALQUIER retiro previo de OTRO usuario
+    const { data: duplicateWallet } = await supabase
       .from('withdrawals')
-      .select('user_id')
-      .eq('address', address.trim())
-      .neq('user_id', userId) // Si otro ID ya usó esta wallet
+      .select('user_id, address')
+      .eq('address', cleanAddress)
+      .neq('user_id', userId) 
       .limit(1)
       .maybeSingle();
 
-    if (existingWalletUse) {
-      // Baneo fulminante a ambos involucrados
+    if (duplicateWallet) {
+      // Bloqueo total al detectar la coincidencia
       await supabase.from('users').update({ is_banned: true }).eq('id', userId);
-      await supabase.from('users').update({ is_banned: true }).eq('id', existingWalletUse.user_id);
       
       const banMsg = `🚫 <b>SISTEMA ANTI-FRAUDE ACTIVADO</b>\n\n` +
-                     `Se detectó uso de Wallet duplicada.\n` +
-                     `• <b>Infractor 1:</b> <code>${userId}</code>\n` +
-                     `• <b>Infractor 2:</b> <code>${existingWalletUse.user_id}</code>\n` +
-                     `• <b>Wallet:</b> <code>${address}</code>\n\n` +
-                     `<i>Ambas cuentas han sido baneadas permanentemente.</i>`;
+                     `Se detectó intento de multicuenta (Wallet duplicada).\n` +
+                     `• <b>Infractor actual:</b> <code>${userId}</code>\n` +
+                     `• <b>Vinculado con:</b> <code>${duplicateWallet.user_id}</code>\n` +
+                     `• <b>Wallet detectada:</b> <code>${cleanAddress}</code>\n\n` +
+                     `<i>La cuenta ha sido baneada permanentemente.</i>`;
       await notifyBan(banMsg);
 
-      return res.json({ success: false, error: "Fraude detectado: Esta wallet ya está vinculada a otra cuenta. Ambas han sido bloqueadas." });
+      return res.json({ success: false, error: "Fraude detectado: Esta wallet ya pertenece a otro usuario registrado. Tu cuenta ha sido bloqueada." });
     }
 
     // 3. Verificación de Cooldown (Límite de tiempo)
@@ -225,7 +226,7 @@ app.post('/api/withdraw', async (req, res) => {
       sendMode: 3,
       messages: [
         internal({ 
-          to: address, 
+          to: cleanAddress, 
           value: toNano(WITHDRAW_FIXED.toString()), 
           bounce: false, 
           body: "IA Profit Payout Official" 
@@ -243,7 +244,7 @@ app.post('/api/withdraw', async (req, res) => {
       amount: WITHDRAW_FIXED, 
       status: 'completed', 
       tx_hash: txHash,
-      address: address.trim() // Guardamos la wallet para futuras detecciones
+      address: cleanAddress 
     }]);
 
     // 6. Notificación Profesional al Canal
