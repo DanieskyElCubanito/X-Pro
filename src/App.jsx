@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import axios from 'axios';
 
-/* */
 function App() {
   const [status, setStatus] = useState('loading');
   const [userData, setUserData] = useState(null);
   const [stats, setStats] = useState({ n1: 0, n2: 0, n3: 0, c1: 0, c2: 0, c3: 0 });
   const [errorInfo, setErrorInfo] = useState('');
 
-  /* */
+  // Estados para controlar la ventana de ingreso de Wallet
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [walletAddr, setWalletAddr] = useState('');
+
   const verifyUser = (user, startParam) => {
     axios.post('/api/verify', { user, start_param: startParam })
       .then(res => {
@@ -50,7 +52,6 @@ function App() {
     }
   }, []);
 
-  /* */
   const handleCheckSubscription = () => {
     const user = WebApp.initDataUnsafe?.user;
     const startParam = WebApp.initDataUnsafe?.start_param;
@@ -75,71 +76,55 @@ function App() {
       });
   };
 
-  /* */
   const handleShare = () => {
     const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = `¡Gana TON en 3 niveles con IA Profit! 🚀`;
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   };
 
-/* */
-  const handleWithdraw = async () => {
-    // 1. Validación de saldo
+  // PASO 1: Validar saldo y abrir ventana
+  const handleStartWithdraw = () => {
     if (!userData || userData.balance < 0.1) {
       WebApp.showAlert('❌ Necesitas al menos 0.1 TON para retirar.');
       return;
     }
+    setIsWithdrawing(true); // Esto cambia la UI para pedir la wallet
+  };
 
-    // 2. Pedir la Wallet
-    WebApp.showPrompt('Pega tu dirección de Wallet TON:', (addr) => {
-      if (!addr || addr.trim().length < 10) return;
+  // PASO 2: Confirmar retiro y enviar al backend
+  const executeWithdraw = async () => {
+    if (!walletAddr || walletAddr.trim().length < 10) {
+      WebApp.showAlert('⚠️ Por favor, ingresa una dirección de wallet válida.');
+      return;
+    }
 
-      const walletAddr = addr.trim();
+    WebApp.MainButton.setText("PROCESANDO PAGO...");
+    WebApp.MainButton.showProgress();
+    WebApp.MainButton.show();
 
-      // 3. Configurar el MainButton (Botón nativo inferior)
-      WebApp.MainButton.setText(`CONFIRMAR RETIRO DE 0.1 TON`);
-      WebApp.MainButton.setParams({
-        is_visible: true,
-        is_active: true,
-        color: '#28a745', // Color verde para confirmar
-        text_color: '#ffffff'
+    try {
+      const res = await axios.post('/api/withdraw', { 
+        userId: userData.id, 
+        address: walletAddr.trim() 
       });
 
-      // Definimos la función de envío
-      const sendRequest = async () => {
-        WebApp.MainButton.showProgress(); // Animación de carga nativa
-        WebApp.MainButton.disable(); // Evitar múltiples clics
-
-        try {
-          const res = await axios.post('/api/withdraw', { 
-            userId: userData.id, 
-            address: walletAddr 
-          });
-
-          if (res.data.success) {
-            WebApp.showAlert('✅ ¡Pago enviado! Revisa el canal de pagos.');
-            WebApp.MainButton.hide();
-            window.location.reload();
-          } else {
-            WebApp.showAlert('❌ ' + (res.data.error || 'Error desconocido'));
-            WebApp.MainButton.hide();
-          }
-        } catch (e) {
-          WebApp.showAlert('❌ Error de red al procesar el retiro.');
-          WebApp.MainButton.hide();
-        } finally {
-          // Importante: Limpiamos el evento para que no se repita en el próximo intento
-          WebApp.MainButton.offClick(sendRequest);
-        }
-      };
-
-      // Limpiar cualquier clic previo y asignar el nuevo
-      WebApp.MainButton.offClick(sendRequest);
-      WebApp.MainButton.onClick(sendRequest);
-    });
+      if (res.data.success) {
+        WebApp.showAlert('✅ ¡Pago enviado! Revisa el canal de pagos.');
+        window.location.reload();
+      } else {
+        WebApp.showAlert('❌ ' + (res.data.error || 'Error desconocido'));
+      }
+    } catch (e) {
+      WebApp.showAlert('❌ Error de red al procesar el retiro.');
+    } finally {
+      WebApp.MainButton.hideProgress();
+      WebApp.MainButton.hide();
+      setIsWithdrawing(false);
+      setWalletAddr('');
+    }
   };
-  /* */
-  if (status === 'loading') return <div style={s.center}>🪫 Cargando...</div>;
+
+  if (status === 'loading') return <div style={s.center}>🛰️ Conectando con IA Profit...</div>;
   
   if (status === 'error') return (
     <div style={s.center}>
@@ -168,12 +153,31 @@ function App() {
         </div>
       ) : (
         <div style={s.main}>
-           {/* Sección de Balance */}
+           {/* Sección Dinámica: Muestra el Balance o la Ventana de Retiro */}
            <div style={s.cardBalance}>
-              <p style={{margin: 0, opacity: 0.8}}>Balance Disponible</p>
-              <h1 style={{fontSize: '40px', margin: '10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize: '18px'}}>TON</span></h1>
-              <button style={s.btnWhite} onClick={handleWithdraw}>RETIRAR 0.1 TON</button>
-              <p style={{fontSize: '10px', marginTop: '10px', color: '#e0f4ff'}}>Límite: 1 retiro cada 60 min</p>
+              {!isWithdrawing ? (
+                <>
+                  <p style={{margin: 0, opacity: 0.8}}>Balance Disponible</p>
+                  <h1 style={{fontSize: '40px', margin: '10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize: '18px'}}>TON</span></h1>
+                  <button style={s.btnWhite} onClick={handleStartWithdraw}>RETIRAR 0.1 TON</button>
+                  <p style={{fontSize: '10px', marginTop: '10px', color: '#e0f4ff'}}>Límite: 1 retiro cada 60 min</p>
+                </>
+              ) : (
+                <>
+                  <p style={{margin: 0, fontWeight: 'bold', marginBottom: '10px'}}>Ingresa tu Wallet de TON</p>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: UQ..." 
+                    value={walletAddr}
+                    onChange={(e) => setWalletAddr(e.target.value)}
+                    style={s.inputStyle}
+                  />
+                  <div style={{display: 'flex', gap: '10px', marginTop: '15px'}}>
+                    <button style={s.btnCancel} onClick={() => { setIsWithdrawing(false); setWalletAddr(''); }}>CANCELAR</button>
+                    <button style={s.btnConfirm} onClick={executeWithdraw}>CONFIRMAR</button>
+                  </div>
+                </>
+              )}
            </div>
 
            {/* Sección de Referidos */}
@@ -237,9 +241,12 @@ const s = {
   statLabel: { fontSize: '11px', color: '#888', margin: '0 0 5px 0' },
   statValue: { fontSize: '16px', fontWeight: 'bold', margin: '0 0 5px 0' },
   statCom: { fontSize: '12px', color: '#28a745', fontWeight: 'bold', margin: 0 },
-  totalRow: { marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  totalRow: { marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  
+  // Nuevos estilos para la ventana de retiro
+  inputStyle: { width: '100%', padding: '12px', borderRadius: '8px', border: 'none', textAlign: 'center', boxSizing: 'border-box', outline: 'none', color: '#000', fontWeight: 'bold' },
+  btnCancel: { flex: 1, padding: '12px', backgroundColor: '#1c1c1c', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
+  btnConfirm: { flex: 1, padding: '12px', backgroundColor: '#fff', color: '#0088cc', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }
 };
 
-export default App; 
-
-solo actualiza la función de retiro no cambies lo demás. 
+export default App;
