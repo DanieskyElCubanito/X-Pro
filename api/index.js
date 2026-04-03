@@ -176,71 +176,82 @@ app.post('/api/withdraw', async (req, res) => {
         const MNEMONIC = process.env.ADMIN_MNEMONIC;
         const cleanAddress = address?.trim();
 
+        // 1. Validaciones iniciales
+        if (!userId || !cleanAddress) return res.json({ success: false, error: "Datos incompletos" });
         if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
 
-        const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-        if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado." });
+        // 2. Verificar usuario en Supabase
+        const { data: user, error: userErr } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+        if (userErr || !user) return res.json({ success: false, error: "Usuario no encontrado" });
+        if (user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado o saldo insuficiente" });
 
-        // --- SISTEMA DE PAGO TON ---
-        const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
-        const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
-        const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
-        
-        const seqno = await wallet.getSeqno();
-        const transfer = wallet.createTransfer({
-            seqno,
-            secretKey: keyPair.secretKey,
-            sendMode: 3,
-            messages: [internal({ to: cleanAddress, value: toNano(WITHDRAW_FIXED.toString()), bounce: false, body: "IA Profit" })]
-        });
-
-        await wallet.send(transfer);
-        const txHash = transfer.hash().toString('hex');
-
-        // --- REGISTRO EN BASE DE DATOS ---
+        // 3. Proceso de Pago TON (Envuelto en su propio try para que no mate el servidor)
+        let txHash;
         try {
-            // Descontar saldo usando la función RPC
-            await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
+            const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
+            const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
+            const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
             
-            // Insertar en la tabla withdrawals (ahora con las columnas address y tx_hash)
-            await supabase.from('withdrawals').insert([{ 
-                user_id: Number(userId), 
-                amount: WITHDRAW_FIXED, 
-                status: 'SUCCESS', 
-                tx_hash: txHash, 
-                address: cleanAddress 
-            }]);
-        } catch (dbErr) {
-            console.error("Error guardando datos:", dbErr.message);
+            // Intentamos obtener el seqno. Si falla, es probable que la billetera esté vacía o no activada.
+            const seqno = await wallet.getSeqno().catch(() => 0);
+            
+            const transfer = wallet.createTransfer({
+                seqno,
+                secretKey: keyPair.secretKey,
+                sendMode: 3,
+                messages: [internal({ to: cleanAddress, value: toNano(WITHDRAW_FIXED.toString()), bounce: false, body: "IA Profit" })]
+            });
+
+            await wallet.send(transfer);
+            txHash = transfer.hash().toString('hex');
+        } catch (tonError) {
+            console.error("Error en red TON:", tonError.message);
+            return res.json({ success: false, error: "Error en la red TON: " + tonError.message });
         }
 
-        // --- TU MENSAJE ORIGINAL ---
-        const messageText = 
-            `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
-            `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
-            `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
-            `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
-            `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
-            `🔹 <b>TXID:</b>\n` +
-            `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
-            `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
-      
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            chat_id: PAYMENTS_CHANNEL,
-            text: messageText,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true,
-            reply_markup: {
-                inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/IAProfitTonBot` }]]
+        // 4. Registro en DB (Si el pago se envió, intentamos guardar)
+        if (txHash) {
+            try {
+                await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
+                await supabase.from('withdrawals').insert([{ 
+                    user_id: Number(userId), 
+                    amount: WITHDRAW_FIXED, 
+                    status: 'SUCCESS', 
+                    tx_hash: txHash, 
+                    address: cleanAddress 
+                }]);
+            } catch (dbErr) {
+                console.error("Pago enviado pero error en DB:", dbErr.message);
             }
-        });
 
-        return res.json({ success: true, txHash });
+            // 5. Tu mensaje original de Telegram
+            const messageText = 
+                `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+                `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
+                `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
+                `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+                `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+                `🔹 <b>TXID:</b>\n` +
+                `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
+                `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
+          
+            await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                chat_id: PAYMENTS_CHANNEL,
+                text: messageText,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_markup: {
+                    inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/IAProfitTonBot` }]]
+                }
+            }).catch(e => console.log("Error Telegram"));
+
+            return res.json({ success: true, txHash });
+        }
 
     } catch (e) {
-        console.error("Error crítico:", e.message);
-        // Si hay error, devolvemos el mensaje real para que el alert del Frontend lo muestre
-        return res.status(500).json({ success: false, error: e.message });
+        // Esto captura cualquier error inesperado y evita el Error 500 "mudo"
+        console.error("CATCH FINAL:", e.message);
+        return res.json({ success: false, error: "Error interno: " + e.message });
     }
 });
 
