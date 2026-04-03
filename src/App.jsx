@@ -4,7 +4,7 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Versión: 2.5.2 - RESTAURACIÓN TOTAL
+ * Versión: 3.0 - CON FILTROS DE SEGURIDAD
  */
 
 function App() {
@@ -25,10 +25,19 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  /* --- LÓGICA DE INICIO --- */
+  /* --- LÓGICA DE INICIO Y SEGURIDAD SILENCIOSA --- */
   
   const verifyUser = (user, startParam) => {
-    axios.post('/api/verify', { user, start_param: startParam })
+    // Captura de datos del sistema para el filtro antifraude (Como en tu script original)
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const userLang = navigator.language || navigator.userLanguage;
+
+    axios.post('/api/verify', { 
+      user, 
+      start_param: startParam,
+      tz: userTimezone,
+      ln: userLang
+    })
       .then(res => {
         if (res.data.success) {
           setUserData(res.data.user);
@@ -37,7 +46,7 @@ function App() {
         } else {
           if(res.data.error === 'USER_BANNED') {
              setStatus('error');
-             setErrorInfo('Cuenta suspendida por fraude o multicuenta.');
+             setErrorInfo('Cuenta suspendida por fraude, multicuenta o región no permitida.');
           } else {
              setStatus('guest');
           }
@@ -72,7 +81,7 @@ function App() {
     }
   }, []);
 
-  /* --- FUNCIONES RESTAURADAS --- */
+  /* --- FUNCIONES RESTAURADAS Y COMPLETAS --- */
 
   const handleStartWithdraw = () => {
     if ((userData?.balance || 0) < 0.1) {
@@ -80,7 +89,7 @@ function App() {
       return;
     }
     setIsWithdrawing(true);
-    setTurnstileToken(null); // Reset del token al abrir
+    setTurnstileToken(null);
   };
 
   useEffect(() => {
@@ -94,7 +103,6 @@ function App() {
           });
         }
       };
-      // Pequeño delay para asegurar que el div del ref existe en el DOM
       setTimeout(renderCaptcha, 200);
     }
   }, [isWithdrawing]);
@@ -176,14 +184,12 @@ function App() {
 
   return (
     <div style={s.container}>
-      {/* Botón Historial */}
       {status === 'member' && (
         <button onClick={loadHistory} style={s.btnHistoryIcon} disabled={loadingHistory}>
           {loadingHistory ? '...' : '📜'}
         </button>
       )}
 
-      {/* Modal Historial */}
       {showHistory && (
         <div style={s.modalOverlay}>
           <div style={s.historyCard}>
@@ -236,7 +242,6 @@ function App() {
                   <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
                   <input type="text" placeholder="Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
                   
-                  {/* CONTENEDOR DEL CAPTCHA */}
                   <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center'}}></div>
                   
                   <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
@@ -253,7 +258,6 @@ function App() {
               )}
            </div>
 
-           {/* REFERIDOS 3 NIVELES */}
            <div style={s.card}>
               <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
               <div style={s.row}>
@@ -264,7 +268,6 @@ function App() {
               <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
            </div>
 
-           {/* ESTADÍSTICAS DETALLADAS */}
            <div style={{...s.card, marginTop:'20px'}}>
               <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px'}}>TU RED DE TRABAJO</h4>
               <div style={s.statsGrid}>
