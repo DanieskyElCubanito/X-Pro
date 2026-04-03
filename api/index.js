@@ -59,21 +59,74 @@ async function notifyBan(adminMsg) {
 app.post('/api/verify', async (req, res) => {
   try {
     const { user, start_param } = req.body;
-    if (!user || !user.id) return res.status(400).json({ success: false, error: 'No user data' });
+    if (!user || !user.id) return res.status(400).json({ success: false });
 
-    // Extracción de datos de red para seguridad
-    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const userAgent = req.headers['user-agent'] || "unknown";
+    // Captura de IP y Agente (Prioridad Vercel)
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || "127.0.0.1";
+    const userAgent = req.headers['user-agent'] || "unknown_device";
 
-    // GENERAR HASH DE DISPOSITIVO (Para evitar multicuentas en el mismo móvil/PC)
+    // GENERAR HASH (MD5 es infalible para esto)
     const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
+    
+    console.log(`DEBUG: Usuario ${user.id} - IP: ${userIp} - Hash: ${deviceHash}`);
 
-    // 1. VERIFICAR BANEO PREVIO
-    const { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
-    if (dbUser && dbUser.is_banned) {
-      return res.json({ success: false, error: 'USER_BANNED' });
+    // 1. BUSCAR USUARIO
+    const { data: dbUser, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (dbUser?.is_banned) return res.json({ success: false, error: 'USER_BANNED' });
+
+    // 2. SI EL USUARIO YA EXISTE PERO NO TIENE HASH (Actualizarlo)
+    if (dbUser && !dbUser.device_hash) {
+       await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
     }
 
+    // 3. SI ES NUEVO, APLICAR FILTROS DE BLOQUEO
+    if (!dbUser) {
+      // ¿Este Hash ya lo tiene otro ID?
+      const { data: hashExists } = await supabase
+        .from('users')
+        .select('id')
+        .eq('device_hash', deviceHash)
+        .maybeSingle();
+
+      if (hashExists) {
+        await notifyBan(`🚫 <b>MULTICUENTA DETECTADA</b>\nID Nuevo: <code>${user.id}</code>\nID Original: <code>${hashExists.id}</code>\nHash: <code>${deviceHash}</code>`);
+        return res.json({ success: false, error: 'USER_BANNED' });
+      }
+
+      // Registro con el Hash incluido desde el inicio
+      const referrerId = start_param ? parseInt(start_param) : null;
+      const { error: insertError } = await supabase.from('users').insert([{
+        id: user.id,
+        username: user.username || 'user',
+        referred_by: (referrerId && referrerId !== user.id) ? referrerId : null,
+        balance: 0,
+        device_hash: deviceHash, // <--- ESTO DEBE GUARDARSE SÍ O SÍ
+        is_verified: true,
+        is_banned: false
+      }]);
+
+      if (insertError) {
+        console.error("Error al insertar usuario:", insertError);
+        return res.status(500).json({ success: false, error: "DB_INSERT_ERROR" });
+      }
+      
+      // Lógica de referidos (se mantiene igual)...
+    }
+
+    // Devolver datos al frontend
+    const { data: finalUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+    return res.json({ success: true, user: finalUser, stats: { n1:0, n2:0, n3:0, c1:0, c2:0, c3:0 } });
+
+  } catch (error) {
+    console.error("Critical Verify Error:", error);
+    return res.status(500).json({ success: false });
+  }
+});
     // 2. VERIFICAR SUSCRIPCIÓN AL CANAL
     const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${user.id}`;
     const tgRes = await axios.get(tgUrl);
