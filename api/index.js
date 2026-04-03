@@ -168,31 +168,20 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-/* --- [ENDPOINT WITHDRAW] --- */
+/* --- [ENDPOINT WITHDRAW ACTUALIZADO] --- */
 
 app.post('/api/withdraw', async (req, res) => {
     try {
         const { userId, address, captchaToken } = req.body;
         const MNEMONIC = process.env.ADMIN_MNEMONIC;
-        const cleanAddress = address?.trim();
+        const cleanAddress = address.trim();
 
-        // 1. Verificación de Variables Críticas
-        if (!MNEMONIC) {
-            console.error("ERROR: ADMIN_MNEMONIC no configurada en Vercel");
-            return res.status(500).json({ success: false, error: "Error interno del servidor (Config)." });
-        }
+        if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
 
-        // 2. Validación de Captcha
-        const isCaptchaValid = await verifyTurnstile(captchaToken);
-        if (!isCaptchaValid) return res.json({ success: false, error: "Captcha inválido o expirado." });
+        const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+        if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado." });
 
-        // 3. Verificación de Usuario
-        const { data: user, error: userErr } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-        if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) {
-            return res.json({ success: false, error: "Saldo insuficiente o cuenta bloqueada." });
-        }
-
-        // 4. Verificación de duplicados (Antifraude)
+        // Fraude de Wallet
         const { data: dup } = await supabase.from('withdrawals').select('user_id').eq('address', cleanAddress).neq('user_id', userId).limit(1).maybeSingle();
         if (dup) {
             await supabase.from('users').update({ is_banned: true }).in('id', [userId, dup.user_id]);
@@ -200,64 +189,50 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: false, error: "USER_BANNED" });
         }
 
-        // 5. Lógica de Blockchain (TON)
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
         const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
         
-        // Intentar obtener el seqno con tiempo límite
-        let seqno;
-        try {
-            seqno = await wallet.getSeqno();
-        } catch (e) {
-            return res.status(500).json({ success: false, error: "La red TON no responde. Intenta en 1 minuto." });
-        }
-        
         const transfer = wallet.createTransfer({
-            seqno: seqno,
+            seqno: await wallet.getSeqno(),
             secretKey: keyPair.secretKey,
             sendMode: 3,
-            messages: [internal({ 
-                to: cleanAddress, 
-                value: toNano(WITHDRAW_FIXED.toString()), 
-                bounce: false, 
-                body: "IA Profit Reward" 
-            })]
+            messages: [internal({ to: cleanAddress, value: toNano(WITHDRAW_FIXED.toString()), bounce: false, body: "IA Profit" })]
         });
 
         await wallet.send(transfer);
         const txHash = transfer.hash().toString('hex');
 
-        // 6. Actualización de Base de Datos
-        // IMPORTANTE: Asegúrate de tener la función 'decrement_balance' en Supabase
-        const { error: rpcErr } = await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
-        
-        if (rpcErr) {
-            console.error("Error RPC Supabase:", rpcErr);
-            // Si el RPC falla, intentamos actualización manual por si acaso
-            await supabase.from('users').update({ balance: user.balance - WITHDRAW_FIXED }).eq('id', userId);
-        }
+        await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
+        await supabase.from('withdrawals').insert([{ user_id: userId, amount: WITHDRAW_FIXED, status: 'completed', tx_hash: txHash, address: cleanAddress }]);
 
-        await supabase.from('withdrawals').insert([{ 
-            user_id: userId, 
-            amount: WITHDRAW_FIXED, 
-            status: 'completed', 
-            tx_hash: txHash, 
-            address: cleanAddress 
-        }]);
+        /* --- FORMATO DE MENSAJE TIPO FOTO --- */
+        const messageText = 
+            `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+            `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
+            `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
+            `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+            `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+            `🔹 <b>TXID:</b>\n<code>${txHash}</code>\n\n` +
+            `<a href="https://tonscan.org/tx/${txHash}">Ver en la Blockchain</a>\n\n` +
+            `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
 
-        // 7. Notificación
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
-            text: `💎 <b>PAGO ENVIADO</b>\nUser: <code>${user.username}</code>\nMonto: ${WITHDRAW_FIXED} TON\n<a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`,
-            parse_mode: 'HTML'
+            text: messageText,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/AiProfitTon_Bot` }]
+                ]
+            }
         });
 
         return res.json({ success: true, txHash });
-
     } catch (e) {
-        console.error("FALLO CRÍTICO EN RETIRO:", e.message);
-        return res.status(500).json({ success: false, error: "Error en el procesamiento. Intenta de nuevo." });
+        console.error("Error en retiro:", e.message);
+        return res.status(500).json({ success: false, error: e.message });
     }
 });
 
