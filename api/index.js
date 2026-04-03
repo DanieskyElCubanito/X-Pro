@@ -2,6 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 const cors = require('cors');
+const crypto = require('crypto');
 const { TonClient, WalletContractV5R1, toNano, internal } = require("@ton/ton");
 const { mnemonicToPrivateKey } = require("@ton/crypto");
 
@@ -9,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* --- CONFIGURACIÓN DE VARIABLES DE ENTORNO Y CONSTANTES --- */
+/* --- CONFIGURACIÓN DE VARIABLES DE ENTORNO --- */
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -17,8 +18,6 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const PAYMENTS_CHANNEL = "-1002352835078"; 
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5";
-
-// ACTUALIZACIÓN: Ahora lee la variable configurada en Vercel
 const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_SECRET;
 
 const REWARDS = { level1: 0.03, level2: 0.02, level3: 0.01 };
@@ -27,12 +26,10 @@ const COOLDOWN_MS = 60 * 60 * 1000;
 
 /* --- [FUNCIONES AUXILIARES DE SEGURIDAD] --- */
 
-// Función para verificar el token de Cloudflare Turnstile
+// 1. Verificación de Captcha (Cloudflare)
 async function verifyTurnstile(token) {
   try {
-    // Si la clave no está configurada, fallamos por seguridad
     if (!CLOUDFLARE_SECRET) return false;
-
     const response = await axios.post(
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
       `secret=${CLOUDFLARE_SECRET}&response=${token}`,
@@ -44,7 +41,7 @@ async function verifyTurnstile(token) {
   }
 }
 
-// Función para notificar baneos al administrador
+// 2. Notificación de baneos al administrador
 async function notifyBan(adminMsg) {
   try {
     await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -57,54 +54,79 @@ async function notifyBan(adminMsg) {
   }
 }
 
-/* --- [ENDPOINT DE VERIFICACIÓN E INGRESO] --- */
+/* --- [ENDPOINT DE VERIFICACIÓN E INGRESO (ANTI-GRANJAS)] --- */
 
 app.post('/api/verify', async (req, res) => {
   try {
     const { user, start_param } = req.body;
     if (!user || !user.id) return res.status(400).json({ success: false, error: 'No user data' });
 
-    // 1. Verificar si el usuario está baneado en la base de datos
+    // Extracción de datos de red para seguridad
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'] || "unknown";
+
+    // GENERAR HASH DE DISPOSITIVO (Para evitar multicuentas en el mismo móvil/PC)
+    const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
+
+    // 1. VERIFICAR BANEO PREVIO
     const { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
-    
     if (dbUser && dbUser.is_banned) {
       return res.json({ success: false, error: 'USER_BANNED' });
     }
 
-    // 2. Verificar suscripción al canal
+    // 2. VERIFICAR SUSCRIPCIÓN AL CANAL
     const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${user.id}`;
     const tgRes = await axios.get(tgUrl);
     const status = tgRes.data.result?.status;
     const isMember = ['member', 'administrator', 'creator'].includes(status);
-
     if (!isMember) return res.json({ success: false, error: 'NOT_MEMBER' });
 
-    // 3. Registro de nuevo usuario y lógica de referidos
+    // 3. REGISTRO NUEVO CON PROTECCIÓN INFALIBLE
     if (!dbUser) {
+      // FILTRO A: ¿Este dispositivo ya tiene una cuenta registrada?
+      const { data: hashDuplicado } = await supabase.from('users').select('id').eq('device_hash', deviceHash).maybeSingle();
+      if (hashDuplicado) {
+          await notifyBan(`🚫 <b>MULTICUENTA DETECTADA (HASH)</b>\nUsuario: <code>${user.id}</code> intentó usar el mismo dispositivo que la cuenta <code>${hashDuplicado.id}</code>.`);
+          return res.json({ success: false, error: 'USER_BANNED' });
+      }
+
+      // FILTRO B: Detección de Granjas de Bots (VPN / Proxy / Tor)
+      let isVpn = "no";
+      try {
+          const proxyRes = await axios.get(`https://proxycheck.io/v2/${userIp}?vpn=1&asn=1`);
+          if (proxyRes.data[userIp] && proxyRes.data[userIp].proxy === "yes") {
+              isVpn = "yes";
+          }
+      } catch (e) { 
+          console.error("Error en proxycheck, permitiendo paso por precaución."); 
+      }
+
+      if (isVpn === "yes") {
+          await notifyBan(`🛡️ <b>GRANJA/VPN DETECTADA</b>\nUsuario: <code>${user.id}</code> bloqueado al intentar registrarse usando IP enmascarada (${userIp}).`);
+          return res.json({ success: false, error: 'USER_BANNED' }); // Bloqueo directo sin registro
+      }
+
+      // Procesamiento de Referidos (Seguro)
       const referrerId = start_param ? parseInt(start_param) : null;
-      
-      // Seguridad: Un usuario no puede referirse a sí mismo
       const validReferrer = (referrerId && referrerId !== user.id) ? referrerId : null;
 
+      // Inserción en base de datos
       await supabase.from('users').insert([{
         id: user.id,
         username: user.username || 'user',
         referred_by: validReferrer,
         balance: 0,
+        device_hash: deviceHash,
         is_verified: true,
         is_banned: false
       }]);
 
+      // Reparto de Recompensas de 3 Niveles
       if (validReferrer) {
-        // Nivel 1
         await supabase.rpc('increment_balance', { user_id: validReferrer, amount: REWARDS.level1 });
-        
-        // Nivel 2
         const { data: p1 } = await supabase.from('users').select('referred_by').eq('id', validReferrer).maybeSingle();
         if (p1?.referred_by) {
           await supabase.rpc('increment_balance', { user_id: p1.referred_by, amount: REWARDS.level2 });
-          
-          // Nivel 3
           const { data: p2 } = await supabase.from('users').select('referred_by').eq('id', p1.referred_by).maybeSingle();
           if (p2?.referred_by) {
             await supabase.rpc('increment_balance', { user_id: p2.referred_by, amount: REWARDS.level3 });
@@ -113,7 +135,7 @@ app.post('/api/verify', async (req, res) => {
       }
     }
 
-    // 4. Cálculo de estadísticas de red de 3 niveles
+    // 4. CÁLCULO DE ESTADÍSTICAS DE RED
     const { data: lvl1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
     const idsL1 = lvl1 ? lvl1.map(u => u.id) : [];
 
@@ -145,55 +167,53 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-/* --- [ENDPOINT DE RETIRO CON ANTI-FRAUDE AVANZADO] --- */
+/* --- [ENDPOINT DE RETIRO (ANTI-MULTICUENTA WALLET)] --- */
 
 app.post('/api/withdraw', async (req, res) => {
   try {
     const { userId, address, captchaToken } = req.body;
     const MNEMONIC = process.env.ADMIN_MNEMONIC;
-    const cleanAddress = address.trim();
+    const cleanAddress = address.trim(); // Evita espacios invisibles
 
-    // 1. Validaciones de Seguridad Iniciales
+    // 1. Verificación Humana
     if (!captchaToken) return res.json({ success: false, error: "Verificación de seguridad requerida." });
-    
     const isHuman = await verifyTurnstile(captchaToken);
     if (!isHuman) return res.json({ success: false, error: "Fallo en la verificación de Cloudflare." });
 
+    // 2. Verificación de Usuario
     const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
     if (!user) return res.json({ success: false, error: "Usuario no encontrado." });
-    
     if (user.is_banned) return res.json({ success: false, error: "Esta cuenta está bloqueada por fraude." });
-
     if (user.balance < WITHDRAW_FIXED) {
         return res.json({ success: false, error: `Balance insuficiente. Mínimo ${WITHDRAW_FIXED} TON` });
     }
 
-    // 2. DETECCIÓN DE MULTICUENTA POR WALLET (CORREGIDO)
-    // Buscamos si esta wallet ya existe en CUALQUIER retiro previo de OTRO usuario
-    const { data: duplicateWallet } = await supabase
+    // 3. FILTRO C: BLOQUEO POR WALLET DUPLICADA (Infalible)
+    const { data: existingWalletUse } = await supabase
       .from('withdrawals')
-      .select('user_id, address')
+      .select('user_id')
       .eq('address', cleanAddress)
-      .neq('user_id', userId) 
+      .neq('user_id', userId) // Buscamos si la wallet pertenece a OTRO ID distinto
       .limit(1)
       .maybeSingle();
 
-    if (duplicateWallet) {
-      // Bloqueo total al detectar la coincidencia
+    if (existingWalletUse) {
+      // Castigo fulminante: Baneo a ambos
       await supabase.from('users').update({ is_banned: true }).eq('id', userId);
+      await supabase.from('users').update({ is_banned: true }).eq('id', existingWalletUse.user_id);
       
-      const banMsg = `🚫 <b>SISTEMA ANTI-FRAUDE ACTIVADO</b>\n\n` +
-                     `Se detectó intento de multicuenta (Wallet duplicada).\n` +
-                     `• <b>Infractor actual:</b> <code>${userId}</code>\n` +
-                     `• <b>Vinculado con:</b> <code>${duplicateWallet.user_id}</code>\n` +
-                     `• <b>Wallet detectada:</b> <code>${cleanAddress}</code>\n\n` +
-                     `<i>La cuenta ha sido baneada permanentemente.</i>`;
+      const banMsg = `🚫 <b>FRAUDE WALLET DETECTADO</b>\n` +
+                     `Intento de retiro a una billetera ya registrada.\n` +
+                     `• <b>Infractor Nuevo:</b> <code>${userId}</code>\n` +
+                     `• <b>Cuenta Original:</b> <code>${existingWalletUse.user_id}</code>\n` +
+                     `• <b>Wallet:</b> <code>${cleanAddress}</code>\n\n` +
+                     `<i>Ambas cuentas han sido bloqueadas.</i>`;
       await notifyBan(banMsg);
 
-      return res.json({ success: false, error: "Fraude detectado: Esta wallet ya pertenece a otro usuario registrado. Tu cuenta ha sido bloqueada." });
+      return res.json({ success: false, error: "Esta wallet ya está vinculada a otra cuenta. Tu cuenta ha sido bloqueada." });
     }
 
-    // 3. Verificación de Cooldown (Límite de tiempo)
+    // 4. Verificación de Límite de Tiempo (Cooldown)
     const { data: lastWithdraw } = await supabase
       .from('withdrawals')
       .select('created_at')
@@ -210,7 +230,7 @@ app.post('/api/withdraw', async (req, res) => {
       }
     }
 
-    // 4. Ejecución del Pago en la Blockchain TON
+    // 5. Ejecución del Pago en TON
     if (!MNEMONIC) throw new Error("ADMIN_MNEMONIC missing");
 
     const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
@@ -237,7 +257,7 @@ app.post('/api/withdraw', async (req, res) => {
     await contract.send(transfer);
     const txHash = transfer.hash().toString('hex');
 
-    // 5. Registro de Transacción y Descuento de Saldo
+    // 6. Registro de Historial y Descuento de Saldo
     await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
     await supabase.from('withdrawals').insert([{ 
       user_id: userId, 
@@ -247,7 +267,7 @@ app.post('/api/withdraw', async (req, res) => {
       address: cleanAddress 
     }]);
 
-    // 6. Notificación Profesional al Canal
+    // 7. Notificación al Canal
     const message = `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                     `👤 <b>Beneficiario:</b> <a href="tg://user?id=${user.id}">${user.username}</a>\n` +
                     `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
