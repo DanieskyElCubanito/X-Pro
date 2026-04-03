@@ -4,7 +4,7 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Versión: 3.1 - CAPTCHA REPARADO Y BOTONES INTELIGENTES
+ * Versión: 3.2 - DISEÑO CENTRADO Y ESTADÍSTICAS COMPLETAS
  */
 
 function App() {
@@ -60,7 +60,7 @@ function App() {
       .catch(err => {
         console.error(err);
         setStatus('error');
-        setErrorInfo('Servidor fuera de línea (Error 500).');
+        setErrorInfo('Servidor fuera de línea.');
       });
   };
 
@@ -86,30 +86,29 @@ function App() {
     }
   }, []);
 
-  /* --- FUNCIONES DE RETIRO ACTUALIZADAS --- */
+  /* --- FUNCIONES DE RETIRO --- */
 
   const handleStartWithdraw = () => {
     if ((userData?.balance || 0) < 0.1) {
       WebApp.showAlert('⚠️ Mínimo de retiro: 0.1 TON');
       return;
     }
-    setTurnstileToken(null); // Resetear token anterior
+    setTurnstileToken(null);
     setIsWithdrawing(true);
   };
 
-  // Efecto para renderizar el captcha cada vez que se abre el retiro
   useEffect(() => {
     if (isWithdrawing && window.turnstile) {
       const timeout = setTimeout(() => {
         if (turnstileRef.current) {
-          turnstileRef.current.innerHTML = ''; // Limpiar contenedor
+          turnstileRef.current.innerHTML = ''; 
           window.turnstile.render(turnstileRef.current, {
             sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
             callback: (token) => setTurnstileToken(token),
             'expired-callback': () => setTurnstileToken(null),
           });
         }
-      }, 300); // Esperar a que el modal abra
+      }, 300);
       return () => clearTimeout(timeout);
     }
   }, [isWithdrawing]);
@@ -120,7 +119,7 @@ function App() {
       return;
     }
     if (!turnstileToken) {
-      WebApp.showAlert('⚠️ Por favor, completa el captcha de seguridad.');
+      WebApp.showAlert('⚠️ Completa el captcha.');
       return;
     }
 
@@ -240,11 +239,10 @@ function App() {
                   <div style={s.badge}>Mínimo: 0.1 TON</div>
                 </>
               ) : (
-                <>
+                <div style={{width: '100%'}}>
                   <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
                   <input type="text" placeholder="Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
                   
-                  {/* CONTENEDOR DEL CAPTCHA */}
                   <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
                   
                   <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
@@ -261,7 +259,7 @@ function App() {
                       {isSubmitting ? '...' : 'CONFIRMAR'}
                     </button>
                   </div>
-                </>
+                </div>
               )}
            </div>
 
@@ -276,11 +274,29 @@ function App() {
            </div>
 
            <div style={{...s.card, marginTop:'20px'}}>
-              <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px'}}>TU RED</h4>
+              <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px', marginBottom:'15px'}}>TU RED DE TRABAJO</h4>
               <div style={s.statsGrid}>
-                <div style={s.statCol}><p style={s.statLabel}>D</p><p style={s.statValue}>{stats.n1}</p></div>
-                <div style={s.statCol}><p style={s.statLabel}>L2</p><p style={s.statValue}>{stats.n2}</p></div>
-                <div style={s.statCol}><p style={s.statLabel}>L3</p><p style={s.statValue}>{stats.n3}</p></div>
+                <div style={s.statCol}>
+                  <p style={s.statLabel}>DIRECTOS</p>
+                  <p style={s.statValue}>{stats.n1}</p>
+                  <p style={s.statCom}>+{stats.c1} TON</p>
+                </div>
+                <div style={s.statCol}>
+                  <p style={s.statLabel}>NIVEL 2</p>
+                  <p style={s.statValue}>{stats.n2}</p>
+                  <p style={s.statCom}>+{stats.c2} TON</p>
+                </div>
+                <div style={s.statCol}>
+                  <p style={s.statLabel}>NIVEL 3</p>
+                  <p style={s.statValue}>{stats.n3}</p>
+                  <p style={s.statCom}>+{stats.c3} TON</p>
+                </div>
+              </div>
+              <div style={s.totalRow}>
+                <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
+                <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>
+                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
+                </p>
               </div>
            </div>
         </div>
@@ -293,9 +309,9 @@ const s = {
   container: { backgroundColor:'#000', color:'#fff', minHeight:'100vh', padding:'20px', fontFamily:'Inter, sans-serif' },
   center: { height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center' },
   loader: { width:'40px', height:'40px', border:'3px solid #333', borderTop:'3px solid #0088cc', borderRadius:'50%' },
-  main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto' },
-  cardBalance: { background:'linear-gradient(135deg, #0088cc 0%, #005588 100%)', padding:'30px 20px', borderRadius:'24px', textAlign:'center', marginBottom:'20px' },
-  card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #1a1a1a' },
+  main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto', width:'100%' },
+  cardBalance: { background:'linear-gradient(135deg, #0088cc 0%, #005588 100%)', padding:'30px 20px', borderRadius:'24px', textAlign:'center', marginBottom:'20px', display:'flex', flexDirection:'column', alignItems:'center', width:'100%', boxSizing:'border-box' },
+  card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #1a1a1a', width:'100%', boxSizing:'border-box' },
   badge: { fontSize:'10px', backgroundColor:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'20px', marginTop:'10px', display:'inline-block' },
   iconCircle: { width:'60px', height:'60px', backgroundColor:'#1a1a1a', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto', fontSize:'24px' },
   btnBlue: { width:'100%', padding:'16px', backgroundColor:'#0088cc', border:'none', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
@@ -306,13 +322,14 @@ const s = {
   box: { fontSize:'10px', color:'#666', textAlign:'center' },
   statsGrid: { display:'flex', justifyContent:'space-between', marginTop:'10px' },
   statCol: { flex:1, textAlign:'center' },
-  statLabel: { fontSize:'10px', color:'#555' },
-  statValue: { fontSize:'18px', fontWeight:'bold', margin:'5px 0' },
-  totalRow: { marginTop:'20px', paddingTop:'15px', borderTop:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between' },
-  inputStyle: { width:'100%', padding:'15px', borderRadius:'12px', border:'none', textAlign:'center', backgroundColor:'#fff', color:'#000', fontWeight:'bold' },
+  statLabel: { fontSize:'10px', color:'#555', marginBottom:'5px' },
+  statValue: { fontSize:'18px', fontWeight:'bold', margin:'0' },
+  statCom: { fontSize:'11px', color:'#28a745', fontWeight:'bold', marginTop:'5px' },
+  totalRow: { marginTop:'20px', paddingTop:'15px', borderTop:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between', alignItems:'center' },
+  inputStyle: { width:'100%', padding:'15px', borderRadius:'12px', border:'none', textAlign:'center', backgroundColor:'#fff', color:'#000', fontWeight:'bold', boxSizing:'border-box' },
   btnCancel: { flex:1, padding:'14px', backgroundColor:'rgba(0,0,0,0.3)', color:'#fff', border:'none', borderRadius:'12px' },
   btnConfirm: { flex:1, padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'12px', fontWeight:'bold' },
-  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px' },
+  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px', zIndex:10 },
   modalOverlay: { position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.9)', zIndex:100, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px' },
   historyCard: { backgroundColor:'#0a0a0a', border:'2px solid #ff4444', borderRadius:'20px', width:'100%', maxWidth:'380px', maxHeight:'80vh', display:'flex', flexDirection:'column' },
   modalHeader: { padding:'20px', borderBottom:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between' },
