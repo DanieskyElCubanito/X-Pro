@@ -213,7 +213,7 @@ app.post('/api/withdraw', async (req, res) => {
     `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
     `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
     `🔹 <b>TXID:</b>\n` +
-    `<a href="https://tonscan.org/tx/${txHash}"><code>${txHash}</code></a>\n\n` +
+    `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
     `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
       
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
