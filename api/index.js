@@ -203,8 +203,16 @@ app.post('/api/withdraw', async (req, res) => {
         const txHash = transfer.hash().toString('hex');
 
         await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
-        await supabase.from('withdrawals').insert([{ user_id: userId, amount: WITHDRAW_FIXED, status: 'completed', tx_hash: txHash, address: cleanAddress }]);
-
+        // Forzamos el ID a número y el estado a SUCCESS
+await supabase.from('withdrawals').insert([
+    { 
+        user_id: Number(userId), 
+        amount: WITHDRAW_FIXED, 
+        status: 'SUCCESS', 
+        tx_hash: txHash || 'no_hash', 
+        address: cleanAddress 
+    }
+]);
         // FORMATO DE MENSAJE TIPO FOTO (SOLO UNO)
         const messageText = 
     `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
