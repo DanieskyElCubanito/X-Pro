@@ -4,7 +4,7 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Versión: 3.0 - CON FILTROS DE SEGURIDAD
+ * Versión: 3.1 - CAPTCHA REPARADO Y BOTONES INTELIGENTES
  */
 
 function App() {
@@ -25,7 +25,7 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  /* --- LÓGICA DE INICIO Y SEGURIDAD SILENCIOSA --- */
+  /* --- LÓGICA DE INICIO --- */
   
   const verifyUser = (user, startParam) => {
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -43,26 +43,24 @@ function App() {
           setStats(res.data.stats);
           setStatus('member');
         } else {
-          // Aquí capturamos los errores específicos y mostramos el mensaje del servidor
           if (res.data.error === 'USER_BANNED') {
             setStatus('error');
             setErrorInfo(res.data.message || 'Cuenta suspendida.');
           } else if (res.data.error === 'PROXY_DETECTED') {
             setStatus('error');
-            setErrorInfo(res.data.message); // Mostrará: "Desactiva tu VPN para entrar"
+            setErrorInfo(res.data.message);
           } else if (res.data.error === 'NOT_MEMBER') {
             setStatus('guest');
           } else {
             setStatus('error');
-            setErrorInfo('Error inesperado. Contacta al soporte.');
+            setErrorInfo('Error inesperado.');
           }
         }
       })
       .catch(err => {
         console.error(err);
         setStatus('error');
-        // Si el backend da Error 500, saldrá este mensaje:
-        setErrorInfo('El servidor no responde (Error 500). Reintenta pronto.');
+        setErrorInfo('Servidor fuera de línea (Error 500).');
       });
   };
 
@@ -88,70 +86,33 @@ function App() {
     }
   }, []);
 
-  /* --- FUNCIONES RESTAURADAS Y COMPLETAS --- */
+  /* --- FUNCIONES DE RETIRO ACTUALIZADAS --- */
 
   const handleStartWithdraw = () => {
     if ((userData?.balance || 0) < 0.1) {
       WebApp.showAlert('⚠️ Mínimo de retiro: 0.1 TON');
       return;
     }
+    setTurnstileToken(null); // Resetear token anterior
     setIsWithdrawing(true);
-    setTurnstileToken(null);
   };
 
+  // Efecto para renderizar el captcha cada vez que se abre el retiro
   useEffect(() => {
     if (isWithdrawing && window.turnstile) {
-      const renderCaptcha = () => {
+      const timeout = setTimeout(() => {
         if (turnstileRef.current) {
-          // LIMPIEZA: Evita que el captcha falle si ya se intentó cargar antes
-          turnstileRef.current.innerHTML = ''; 
-          try {
-            window.turnstile.render(turnstileRef.current, {
-              sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
-              callback: (token) => {
-                console.log("Captcha obtenido");
-                setTurnstileToken(token);
-              },
-              'expired-callback': () => setTurnstileToken(null),
-              'error-callback': () => setTurnstileToken(null),
-            });
-          } catch (e) {
-            console.error("Error al renderizar Turnstile:", e);
-          }
+          turnstileRef.current.innerHTML = ''; // Limpiar contenedor
+          window.turnstile.render(turnstileRef.current, {
+            sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
+            callback: (token) => setTurnstileToken(token),
+            'expired-callback': () => setTurnstileToken(null),
+          });
         }
-      };
-      // Damos 300ms para que el modal termine su animación de apertura
-      setTimeout(renderCaptcha, 300);
+      }, 300); // Esperar a que el modal abra
+      return () => clearTimeout(timeout);
     }
   }, [isWithdrawing]);
-
-  const handleCheckSubscription = () => {
-    const user = WebApp.initDataUnsafe?.user;
-    const startParam = WebApp.initDataUnsafe?.start_param;
-    setStatus('loading');
-    verifyUser(user, startParam);
-  };
-
-  const loadHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const res = await axios.get(`/api/history?userId=${userData.id}`);
-      setHistory(res.data.history || []);
-      setShowHistory(true);
-      WebApp.HapticFeedback.impactOccurred('light');
-    } catch (e) {
-      WebApp.showAlert('Error al sincronizar historial.');
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const handleShare = () => {
-    const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
-    const text = `💰 ¡Gana TON con IA Profit! Referidos de 3 niveles activados. 🚀`;
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
-    WebApp.HapticFeedback.impactOccurred('medium');
-  };
 
   const executeWithdraw = async () => {
     if (!walletAddr || walletAddr.trim().length < 20) {
@@ -159,7 +120,7 @@ function App() {
       return;
     }
     if (!turnstileToken) {
-      WebApp.showAlert('⚠️ Completa el captcha.');
+      WebApp.showAlert('⚠️ Por favor, completa el captcha de seguridad.');
       return;
     }
 
@@ -186,10 +147,36 @@ function App() {
     }
   };
 
+  /* --- OTRAS FUNCIONES --- */
+
+  const handleCheckSubscription = () => {
+    const user = WebApp.initDataUnsafe?.user;
+    const startParam = WebApp.initDataUnsafe?.start_param;
+    setStatus('loading');
+    verifyUser(user, startParam);
+  };
+
+  const loadHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await axios.get(`/api/history?userId=${userData.id}`);
+      setHistory(res.data.history || []);
+      setShowHistory(true);
+      WebApp.HapticFeedback.impactOccurred('light');
+    } catch (e) { WebApp.showAlert('Error historial.'); }
+    finally { setLoadingHistory(false); }
+  };
+
+  const handleShare = () => {
+    const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
+    const text = `💰 ¡Gana TON con IA Profit! 🚀`;
+    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
+  };
+
   /* --- RENDERIZADO --- */
 
   if (status === 'loading') return (
-    <div style={s.center}><div style={s.loader}></div><p style={{marginTop:'20px'}}>Sincronizando...</p></div>
+    <div style={s.center}><div style={s.loader}></div><p style={{marginTop:'20px'}}>Cargando...</p></div>
   );
 
   if (status === 'error') return (
@@ -221,11 +208,9 @@ function App() {
                   <div key={i} style={s.historyItem}>
                     <div style={{textAlign:'left'}}>
                       <div style={{fontSize:'12px', color:'#fff'}}>{new Date(h.created_at).toLocaleDateString()}</div>
-                      <div style={{fontSize:'10px', color:'#777'}}>{new Date(h.created_at).toLocaleTimeString()}</div>
                     </div>
                     <div style={{textAlign:'right'}}>
                       <div style={{color:'#ff4444', fontWeight:'bold'}}>-{h.amount} TON</div>
-                      <div style={{fontSize:'9px', color:'#28a745'}}>COMPLETADO</div>
                     </div>
                   </div>
                 ))
@@ -240,8 +225,7 @@ function App() {
           <div style={s.card}>
             <div style={s.iconCircle}>🔔</div>
             <h2>Canal Requerido</h2>
-            <p style={{color:'#aaa', marginBottom:'25px'}}>Únete al canal para activar el sistema.</p>
-            <button style={s.btnBlue} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>1. UNIRME AL CANAL</button>
+            <button style={s.btnBlue} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>1. UNIRME</button>
             <button style={{...s.btnOutline, marginTop:'12px'}} onClick={handleCheckSubscription}>2. VERIFICAR</button>
           </div>
         </div>
@@ -253,19 +237,24 @@ function App() {
                   <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
                   <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
                   <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
-                  <div style={s.badge}>Pago mínimo: 0.1 TON</div>
+                  <div style={s.badge}>Mínimo: 0.1 TON</div>
                 </>
               ) : (
                 <>
                   <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
                   <input type="text" placeholder="Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
                   
-                  <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center'}}></div>
+                  {/* CONTENEDOR DEL CAPTCHA */}
+                  <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
                   
                   <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
                     <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
                     <button 
-                      style={{...s.btnConfirm, opacity: (turnstileToken && !isSubmitting) ? 1 : 0.5}} 
+                      style={{
+                        ...s.btnConfirm, 
+                        opacity: isSubmitting ? 0.5 : 1,
+                        backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff' 
+                      }} 
                       onClick={executeWithdraw}
                       disabled={isSubmitting}
                     >
@@ -279,25 +268,19 @@ function App() {
            <div style={s.card}>
               <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
               <div style={s.row}>
-                <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.03 TON</b></div>
-                <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.02 TON</b></div>
-                <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.01 TON</b></div>
+                <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.03</b></div>
+                <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.02</b></div>
+                <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.01</b></div>
               </div>
               <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
            </div>
 
            <div style={{...s.card, marginTop:'20px'}}>
-              <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px'}}>TU RED DE TRABAJO</h4>
+              <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px'}}>TU RED</h4>
               <div style={s.statsGrid}>
-                <div style={s.statCol}><p style={s.statLabel}>DIRECTOS</p><p style={s.statValue}>{stats.n1}</p><p style={s.statCom}>+{stats.c1}</p></div>
-                <div style={s.statCol}><p style={s.statLabel}>NIVEL 2</p><p style={s.statValue}>{stats.n2}</p><p style={s.statCom}>+{stats.c2}</p></div>
-                <div style={s.statCol}><p style={s.statLabel}>NIVEL 3</p><p style={s.statValue}>{stats.n3}</p><p style={s.statCom}>+{stats.c3}</p></div>
-              </div>
-              <div style={s.totalRow}>
-                <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
-                <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>
-                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
-                </p>
+                <div style={s.statCol}><p style={s.statLabel}>D</p><p style={s.statValue}>{stats.n1}</p></div>
+                <div style={s.statCol}><p style={s.statLabel}>L2</p><p style={s.statValue}>{stats.n2}</p></div>
+                <div style={s.statCol}><p style={s.statLabel}>L3</p><p style={s.statValue}>{stats.n3}</p></div>
               </div>
            </div>
         </div>
@@ -325,7 +308,6 @@ const s = {
   statCol: { flex:1, textAlign:'center' },
   statLabel: { fontSize:'10px', color:'#555' },
   statValue: { fontSize:'18px', fontWeight:'bold', margin:'5px 0' },
-  statCom: { fontSize:'12px', color:'#28a745', fontWeight:'bold' },
   totalRow: { marginTop:'20px', paddingTop:'15px', borderTop:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between' },
   inputStyle: { width:'100%', padding:'15px', borderRadius:'12px', border:'none', textAlign:'center', backgroundColor:'#fff', color:'#000', fontWeight:'bold' },
   btnCancel: { flex:1, padding:'14px', backgroundColor:'rgba(0,0,0,0.3)', color:'#fff', border:'none', borderRadius:'12px' },
