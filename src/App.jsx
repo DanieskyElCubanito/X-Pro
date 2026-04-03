@@ -28,7 +28,6 @@ function App() {
   /* --- LÓGICA DE INICIO Y SEGURIDAD SILENCIOSA --- */
   
   const verifyUser = (user, startParam) => {
-    // Captura de datos del sistema para el filtro antifraude (Como en tu script original)
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const userLang = navigator.language || navigator.userLanguage;
 
@@ -44,18 +43,26 @@ function App() {
           setStats(res.data.stats);
           setStatus('member');
         } else {
-          if(res.data.error === 'USER_BANNED') {
-             setStatus('error');
-             setErrorInfo('Cuenta suspendida por fraude, multicuenta o región no permitida.');
+          // Aquí capturamos los errores específicos y mostramos el mensaje del servidor
+          if (res.data.error === 'USER_BANNED') {
+            setStatus('error');
+            setErrorInfo(res.data.message || 'Cuenta suspendida.');
+          } else if (res.data.error === 'PROXY_DETECTED') {
+            setStatus('error');
+            setErrorInfo(res.data.message); // Mostrará: "Desactiva tu VPN para entrar"
+          } else if (res.data.error === 'NOT_MEMBER') {
+            setStatus('guest');
           } else {
-             setStatus('guest');
+            setStatus('error');
+            setErrorInfo('Error inesperado. Contacta al soporte.');
           }
         }
       })
       .catch(err => {
         console.error(err);
         setStatus('error');
-        setErrorInfo('Error de conexión. Reintenta en unos minutos.');
+        // Si el backend da Error 500, saldrá este mensaje:
+        setErrorInfo('El servidor no responde (Error 500). Reintenta pronto.');
       });
   };
 
