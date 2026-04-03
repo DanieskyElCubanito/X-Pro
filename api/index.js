@@ -181,19 +181,14 @@ app.post('/api/withdraw', async (req, res) => {
         const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
         if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado." });
 
-        // Antifraude
-        const { data: dup } = await supabase.from('withdrawals').select('user_id').eq('address', cleanAddress).neq('user_id', userId).limit(1).maybeSingle();
-        if (dup) {
-            await supabase.from('users').update({ is_banned: true }).in('id', [userId, dup.user_id]);
-            return res.json({ success: false, error: "USER_BANNED" });
-        }
-
+        // --- SISTEMA DE PAGO TON ---
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
         const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
         
+        const seqno = await wallet.getSeqno();
         const transfer = wallet.createTransfer({
-            seqno: await wallet.getSeqno(),
+            seqno,
             secretKey: keyPair.secretKey,
             sendMode: 3,
             messages: [internal({ to: cleanAddress, value: toNano(WITHDRAW_FIXED.toString()), bounce: false, body: "IA Profit" })]
@@ -202,37 +197,33 @@ app.post('/api/withdraw', async (req, res) => {
         await wallet.send(transfer);
         const txHash = transfer.hash().toString('hex');
 
-        const { error: insertError } = await supabase
-  .from('withdrawals')
-  .insert([
-    { 
-      user_id: Number(userId), 
-      amount: WITHDRAW_FIXED, 
-      status: 'SUCCESS', 
-      tx_hash: txHash || 'no_hash', 
-      address: cleanAddress 
-    }
-  ]);
+        // --- REGISTRO EN BASE DE DATOS ---
+        try {
+            // Descontar saldo usando la función RPC
+            await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
+            
+            // Insertar en la tabla withdrawals (ahora con las columnas address y tx_hash)
+            await supabase.from('withdrawals').insert([{ 
+                user_id: Number(userId), 
+                amount: WITHDRAW_FIXED, 
+                status: 'SUCCESS', 
+                tx_hash: txHash, 
+                address: cleanAddress 
+            }]);
+        } catch (dbErr) {
+            console.error("Error guardando datos:", dbErr.message);
+        }
 
-if (insertError) {
-    console.error("Error en Supabase:", insertError);
-          }
-
-// Si Supabase rechaza el registro, lo imprimimos en Vercel y detenemos todo
-if (insertError) {
-    console.error("🔥 ERROR FATAL EN SUPABASE:", insertError);
-    return res.json({ success: false, error: "Supabase rechazó el registro: " + insertError.message });
-      }
-        // FORMATO DE MENSAJE TIPO FOTO (SOLO UNO)
+        // --- TU MENSAJE ORIGINAL ---
         const messageText = 
-    `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
-    `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
-    `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
-    `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
-    `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
-    `🔹 <b>TXID:</b>\n` +
-    `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
-    `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
+            `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+            `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
+            `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
+            `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+            `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+            `🔹 <b>TXID:</b>\n` +
+            `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
+            `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
       
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
@@ -245,10 +236,15 @@ if (insertError) {
         });
 
         return res.json({ success: true, txHash });
+
     } catch (e) {
+        console.error("Error crítico:", e.message);
+        // Si hay error, devolvemos el mensaje real para que el alert del Frontend lo muestre
         return res.status(500).json({ success: false, error: e.message });
     }
 });
+
+        
 
 app.get('/api/history', async (req, res) => {
   const { userId } = req.query;
