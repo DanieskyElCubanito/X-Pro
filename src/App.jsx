@@ -267,7 +267,7 @@ function App() {
                     <button 
                       style={{...s.btnConfirm, opacity: (turnstileToken && !isSubmitting) ? 1 : 0.5}} 
                       onClick={executeWithdraw}
-                      disabled={!turnstileToken || isSubmitting}
+                      disabled={isSubmitting}
                     >
                       {isSubmitting ? '...' : 'CONFIRMAR'}
                     </button>
