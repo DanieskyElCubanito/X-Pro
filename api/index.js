@@ -56,67 +56,71 @@ async function notifyBan(adminMsg) {
 
 /* --- [ENDPOINT DE VERIFICACIÓN E INGRESO (ANTI-GRANJAS)] --- */
 
+// ... (resto del código igual arriba)
+
 app.post('/api/verify', async (req, res) => {
   try {
     const { user, start_param } = req.body;
     if (!user || !user.id) return res.status(400).json({ success: false });
 
-    // Captura de IP y Agente (Prioridad Vercel)
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || "127.0.0.1";
-    const userAgent = req.headers['user-agent'] || "unknown_device";
-
-    // GENERAR HASH (MD5 es infalible para esto)
+    const userAgent = req.headers['user-agent'] || "unknown";
     const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
-    
-    console.log(`DEBUG: Usuario ${user.id} - IP: ${userIp} - Hash: ${deviceHash}`);
 
-    // 1. BUSCAR USUARIO
-    const { data: dbUser, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
+    // 1. BUSCAR O CREAR USUARIO (Aseguramos el Hash desde el segundo 1)
+    let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
 
     if (dbUser?.is_banned) return res.json({ success: false, error: 'USER_BANNED' });
 
-    // 2. SI EL USUARIO YA EXISTE PERO NO TIENE HASH (Actualizarlo)
-    if (dbUser && !dbUser.device_hash) {
-       await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
+    // 2. VERIFICACIÓN DE CANAL (Con bloqueador de errores para que no de Error 500)
+    let isMember = false;
+    try {
+        const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${user.id}`;
+        const tgRes = await axios.get(tgUrl);
+        const status = tgRes.data.result?.status;
+        isMember = ['member', 'administrator', 'creator'].includes(status);
+    } catch (e) {
+        console.error("Error en Telegram API:", e.message);
+        // Si hay error en la API de Telegram, por seguridad pedimos que se unan
+        isMember = false; 
     }
 
-    // 3. SI ES NUEVO, APLICAR FILTROS DE BLOQUEO
-    if (!dbUser) {
-      // ¿Este Hash ya lo tiene otro ID?
-      const { data: hashExists } = await supabase
-        .from('users')
-        .select('id')
-        .eq('device_hash', deviceHash)
-        .maybeSingle();
+    if (!isMember) return res.json({ success: false, error: 'NOT_MEMBER' });
 
+    // 3. PROTECCIÓN MULTICUENTA (Si es nuevo)
+    if (!dbUser) {
+      const { data: hashExists } = await supabase.from('users').select('id').eq('device_hash', deviceHash).maybeSingle();
+      
       if (hashExists) {
-        await notifyBan(`🚫 <b>MULTICUENTA DETECTADA</b>\nID Nuevo: <code>${user.id}</code>\nID Original: <code>${hashExists.id}</code>\nHash: <code>${deviceHash}</code>`);
+        await notifyBan(`🚫 <b>MULTICUENTA DETECTADA</b>\nID: <code>${user.id}</code> intentó entrar con el mismo dispositivo que <code>${hashExists.id}</code>`);
         return res.json({ success: false, error: 'USER_BANNED' });
       }
 
-      // Registro con el Hash incluido desde el inicio
       const referrerId = start_param ? parseInt(start_param) : null;
-      const { error: insertError } = await supabase.from('users').insert([{
+      const { data: newUser, error: insError } = await supabase.from('users').insert([{
         id: user.id,
         username: user.username || 'user',
         referred_by: (referrerId && referrerId !== user.id) ? referrerId : null,
         balance: 0,
-        device_hash: deviceHash, // <--- ESTO DEBE GUARDARSE SÍ O SÍ
+        device_hash: deviceHash,
         is_verified: true,
         is_banned: false
-      }]);
+      }]).select().single();
 
-      if (insertError) {
-        console.error("Error al insertar usuario:", insertError);
-        return res.status(500).json({ success: false, error: "DB_INSERT_ERROR" });
-      }
-      
-      // Lógica de referidos (se mantiene igual)...
+      if (insError) throw insError;
+      dbUser = newUser;
+    } else if (!dbUser.device_hash) {
+      // Si ya existía pero no tenía hash, se lo ponemos ahora
+      await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
     }
+
+    return res.json({ success: true, user: dbUser });
+
+  } catch (error) {
+    console.error("Error crítico:", error.message);
+    return res.status(500).json({ success: false, msg: "Revisa variables de entorno" });
+  }
+});
 
     // Devolver datos al frontend
     const { data: finalUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
