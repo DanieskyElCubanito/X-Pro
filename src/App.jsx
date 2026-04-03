@@ -4,7 +4,7 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Versión: 3.2 - DISEÑO CENTRADO Y ESTADÍSTICAS COMPLETAS
+ * Versión: 3.2 - CORREGIDA
  */
 
 function App() {
@@ -141,11 +141,11 @@ function App() {
         setIsSubmitting(false);
       }
     } catch (e) {
-      // Esto te dirá qué código de error da el servidor (ej: 500, 404, etc)
       const errorMsg = e.response?.data?.error || e.message;
       WebApp.showAlert('❌ DETALLE DEL ERROR: ' + errorMsg);
       setIsSubmitting(false);
     }
+  }; // <--- AQUÍ ESTABA EL ERROR: ESTA LLAVE FALTABA
 
   /* --- OTRAS FUNCIONES --- */
 
