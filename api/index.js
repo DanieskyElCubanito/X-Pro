@@ -207,15 +207,15 @@ app.post('/api/withdraw', async (req, res) => {
 
         // FORMATO DE MENSAJE TIPO FOTO (SOLO UNO)
         const messageText = 
-            `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
-            `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
-            `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
-            `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
-            `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
-            `🔹 <b>TXID:</b>\n<code>${txHash}</code>\n\n` +
-            `<a href="https://tonscan.org/tx/${txHash}">Ver en la Blockchain</a>\n\n` +
-            `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
-
+    `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+    `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
+    `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
+    `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+    `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+    `🔹 <b>TXID:</b>\n` +
+    `<a href="https://tonscan.org/tx/${txHash}"><code>${txHash}</code></a>\n\n` +
+    `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
+      
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
             text: messageText,
