@@ -59,18 +59,23 @@ app.post('/api/verify', async (req, res) => {
     const userAgent = req.headers['user-agent'] || "unknown";
     const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
 
-    // 1. Verificar Baneo en DB
+    // 1. Verificar Baneo en DB (Corte total)
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
     if (dbUser?.is_banned) {
-      return res.json({ success: false, error: 'USER_BANNED' });
+      return res.json({ success: false, error: 'USER_BANNED', message: "Tu cuenta ha sido bloqueada permanentemente." });
     }
 
-    // 2. Filtro VPN (Solo aviso al Admin, permite reintentar)
+    // 2. Filtro VPN (Aviso al Admin y al Usuario)
     try {
         const pCheck = await axios.get(`https://proxycheck.io/v2/${userIp}?vpn=1`);
         if (pCheck.data[userIp]?.proxy === "yes") {
             await notifyAdmin(`🛡️ <b>AVISO VPN</b>\nUsuario: <code>${user.id}</code> intentó entrar con VPN.\nIP: <code>${userIp}</code>`);
-            return res.json({ success: false, error: 'PROXY_DETECTED' });
+            // Enviamos el error específico para que el Frontend muestre el aviso de desactivar VPN
+            return res.json({ 
+                success: false, 
+                error: 'PROXY_DETECTED', 
+                message: "Por favor, desactiva tu Proxy o VPN para continuar." 
+            });
         }
     } catch (e) { console.log("ProxyCheck Skip"); }
 
