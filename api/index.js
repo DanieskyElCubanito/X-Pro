@@ -85,7 +85,7 @@ app.post('/api/verify', async (req, res) => {
 
     if (!isMember) return res.json({ success: false, error: 'NOT_MEMBER' });
 
-    // 5. REGISTRO O ACTUALIZACIÓN (Aquí estaba el fallo)
+    // 5. REGISTRO O ACTUALIZACIÓN
     if (!dbUser) {
       // ¿Existe ya este dispositivo?
       const { data: hashExists } = await supabase.from('users').select('id').eq('device_hash', deviceHash).maybeSingle();
@@ -185,14 +185,13 @@ app.post('/api/withdraw', async (req, res) => {
         if (userErr || !user) return res.json({ success: false, error: "Usuario no encontrado" });
         if (user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado o saldo insuficiente" });
 
-        // 3. Proceso de Pago TON (Envuelto en su propio try para que no mate el servidor)
+        // 3. Proceso de Pago TON
         let txHash;
         try {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
             const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
             const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
             
-            // Intentamos obtener el seqno. Si falla, es probable que la billetera esté vacía o no activada.
             const seqno = await wallet.getSeqno().catch(() => 0);
             
             const transfer = wallet.createTransfer({
@@ -209,7 +208,7 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: false, error: "Error en la red TON: " + tonError.message });
         }
 
-        // 4. Registro en DB (Si el pago se envió, intentamos guardar)
+        // 4. Registro en DB
         if (txHash) {
             try {
                 await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
@@ -224,7 +223,7 @@ app.post('/api/withdraw', async (req, res) => {
                 console.error("Pago enviado pero error en DB:", dbErr.message);
             }
 
-            // 5. Tu mensaje original de Telegram
+            // 5. Notificación Telegram
             const messageText = 
                 `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                 `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
@@ -249,18 +248,19 @@ app.post('/api/withdraw', async (req, res) => {
         }
 
     } catch (e) {
-        // Esto captura cualquier error inesperado y evita el Error 500 "mudo"
         console.error("CATCH FINAL:", e.message);
         return res.json({ success: false, error: "Error interno: " + e.message });
     }
 });
 
-        
-
 app.get('/api/history', async (req, res) => {
-  const { userId } = req.query;
-  const { data: history } = await supabase.from('withdrawals').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-  res.json({ success: true, history: history || [] });
+  try {
+    const { userId } = req.query;
+    const { data: history } = await supabase.from('withdrawals').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    res.json({ success: true, history: history || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 module.exports = app;
