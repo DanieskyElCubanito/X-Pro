@@ -174,14 +174,25 @@ app.post('/api/withdraw', async (req, res) => {
     try {
         const { userId, address, captchaToken } = req.body;
         const MNEMONIC = process.env.ADMIN_MNEMONIC;
-        const cleanAddress = address.trim();
+        const cleanAddress = address?.trim();
 
-        if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
+        // 1. Verificación de Variables Críticas
+        if (!MNEMONIC) {
+            console.error("ERROR: ADMIN_MNEMONIC no configurada en Vercel");
+            return res.status(500).json({ success: false, error: "Error interno del servidor (Config)." });
+        }
 
-        const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-        if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado." });
+        // 2. Validación de Captcha
+        const isCaptchaValid = await verifyTurnstile(captchaToken);
+        if (!isCaptchaValid) return res.json({ success: false, error: "Captcha inválido o expirado." });
 
-        // Fraude de Wallet
+        // 3. Verificación de Usuario
+        const { data: user, error: userErr } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+        if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) {
+            return res.json({ success: false, error: "Saldo insuficiente o cuenta bloqueada." });
+        }
+
+        // 4. Verificación de duplicados (Antifraude)
         const { data: dup } = await supabase.from('withdrawals').select('user_id').eq('address', cleanAddress).neq('user_id', userId).limit(1).maybeSingle();
         if (dup) {
             await supabase.from('users').update({ is_banned: true }).in('id', [userId, dup.user_id]);
@@ -189,32 +200,64 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: false, error: "USER_BANNED" });
         }
 
+        // 5. Lógica de Blockchain (TON)
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
         const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
         
+        // Intentar obtener el seqno con tiempo límite
+        let seqno;
+        try {
+            seqno = await wallet.getSeqno();
+        } catch (e) {
+            return res.status(500).json({ success: false, error: "La red TON no responde. Intenta en 1 minuto." });
+        }
+        
         const transfer = wallet.createTransfer({
-            seqno: await wallet.getSeqno(),
+            seqno: seqno,
             secretKey: keyPair.secretKey,
             sendMode: 3,
-            messages: [internal({ to: cleanAddress, value: toNano(WITHDRAW_FIXED.toString()), bounce: false, body: "IA Profit" })]
+            messages: [internal({ 
+                to: cleanAddress, 
+                value: toNano(WITHDRAW_FIXED.toString()), 
+                bounce: false, 
+                body: "IA Profit Reward" 
+            })]
         });
 
         await wallet.send(transfer);
         const txHash = transfer.hash().toString('hex');
 
-        await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
-        await supabase.from('withdrawals').insert([{ user_id: userId, amount: WITHDRAW_FIXED, status: 'completed', tx_hash: txHash, address: cleanAddress }]);
+        // 6. Actualización de Base de Datos
+        // IMPORTANTE: Asegúrate de tener la función 'decrement_balance' en Supabase
+        const { error: rpcErr } = await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
+        
+        if (rpcErr) {
+            console.error("Error RPC Supabase:", rpcErr);
+            // Si el RPC falla, intentamos actualización manual por si acaso
+            await supabase.from('users').update({ balance: user.balance - WITHDRAW_FIXED }).eq('id', userId);
+        }
 
+        await supabase.from('withdrawals').insert([{ 
+            user_id: userId, 
+            amount: WITHDRAW_FIXED, 
+            status: 'completed', 
+            tx_hash: txHash, 
+            address: cleanAddress 
+        }]);
+
+        // 7. Notificación
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
-            text: `💎 <b>PAGO ENVIADO</b>\nBeneficiario: ${user.username}\n${WITHDRAW_FIXED} TON\n<a href="https://tonscan.org/tx/${txHash}">Ver TX</a>`,
+            text: `💎 <b>PAGO ENVIADO</b>\nUser: <code>${user.username}</code>\nMonto: ${WITHDRAW_FIXED} TON\n<a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`,
             parse_mode: 'HTML'
         });
 
         return res.json({ success: true, txHash });
+
     } catch (e) {
-        return res.status(500).json({ success: false, error: e.message });
+        console.error("FALLO CRÍTICO EN RETIRO:", e.message);
+        return res.status(500).json({ success: false, error: "Error en el procesamiento. Intenta de nuevo." });
     }
 });
 
