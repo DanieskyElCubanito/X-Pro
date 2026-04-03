@@ -202,17 +202,21 @@ app.post('/api/withdraw', async (req, res) => {
         await wallet.send(transfer);
         const txHash = transfer.hash().toString('hex');
 
-        await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
-        // Forzamos el ID a número y el estado a SUCCESS
-const { data, error: insertError } = await supabase.from('withdrawals').insert([
+        const { error: insertError } = await supabase
+  .from('withdrawals')
+  .insert([
     { 
-        user_id: Number(userId), 
-        amount: WITHDRAW_FIXED, 
-        status: 'SUCCESS', 
-        tx_hash: txHash || 'no_hash', 
-        address: cleanAddress 
+      user_id: Number(userId), 
+      amount: WITHDRAW_FIXED, 
+      status: 'SUCCESS', 
+      tx_hash: txHash || 'no_hash', 
+      address: cleanAddress 
     }
-]);
+  ]);
+
+if (insertError) {
+    console.error("Error en Supabase:", insertError);
+          }
 
 // Si Supabase rechaza el registro, lo imprimimos en Vercel y detenemos todo
 if (insertError) {
