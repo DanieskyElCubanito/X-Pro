@@ -103,14 +103,25 @@ function App() {
     if (isWithdrawing && window.turnstile) {
       const renderCaptcha = () => {
         if (turnstileRef.current) {
-          window.turnstile.render(turnstileRef.current, {
-            sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
-            callback: (token) => setTurnstileToken(token),
-            'expired-callback': () => setTurnstileToken(null),
-          });
+          // LIMPIEZA: Evita que el captcha falle si ya se intentó cargar antes
+          turnstileRef.current.innerHTML = ''; 
+          try {
+            window.turnstile.render(turnstileRef.current, {
+              sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
+              callback: (token) => {
+                console.log("Captcha obtenido");
+                setTurnstileToken(token);
+              },
+              'expired-callback': () => setTurnstileToken(null),
+              'error-callback': () => setTurnstileToken(null),
+            });
+          } catch (e) {
+            console.error("Error al renderizar Turnstile:", e);
+          }
         }
       };
-      setTimeout(renderCaptcha, 200);
+      // Damos 300ms para que el modal termine su animación de apertura
+      setTimeout(renderCaptcha, 300);
     }
   }, [isWithdrawing]);
 
