@@ -174,18 +174,17 @@ app.post('/api/withdraw', async (req, res) => {
     try {
         const { userId, address, captchaToken } = req.body;
         const MNEMONIC = process.env.ADMIN_MNEMONIC;
-        const cleanAddress = address.trim();
+        const cleanAddress = address?.trim();
 
         if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
 
         const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
         if (!user || user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado." });
 
-        // Fraude de Wallet
+        // Antifraude
         const { data: dup } = await supabase.from('withdrawals').select('user_id').eq('address', cleanAddress).neq('user_id', userId).limit(1).maybeSingle();
         if (dup) {
             await supabase.from('users').update({ is_banned: true }).in('id', [userId, dup.user_id]);
-            await notifyAdmin(`🚫 <b>FRAUDE WALLET</b>\nID: <code>${userId}</code> usó wallet de <code>${dup.user_id}</code>`);
             return res.json({ success: false, error: "USER_BANNED" });
         }
 
@@ -206,7 +205,7 @@ app.post('/api/withdraw', async (req, res) => {
         await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
         await supabase.from('withdrawals').insert([{ user_id: userId, amount: WITHDRAW_FIXED, status: 'completed', tx_hash: txHash, address: cleanAddress }]);
 
-        /* --- FORMATO DE MENSAJE TIPO FOTO --- */
+        // FORMATO DE MENSAJE TIPO FOTO (SOLO UNO)
         const messageText = 
             `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
             `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
@@ -223,15 +222,12 @@ app.post('/api/withdraw', async (req, res) => {
             parse_mode: 'HTML',
             disable_web_page_preview: true,
             reply_markup: {
-                inline_keyboard: [
-                    [{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/AiProfitTon_Bot` }]
-                ]
+                inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/IAProfitTonBot` }]]
             }
         });
 
         return res.json({ success: true, txHash });
     } catch (e) {
-        console.error("Error en retiro:", e.message);
         return res.status(500).json({ success: false, error: e.message });
     }
 });
