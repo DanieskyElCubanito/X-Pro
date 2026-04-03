@@ -204,7 +204,7 @@ app.post('/api/withdraw', async (req, res) => {
 
         await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
         // Forzamos el ID a número y el estado a SUCCESS
-await supabase.from('withdrawals').insert([
+const { data, error: insertError } = await supabase.from('withdrawals').insert([
     { 
         user_id: Number(userId), 
         amount: WITHDRAW_FIXED, 
@@ -213,6 +213,12 @@ await supabase.from('withdrawals').insert([
         address: cleanAddress 
     }
 ]);
+
+// Si Supabase rechaza el registro, lo imprimimos en Vercel y detenemos todo
+if (insertError) {
+    console.error("🔥 ERROR FATAL EN SUPABASE:", insertError);
+    return res.json({ success: false, error: "Supabase rechazó el registro: " + insertError.message });
+      }
         // FORMATO DE MENSAJE TIPO FOTO (SOLO UNO)
         const messageText = 
     `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
