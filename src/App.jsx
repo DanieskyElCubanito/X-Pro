@@ -293,7 +293,7 @@ function App() {
               {!isWithdrawing ? (
                 <>
                   <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
-                  <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
+                  <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(5) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
                   <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
                   <div style={s.badge}>Min: 0.01 TON | Límite: 0.2 TON/Día</div>
                 </>
