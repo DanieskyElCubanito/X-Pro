@@ -4,28 +4,33 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Versión: 3.2 - CORREGIDA
+ * Dev: @DannyElCallejero | Versión: 3.3 - SEGURIDAD MEJORADA
  */
 
 function App() {
-  /* --- ESTADOS --- */
+  /* --- [ ESTADOS Y REFERENCIAS ] --- */
   const [status, setStatus] = useState('loading');
   const [userData, setUserData] = useState(null);
   const [errorInfo, setErrorInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stats, setStats] = useState({ 
     n1: 0, n2: 0, n3: 0, 
-    c1: "0.00", c2: "0.00", c3: "0.00" 
+    c1: "0.000", c2: "0.000", c3: "0.000" 
   });
+  
+  // Estados para Retiro
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [walletAddr, setWalletAddr] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  
+  // Estados de Seguridad (Captcha) y Utilidades
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  /* --- LÓGICA DE INICIO --- */
+  /* --- [ LÓGICA DE INICIO Y SESIÓN ] --- */
   
   const verifyUser = (user, startParam) => {
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -86,13 +91,14 @@ function App() {
     }
   }, []);
 
-  /* --- FUNCIONES DE RETIRO --- */
+  /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
 
   const handleStartWithdraw = () => {
-    if ((userData?.balance || 0) < 0.1) {
-      WebApp.showAlert('⚠️ Mínimo de retiro: 0.1 TON');
+    if ((userData?.balance || 0) < 0.01) {
+      WebApp.showAlert('⚠️ Mínimo de retiro: 0.01 TON');
       return;
     }
+    setWithdrawAmount(''); // Reseteamos el campo al abrir
     setTurnstileToken(null);
     setIsWithdrawing(true);
   };
@@ -114,12 +120,22 @@ function App() {
   }, [isWithdrawing]);
 
   const executeWithdraw = async () => {
-    if (!walletAddr || walletAddr.trim().length < 20) {
+    const amountFloat = parseFloat(withdrawAmount);
+
+    if (!walletAddr || walletAddr.trim().length < 40) { // Mayor validación de longitud para TON
       WebApp.showAlert('⚠️ Dirección TON inválida.');
       return;
     }
+    if (isNaN(amountFloat) || amountFloat < 0.01) {
+      WebApp.showAlert('⚠️ Ingresa una cantidad válida (Mín: 0.01 TON).');
+      return;
+    }
+    if (amountFloat > userData.balance) {
+      WebApp.showAlert('⚠️ No tienes saldo suficiente.');
+      return;
+    }
     if (!turnstileToken) {
-      WebApp.showAlert('⚠️ Completa el captcha.');
+      WebApp.showAlert('⚠️ Completa el captcha de seguridad.');
       return;
     }
 
@@ -128,6 +144,7 @@ function App() {
       const res = await axios.post('/api/withdraw', { 
         userId: userData.id, 
         address: walletAddr.trim(),
+        amount: amountFloat,
         captchaToken: turnstileToken
       });
 
@@ -145,9 +162,9 @@ function App() {
       WebApp.showAlert('❌ DETALLE DEL ERROR: ' + errorMsg);
       setIsSubmitting(false);
     }
-  }; // <--- AQUÍ ESTABA EL ERROR: ESTA LLAVE FALTABA
+  }; 
 
-  /* --- OTRAS FUNCIONES --- */
+  /* --- [ UTILIDADES SECUNDARIAS ] --- */
 
   const handleCheckSubscription = () => {
     const user = WebApp.initDataUnsafe?.user;
@@ -163,7 +180,7 @@ function App() {
       setHistory(res.data.history || []);
       setShowHistory(true);
       WebApp.HapticFeedback.impactOccurred('light');
-    } catch (e) { WebApp.showAlert('Error historial.'); }
+    } catch (e) { WebApp.showAlert('Error obteniendo historial.'); }
     finally { setLoadingHistory(false); }
   };
 
@@ -173,7 +190,7 @@ function App() {
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
   };
 
-  /* --- RENDERIZADO --- */
+  /* --- [ RENDERIZADO VISUAL ] --- */
 
   if (status === 'loading') return (
     <div style={s.center}><div style={s.loader}></div><p style={{marginTop:'20px'}}>Cargando...</p></div>
@@ -237,12 +254,14 @@ function App() {
                   <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
                   <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
                   <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
-                  <div style={s.badge}>Mínimo: 0.1 TON</div>
+                  <div style={s.badge}>Min: 0.01 TON | Límite: 0.2 TON/Día</div>
                 </>
               ) : (
                 <div style={{width: '100%'}}>
                   <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
-                  <input type="text" placeholder="Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
+                  
+                  <input type="number" placeholder="Monto a retirar (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
+                  <input type="text" placeholder="Tu Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
                   
                   <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
                   
@@ -267,9 +286,9 @@ function App() {
            <div style={s.card}>
               <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
               <div style={s.row}>
-                <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.03</b></div>
-                <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.02</b></div>
-                <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.01</b></div>
+                <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.003</b></div>
+                <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.002</b></div>
+                <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.001</b></div>
               </div>
               <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
            </div>
