@@ -24,6 +24,7 @@ const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_SECRET;
 const REWARDS = { level1: 0.003, level2: 0.002, level3: 0.001 };
 const MIN_WITHDRAW = 0.01; 
 const MAX_DAILY_WITHDRAW = 0.2;
+const AD_REWARD_AMOUNT = 0.0005; // 📺 Recompensa por anuncio
 
 /* --- [ FUNCIONES AUXILIARES DE SEGURIDAD ] --- */
 
@@ -169,7 +170,7 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-/* --- [ LÓGICA DE PAGOS Y RETIROS (SISTEMA ANTI-FANTASMA) ] --- */
+/* --- [ LÓGICA DE PAGOS Y RETIROS ] --- */
 
 app.post('/api/withdraw', async (req, res) => {
     try {
@@ -178,19 +179,16 @@ app.post('/api/withdraw', async (req, res) => {
         const cleanAddress = address?.trim();
         const withdrawAmount = parseFloat(amount);
 
-        // 1. Validaciones estructurales
         if (!userId || !cleanAddress || isNaN(withdrawAmount)) return res.json({ success: false, error: "Datos incompletos." });
         if (!isValidTonAddress(cleanAddress)) return res.json({ success: false, error: "Dirección TON inválida." });
         if (withdrawAmount < MIN_WITHDRAW) return res.json({ success: false, error: `Mínimo: ${MIN_WITHDRAW} TON.` });
         if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
 
-        // 2. Verificar usuario y saldo
         const { data: user } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
         if (!user || user.is_banned || user.balance < withdrawAmount) {
             return res.json({ success: false, error: "Saldo insuficiente o usuario baneado." });
         }
 
-        // 3. Verificación de Límite Diario
         const startOfDay = new Date();
         startOfDay.setUTCHours(0, 0, 0, 0);
         const { data: todayWithdrawals } = await supabase.from('withdrawals').select('amount')
@@ -201,14 +199,12 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: false, error: `Límite diario: ${MAX_DAILY_WITHDRAW} TON.` });
         }
 
-        // 4. Ejecución en Blockchain Protegida
         let txHash = null;
         try {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
             const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
             const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
             
-            // Verificación de Fondos en Wallet Admin
             const balanceAdmin = await wallet.getBalance(); 
             const withdrawInNano = toNano(withdrawAmount.toString());
             if (balanceAdmin < (withdrawInNano + toNano("0.02"))) {
@@ -224,7 +220,6 @@ app.post('/api/withdraw', async (req, res) => {
             });
             await wallet.send(transfer);
 
-            // ESPERA DE CONFIRMACIÓN REAL (SEQNO)
             let currentSeqno = initialSeqno;
             let attempts = 0;
             while (currentSeqno === initialSeqno && attempts < 15) { 
@@ -237,7 +232,6 @@ app.post('/api/withdraw', async (req, res) => {
                 throw new Error("La red TON no confirmó la salida de fondos.");
             }
 
-            // OBTENER HASH REAL GARANTIZADO
             const transactions = await client.getTransactions(wallet.address, { limit: 1 });
             txHash = transactions[0]?.hash().toString('hex');
 
@@ -245,14 +239,12 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: false, error: "Error Blockchain: " + tonError.message });
         }
 
-        // 5. Asentamiento en Base de Datos (Solo si el pago salió)
         if (txHash) {
             await supabase.rpc('decrement_balance', { user_id: userId, amount: withdrawAmount });
             await supabase.from('withdrawals').insert([{ 
                 user_id: Number(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: cleanAddress 
             }]);
 
-            // 6. Notificación al Canal
             const messageText = 
                 `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                 `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
@@ -278,6 +270,54 @@ app.post('/api/withdraw', async (req, res) => {
 
     } catch (e) {
         return res.json({ success: false, error: "Error crítico: " + e.message });
+    }
+});
+
+/* --- [ LÓGICA DE RECOMPENSA POR ANUNCIOS CON LÍMITE DE 1 HORA ] --- */
+
+app.post('/api/ad-reward', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ success: false });
+
+        // 1. Verificar si el usuario existe y no está baneado
+        const { data: user } = await supabase.from('users').select('is_banned').eq('id', userId).maybeSingle();
+        if (!user || user.is_banned) {
+            return res.json({ success: false, error: "BANNED", message: "Usuario no autorizado." });
+        }
+
+        // 2. Verificar el límite de tiempo (1 hora = 60 min * 60 seg * 1000 ms)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { data: recentAds } = await supabase
+            .from('ad_logs')
+            .select('id')
+            .eq('user_id', userId)
+            .gte('created_at', oneHourAgo);
+
+        if (recentAds && recentAds.length > 0) {
+            return res.json({ 
+                success: false, 
+                error: "COOLDOWN", 
+                message: "⏳ Ya reclamaste una recompensa recientemente. Vuelve en 1 hora." 
+            });
+        }
+
+        // 3. Incrementar el saldo
+        const { error } = await supabase.rpc('increment_balance', { 
+            user_id: userId, 
+            amount: AD_REWARD_AMOUNT 
+        });
+
+        if (error) throw error;
+
+        // 4. Registrar la vista del anuncio para activar el cooldown
+        await supabase.from('ad_logs').insert([{ user_id: userId, amount: AD_REWARD_AMOUNT }]);
+
+        return res.json({ success: true, reward: AD_REWARD_AMOUNT });
+
+    } catch (e) {
+        console.error("Error Ad Reward:", e.message);
+        return res.status(500).json({ success: false, message: "Error conectando con la base de datos." });
     }
 });
 
