@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* --- CONFIGURACIÓN --- */
+/* --- [ CONFIGURACIÓN Y CONSTANTES ] --- */
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID; 
@@ -20,10 +20,12 @@ const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5";
 const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_SECRET;
 
-const REWARDS = { level1: 0.03, level2: 0.02, level3: 0.01 };
-const WITHDRAW_FIXED = 0.1; 
+// Nuevas reglas financieras
+const REWARDS = { level1: 0.003, level2: 0.002, level3: 0.001 };
+const MIN_WITHDRAW = 0.01; 
+const MAX_DAILY_WITHDRAW = 0.2;
 
-/* --- FUNCIONES AUXILIARES --- */
+/* --- [ FUNCIONES AUXILIARES DE SEGURIDAD ] --- */
 
 async function notifyAdmin(adminMsg) {
   try {
@@ -47,26 +49,28 @@ async function verifyTurnstile(token) {
   } catch (e) { return false; }
 }
 
-/* --- [ENDPOINT VERIFY: FLUJO DE REGISTRO CORREGIDO] --- */
+function isValidTonAddress(address) {
+  // Validación básica de formato TON (Bounceable o Non-bounceable)
+  return typeof address === 'string' && (address.startsWith('U') || address.startsWith('E')) && address.length === 48;
+}
+
+/* --- [ LÓGICA DE REGISTRO E IDENTIFICACIÓN ] --- */
 
 app.post('/api/verify', async (req, res) => {
   try {
     const { user, start_param } = req.body;
     if (!user || !user.id) return res.status(400).json({ success: false });
 
-    // 1. Identificación Técnica
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || "127.0.0.1";
     const userAgent = req.headers['user-agent'] || "unknown";
     const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
 
-    // 2. Verificar Baneo Previo
     let { data: dbUser, error: fetchError } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
     
     if (dbUser?.is_banned) {
       return res.json({ success: false, error: 'USER_BANNED', message: "Acceso denegado permanentemente." });
     }
 
-    // 3. Filtro VPN (Informativo para el usuario, no banea)
     try {
         const pCheck = await axios.get(`https://proxycheck.io/v2/${userIp}?vpn=1`);
         if (pCheck.data[userIp]?.proxy === "yes") {
@@ -75,7 +79,6 @@ app.post('/api/verify', async (req, res) => {
         }
     } catch (e) { console.log("ProxyCheck Skip"); }
 
-    // 4. Verificación de Telegram
     let isMember = false;
     try {
         const tgRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${user.id}`);
@@ -85,19 +88,15 @@ app.post('/api/verify', async (req, res) => {
 
     if (!isMember) return res.json({ success: false, error: 'NOT_MEMBER' });
 
-    // 5. REGISTRO O ACTUALIZACIÓN
     if (!dbUser) {
-      // ¿Existe ya este dispositivo?
       const { data: hashExists } = await supabase.from('users').select('id').eq('device_hash', deviceHash).maybeSingle();
       
       if (hashExists) {
-        // Bloqueo por multicuenta
         await supabase.from('users').insert([{ id: user.id, username: user.username, is_banned: true, device_hash: deviceHash }]);
         await notifyAdmin(`🚫 <b>MULTICUENTA DETECTADA</b>\nID: <code>${user.id}</code> intentó usar dispositivo de <code>${hashExists.id}</code>`);
         return res.json({ success: false, error: 'USER_BANNED' });
       }
 
-      // Registro de Nuevo Usuario
       const referrerId = start_param ? parseInt(start_param) : null;
       const { data: newUser, error: insErr } = await supabase.from('users').insert([{
         id: user.id,
@@ -109,13 +108,9 @@ app.post('/api/verify', async (req, res) => {
         is_banned: false
       }]).select().single();
 
-      if (insErr) {
-          console.error("Error Supabase Insert:", insErr);
-          throw insErr;
-      }
+      if (insErr) throw insErr;
       dbUser = newUser;
 
-      // Pago de Referidos (3 Niveles)
       const validRef = (referrerId && referrerId !== user.id) ? referrerId : null;
       if (validRef) {
           await supabase.rpc('increment_balance', { user_id: validRef, amount: REWARDS.level1 });
@@ -129,14 +124,12 @@ app.post('/api/verify', async (req, res) => {
           }
       }
     } else {
-        // Si ya existe pero no tiene hash de dispositivo, lo actualizamos
         if (!dbUser.device_hash) {
             await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
             dbUser.device_hash = deviceHash;
         }
     }
 
-    // 6. Obtener Estadísticas para el Front
     const { data: l1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
     const idsL1 = l1 ? l1.map(u => u.id) : [];
     let n2 = 0, n3 = 0;
@@ -156,9 +149,9 @@ app.post('/api/verify', async (req, res) => {
       user: dbUser,
       stats: {
         n1: idsL1.length, n2, n3,
-        c1: (idsL1.length * REWARDS.level1).toFixed(2),
-        c2: (n2 * REWARDS.level2).toFixed(2),
-        c3: (n3 * REWARDS.level3).toFixed(2)
+        c1: (idsL1.length * REWARDS.level1).toFixed(3),
+        c2: (n2 * REWARDS.level2).toFixed(3),
+        c3: (n3 * REWARDS.level3).toFixed(3)
       }
     });
 
@@ -168,24 +161,45 @@ app.post('/api/verify', async (req, res) => {
   }
 });
 
-/* --- [ENDPOINT WITHDRAW ACTUALIZADO] --- */
+/* --- [ LÓGICA DE PAGOS Y RETIROS ] --- */
 
 app.post('/api/withdraw', async (req, res) => {
     try {
-        const { userId, address, captchaToken } = req.body;
+        const { userId, address, captchaToken, amount } = req.body;
         const MNEMONIC = process.env.ADMIN_MNEMONIC;
         const cleanAddress = address?.trim();
+        const withdrawAmount = parseFloat(amount);
 
-        // 1. Validaciones iniciales
-        if (!userId || !cleanAddress) return res.json({ success: false, error: "Datos incompletos" });
+        // 1. Validaciones estructurales
+        if (!userId || !cleanAddress || isNaN(withdrawAmount)) return res.json({ success: false, error: "Datos incompletos o inválidos." });
+        if (!isValidTonAddress(cleanAddress)) return res.json({ success: false, error: "La dirección de la billetera TON no es válida." });
+        if (withdrawAmount < MIN_WITHDRAW) return res.json({ success: false, error: `El retiro mínimo es ${MIN_WITHDRAW} TON.` });
         if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
 
-        // 2. Verificar usuario en Supabase
+        // 2. Verificar usuario y saldo base
         const { data: user, error: userErr } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
         if (userErr || !user) return res.json({ success: false, error: "Usuario no encontrado" });
-        if (user.is_banned || user.balance < WITHDRAW_FIXED) return res.json({ success: false, error: "No autorizado o saldo insuficiente" });
+        if (user.is_banned) return res.json({ success: false, error: "Usuario no autorizado." });
+        if (user.balance < withdrawAmount) return res.json({ success: false, error: "Saldo insuficiente." });
 
-        // 3. Proceso de Pago TON
+        // 3. Verificación de Límite Diario (Seguridad P2P)
+        const startOfDay = new Date();
+        startOfDay.setUTCHours(0, 0, 0, 0);
+
+        const { data: todayWithdrawals } = await supabase
+            .from('withdrawals')
+            .select('amount')
+            .eq('user_id', userId)
+            .gte('created_at', startOfDay.toISOString());
+
+        const dailyTotal = todayWithdrawals ? todayWithdrawals.reduce((sum, tx) => sum + tx.amount, 0) : 0;
+        
+        if ((dailyTotal + withdrawAmount) > MAX_DAILY_WITHDRAW) {
+            const availableToday = Math.max(0, MAX_DAILY_WITHDRAW - dailyTotal).toFixed(3);
+            return res.json({ success: false, error: `Límite de ${MAX_DAILY_WITHDRAW} TON diario excedido. Disponible hoy: ${availableToday} TON.` });
+        }
+
+        // 4. Ejecución en Blockchain
         let txHash;
         try {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
@@ -198,23 +212,23 @@ app.post('/api/withdraw', async (req, res) => {
                 seqno,
                 secretKey: keyPair.secretKey,
                 sendMode: 3,
-                messages: [internal({ to: cleanAddress, value: toNano(WITHDRAW_FIXED.toString()), bounce: false, body: "IA Profit" })]
+                messages: [internal({ to: cleanAddress, value: toNano(withdrawAmount.toString()), bounce: false, body: "IA Profit" })]
             });
 
             await wallet.send(transfer);
             txHash = transfer.hash().toString('hex');
         } catch (tonError) {
             console.error("Error en red TON:", tonError.message);
-            return res.json({ success: false, error: "Error en la red TON: " + tonError.message });
+            return res.json({ success: false, error: "Error en la red TON: Intenta más tarde." });
         }
 
-        // 4. Registro en DB
+        // 5. Asentamiento en Base de Datos
         if (txHash) {
             try {
-                await supabase.rpc('decrement_balance', { user_id: userId, amount: WITHDRAW_FIXED });
+                await supabase.rpc('decrement_balance', { user_id: userId, amount: withdrawAmount });
                 await supabase.from('withdrawals').insert([{ 
                     user_id: Number(userId), 
-                    amount: WITHDRAW_FIXED, 
+                    amount: withdrawAmount, 
                     status: 'SUCCESS', 
                     tx_hash: txHash, 
                     address: cleanAddress 
@@ -223,11 +237,11 @@ app.post('/api/withdraw', async (req, res) => {
                 console.error("Pago enviado pero error en DB:", dbErr.message);
             }
 
-            // 5. Notificación Telegram
+            // 6. Notificación al Canal
             const messageText = 
                 `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                 `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
-                `💸 <b>Monto Total:</b> ${WITHDRAW_FIXED} TON\n` +
+                `💸 <b>Monto Total:</b> ${withdrawAmount} TON\n` +
                 `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
                 `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
                 `🔹 <b>TXID:</b>\n` +
@@ -252,6 +266,8 @@ app.post('/api/withdraw', async (req, res) => {
         return res.json({ success: false, error: "Error interno: " + e.message });
     }
 });
+
+/* --- [ ENDPOINT DE HISTORIAL ] --- */
 
 app.get('/api/history', async (req, res) => {
   try {
