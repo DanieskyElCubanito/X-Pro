@@ -199,55 +199,66 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: false, error: `Límite de ${MAX_DAILY_WITHDRAW} TON diario excedido. Disponible hoy: ${availableToday} TON.` });
         }
 
-        // 4. Ejecución en Blockchain
-        let txHash;
+        // 4. Ejecución en Blockchain a prueba de fallos
+        let txHash = null;
         try {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
             const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
             const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
             
-            // Verificar saldo antes de proceder
+            // Verificar saldo antes de proceder (dejamos un margen de 0.02 para comisiones de red)
             const balanceAdmin = await wallet.getBalance(); 
             const withdrawInNano = toNano(withdrawAmount.toString());
             if (balanceAdmin < (withdrawInNano + toNano("0.02"))) {
-                return res.json({ success: false, error: "Liquidez temporal insuficiente." });
+                return res.json({ success: false, error: "El sistema no tiene fondos suficientes ahora mismo. Intenta más tarde." });
             }
 
-            const seqno = await wallet.getSeqno();
+            // Obtenemos el seqno actual antes de enviar
+            const initialSeqno = await wallet.getSeqno();
+            
             const transfer = wallet.createTransfer({
-                seqno,
+                seqno: initialSeqno,
                 secretKey: keyPair.secretKey,
                 sendMode: 3,
                 messages: [internal({ to: cleanAddress, value: withdrawInNano, bounce: false, body: "IA Profit" })]
             });
 
+            // Enviamos la orden a la red
             await wallet.send(transfer);
 
-            // --- NUEVO: ESPERAR Y BUSCAR EL TXID REAL ---
+            // --- NUEVO: ESPERAMOS LA CONFIRMACIÓN REAL MEDIANTE SEQNO ---
+            let currentSeqno = initialSeqno;
             let attempts = 0;
-            while (attempts < 10) { // Reintenta por ~20 segundos
-                await new Promise(res => setTimeout(res, 2000)); // Espera 2 seg entre intentos
-                const transactions = await client.getTransactions(wallet.address, { limit: 1 });
-                
-                if (transactions.length > 0) {
-                    const lastTx = transactions[0];
-                    // Si el mensaje de salida coincide con nuestro envío, tenemos el Hash real
-                    txHash = lastTx.hash().toString('hex'); 
-                    break;
-                }
+            
+            // Reintentamos por ~30 segundos para ver si la red lo procesa
+            while (currentSeqno === initialSeqno && attempts < 15) { 
+                await new Promise(res => setTimeout(res, 2000)); 
+                currentSeqno = await wallet.getSeqno();
                 attempts++;
             }
 
-            // Si falló la búsqueda pero se envió, usamos el hash del mensaje como fallback (hex)
-            if (!txHash) txHash = transfer.hash().toString('hex');
+            // Si el seqno no cambió, la transacción nunca se hizo. Lanzamos error y abortamos.
+            if (currentSeqno === initialSeqno) {
+                throw new Error("La transacción no fue confirmada por la red (Timeout).");
+            }
+
+            // SI LLEGAMOS AQUÍ: ES 100% SEGURO QUE EL PAGO ESTÁ EN LA BLOCKCHAIN
+            // Ahora obtenemos el Hash real garantizado de la última transacción
+            const transactions = await client.getTransactions(wallet.address, { limit: 1 });
+            
+            if (transactions.length > 0) {
+                txHash = transactions[0].hash().toString('hex');
+            } else {
+                throw new Error("Pago exitoso pero no se pudo recuperar el Hash. Contacte soporte.");
+            }
 
         } catch (tonError) {
             console.error("Error TON:", tonError.message);
-            return res.json({ success: false, error: "Error en red TON." });
+            // Si algo falla aquí, retornamos error. NUNCA pasará a la base de datos ni a Telegram.
+            return res.json({ success: false, error: tonError.message || "Error procesando en la red TON." });
         }
 
-        // ... (Paso 5 igual) ...
-        // 5. Asentamiento en Base de Datos
+        // 5. Asentamiento en Base de Datos (SOLO SI HAY UN HASH REAL)
         if (txHash) {
             try {
                 await supabase.rpc('decrement_balance', { user_id: userId, amount: withdrawAmount });
@@ -262,7 +273,7 @@ app.post('/api/withdraw', async (req, res) => {
                 console.error("Pago enviado pero error en DB:", dbErr.message);
             }
 
-            // 6. Notificación al Canal
+            // 6. Notificación al Canal (Garantizado que es un Hash válido)
             const messageText = 
                 `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                 `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
@@ -286,6 +297,11 @@ app.post('/api/withdraw', async (req, res) => {
             return res.json({ success: true, txHash });
         }
 
+    } catch (e) {
+        console.error("CATCH FINAL:", e.message);
+        return res.json({ success: false, error: "Error interno: " + e.message });
+    }
+});
     } catch (e) {
         console.error("CATCH FINAL:", e.message);
         return res.json({ success: false, error: "Error interno: " + e.message });
