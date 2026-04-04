@@ -4,7 +4,7 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Dev: @DannyElCallejero | Versión: 3.3 - SEGURIDAD MEJORADA
+ * Dev: @DannyElCallejero | Versión: 3.4 - INTEGRACIÓN ADS
  */
 
 function App() {
@@ -18,17 +18,18 @@ function App() {
     c1: "0.000", c2: "0.000", c3: "0.000" 
   });
   
-  // Estados para Retiro
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [walletAddr, setWalletAddr] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   
-  // Estados de Seguridad (Captcha) y Utilidades
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Estado para los anuncios
+  const [isAdLoading, setIsAdLoading] = useState(false);
 
   /* --- [ LÓGICA DE INICIO Y SESIÓN ] --- */
   
@@ -91,6 +92,46 @@ function App() {
     }
   }, []);
 
+  /* --- [ LÓGICA DE ANUNCIOS GIGAPUB ] --- */
+
+  const handleWatchAd = () => {
+    if (isAdLoading) return;
+    
+    setIsAdLoading(true);
+    
+    if (typeof window.showGiga !== 'function') {
+      WebApp.showAlert('⚠️ El sistema de anuncios se está cargando o hay un bloqueador activo.');
+      setIsAdLoading(false);
+      return;
+    }
+
+    window.showGiga()
+      .then(async () => {
+        try {
+          const res = await axios.post('/api/ad-reward', { userId: userData.id });
+          
+          if (res.data.success) {
+            WebApp.HapticFeedback.notificationOccurred('success');
+            WebApp.showAlert(`¡Felicidades! Has ganado ${res.data.reward} TON.`);
+            setUserData(prev => ({ ...prev, balance: prev.balance + res.data.reward }));
+          } else if (res.data.error === 'COOLDOWN') {
+            WebApp.HapticFeedback.notificationOccurred('warning');
+            WebApp.showAlert(res.data.message);
+          } else {
+            WebApp.showAlert('❌ Error: ' + (res.data.message || 'Recompensa no procesada.'));
+          }
+        } catch (e) {
+          WebApp.showAlert('❌ Error al conectar con el servidor.');
+        } finally {
+          setIsAdLoading(false);
+        }
+      })
+      .catch(e => {
+        console.log("Anuncio cerrado o cancelado antes de tiempo", e);
+        setIsAdLoading(false);
+      });
+  };
+
   /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
 
   const handleStartWithdraw = () => {
@@ -98,7 +139,7 @@ function App() {
       WebApp.showAlert('⚠️ Mínimo de retiro: 0.01 TON');
       return;
     }
-    setWithdrawAmount(''); // Reseteamos el campo al abrir
+    setWithdrawAmount(''); 
     setTurnstileToken(null);
     setIsWithdrawing(true);
   };
@@ -122,7 +163,7 @@ function App() {
   const executeWithdraw = async () => {
     const amountFloat = parseFloat(withdrawAmount);
 
-    if (!walletAddr || walletAddr.trim().length < 40) { // Mayor validación de longitud para TON
+    if (!walletAddr || walletAddr.trim().length < 40) { 
       WebApp.showAlert('⚠️ Dirección TON inválida.');
       return;
     }
@@ -281,6 +322,25 @@ function App() {
                   </div>
                 </div>
               )}
+           </div>
+
+           {/* SECCIÓN DE GANANCIAS POR ANUNCIOS */}
+           <div style={{...s.card, marginBottom:'20px', border:'1px solid #28a745'}}>
+              <h4 style={{marginTop:0, color:'#28a745'}}>📺 ANUNCIOS RECOMPENSADOS</h4>
+              <p style={{fontSize:'12px', color:'#aaa', marginBottom:'15px'}}>
+                Mira un video corto para ganar <b>0.0005 TON</b>.<br/> Disponible 1 vez por hora.
+              </p>
+              <button 
+                style={{
+                  ...s.btnGreen, 
+                  backgroundColor: isAdLoading ? '#1a3a1a' : '#28a745',
+                  opacity: isAdLoading ? 0.7 : 1 
+                }} 
+                onClick={handleWatchAd}
+                disabled={isAdLoading}
+              >
+                {isAdLoading ? 'CARGANDO VIDEO...' : '🎥 VER VIDEO Y GANAR'}
+              </button>
            </div>
 
            <div style={s.card}>
