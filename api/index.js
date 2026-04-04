@@ -24,7 +24,7 @@ const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_SECRET;
 const REWARDS = { level1: 0.003, level2: 0.002, level3: 0.001 };
 const MIN_WITHDRAW = 0.01; 
 const MAX_DAILY_WITHDRAW = 0.2;
-const AD_REWARD_AMOUNT = 0.0005; // 📺 Recompensa por anuncio
+const AD_REWARD_AMOUNT = 0.0001; // 📺 Recompensa por anuncio
 
 /* --- [ FUNCIONES AUXILIARES DE SEGURIDAD ] --- */
 
