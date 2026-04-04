@@ -230,7 +230,7 @@ app.post('/api/withdraw', async (req, res) => {
             });
 
             await wallet.send(transfer);
-            txHash = transfer.hash().toString('hex');
+txHash = transfer.hash().toString('base64').replace(/\+/g, '-').replace(/\//g, '_'); // <--- NUEVA LÍNEA
         } catch (tonError) {
             console.error("Error en red TON:", tonError.message);
             return res.json({ success: false, error: "Error en la red TON: Intenta más tarde." });
