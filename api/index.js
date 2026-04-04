@@ -1,362 +1,282 @@
-import { useEffect, useState, useRef } from 'react';
-import WebApp from '@twa-dev/sdk';
-import axios from 'axios';
+const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
+const axios = require('axios');
+const cors = require('cors');
+const crypto = require('crypto');
+const { TonClient, WalletContractV5R1, toNano, internal } = require("@ton/ton");
+const { mnemonicToPrivateKey } = require("@ton/crypto");
 
-/**
- * IA PROFIT TON BOT - FRONTEND CORE
- * Dev: @DannyElCallejero | Versión: 3.3 - SEGURIDAD MEJORADA
- */
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-function App() {
-  /* --- [ ESTADOS Y REFERENCIAS ] --- */
-  const [status, setStatus] = useState('loading');
-  const [userData, setUserData] = useState(null);
-  const [errorInfo, setErrorInfo] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [stats, setStats] = useState({ 
-    n1: 0, n2: 0, n3: 0, 
-    c1: "0.000", c2: "0.000", c3: "0.000" 
-  });
-  
-  // Estados para Retiro
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [walletAddr, setWalletAddr] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  
-  // Estados de Seguridad (Captcha) y Utilidades
-  const [turnstileToken, setTurnstileToken] = useState(null);
-  const turnstileRef = useRef(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+/* --- [ CONFIGURACIÓN Y CONSTANTES ] --- */
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const CHANNEL_ID = process.env.CHANNEL_ID; 
+const ADMIN_ID = "7517815832"; 
+const PAYMENTS_CHANNEL = "-1002352835078"; 
+const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
+const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5";
+const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_SECRET;
 
-  /* --- [ LÓGICA DE INICIO Y SESIÓN ] --- */
-  
-  const verifyUser = (user, startParam) => {
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const userLang = navigator.language || navigator.userLanguage;
+// Nuevas reglas financieras
+const REWARDS = { level1: 0.003, level2: 0.002, level3: 0.001 };
+const MIN_WITHDRAW = 0.01; 
+const MAX_DAILY_WITHDRAW = 0.2;
 
-    axios.post('/api/verify', { 
-      user, 
-      start_param: startParam,
-      tz: userTimezone,
-      ln: userLang
-    })
-      .then(res => {
-        if (res.data.success) {
-          setUserData(res.data.user);
-          setStats(res.data.stats);
-          setStatus('member');
-        } else {
-          if (res.data.error === 'USER_BANNED') {
-            setStatus('error');
-            setErrorInfo(res.data.message || 'Cuenta suspendida.');
-          } else if (res.data.error === 'PROXY_DETECTED') {
-            setStatus('error');
-            setErrorInfo(res.data.message);
-          } else if (res.data.error === 'NOT_MEMBER') {
-            setStatus('guest');
-          } else {
-            setStatus('error');
-            setErrorInfo('Error inesperado.');
-          }
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        setStatus('error');
-        setErrorInfo('Servidor fuera de línea.');
-      });
-  };
+/* --- [ FUNCIONES AUXILIARES DE SEGURIDAD ] --- */
 
-  useEffect(() => {
-    try {
-      WebApp.ready();
-      WebApp.expand();
-      WebApp.setHeaderColor('#000000');
-      WebApp.setBackgroundColor('#000000');
-      
-      const user = WebApp.initDataUnsafe?.user;
-      const startParam = WebApp.initDataUnsafe?.start_param;
-
-      if (!user) {
-        setStatus('error');
-        setErrorInfo('Ejecuta la App desde Telegram.');
-        return;
-      }
-      verifyUser(user, startParam);
-    } catch (e) {
-      setStatus('error');
-      setErrorInfo('Fallo en SDK: ' + e.message);
-    }
-  }, []);
-
-  /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
-
-  const handleStartWithdraw = () => {
-    if ((userData?.balance || 0) < 0.01) {
-      WebApp.showAlert('⚠️ Mínimo de retiro: 0.01 TON');
-      return;
-    }
-    setWithdrawAmount(''); // Reseteamos el campo al abrir
-    setTurnstileToken(null);
-    setIsWithdrawing(true);
-  };
-
-  useEffect(() => {
-    if (isWithdrawing && window.turnstile) {
-      const timeout = setTimeout(() => {
-        if (turnstileRef.current) {
-          turnstileRef.current.innerHTML = ''; 
-          window.turnstile.render(turnstileRef.current, {
-            sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
-            callback: (token) => setTurnstileToken(token),
-            'expired-callback': () => setTurnstileToken(null),
-          });
-        }
-      }, 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [isWithdrawing]);
-
-  const executeWithdraw = async () => {
-    const amountFloat = parseFloat(withdrawAmount);
-
-    if (!walletAddr || walletAddr.trim().length < 40) { // Mayor validación de longitud para TON
-      WebApp.showAlert('⚠️ Dirección TON inválida.');
-      return;
-    }
-    if (isNaN(amountFloat) || amountFloat < 0.01) {
-      WebApp.showAlert('⚠️ Ingresa una cantidad válida (Mín: 0.01 TON).');
-      return;
-    }
-    if (amountFloat > userData.balance) {
-      WebApp.showAlert('⚠️ No tienes saldo suficiente.');
-      return;
-    }
-    if (!turnstileToken) {
-      WebApp.showAlert('⚠️ Completa el captcha de seguridad.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await axios.post('/api/withdraw', { 
-        userId: userData.id, 
-        address: walletAddr.trim(),
-        amount: amountFloat,
-        captchaToken: turnstileToken
-      });
-
-      if (res.data.success) {
-        WebApp.HapticFeedback.notificationOccurred('success');
-        WebApp.showAlert('✅ Retiro procesado con éxito.');
-        window.location.reload();
-      } else {
-        WebApp.HapticFeedback.notificationOccurred('error');
-        WebApp.showAlert('❌ ERROR: ' + res.data.error);
-        setIsSubmitting(false);
-      }
-    } catch (e) {
-      const errorMsg = e.response?.data?.error || e.message;
-      WebApp.showAlert('❌ DETALLE DEL ERROR: ' + errorMsg);
-      setIsSubmitting(false);
-    }
-  }; 
-
-  /* --- [ UTILIDADES SECUNDARIAS ] --- */
-
-  const handleCheckSubscription = () => {
-    const user = WebApp.initDataUnsafe?.user;
-    const startParam = WebApp.initDataUnsafe?.start_param;
-    setStatus('loading');
-    verifyUser(user, startParam);
-  };
-
-  const loadHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const res = await axios.get(`/api/history?userId=${userData.id}`);
-      setHistory(res.data.history || []);
-      setShowHistory(true);
-      WebApp.HapticFeedback.impactOccurred('light');
-    } catch (e) { WebApp.showAlert('Error obteniendo historial.'); }
-    finally { setLoadingHistory(false); }
-  };
-
-  const handleShare = () => {
-    const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
-    const text = `💰 ¡Gana TON con IA Profit! 🚀`;
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
-  };
-
-  /* --- [ RENDERIZADO VISUAL ] --- */
-
-  if (status === 'loading') return (
-    <div style={s.center}><div style={s.loader}></div><p style={{marginTop:'20px'}}>Cargando...</p></div>
-  );
-
-  if (status === 'error') return (
-    <div style={s.center}>
-      <h2 style={{color:'#ff4444'}}>BLOQUEADO</h2>
-      <div style={s.errorBox}>{errorInfo}</div>
-      <button style={s.btnWhite} onClick={() => window.location.reload()}>REINTENTAR</button>
-    </div>
-  );
-
-  return (
-    <div style={s.container}>
-      {status === 'member' && (
-        <button onClick={loadHistory} style={s.btnHistoryIcon} disabled={loadingHistory}>
-          {loadingHistory ? '...' : '📜'}
-        </button>
-      )}
-
-      {showHistory && (
-        <div style={s.modalOverlay}>
-          <div style={s.historyCard}>
-            <div style={s.modalHeader}>
-              <h3 style={{margin:0, color:'#ff4444'}}>HISTORIAL</h3>
-              <button onClick={() => setShowHistory(false)} style={s.btnClose}>CERRAR</button>
-            </div>
-            <div style={s.historyList}>
-              {history.length === 0 ? <p style={{textAlign:'center', padding:'20px'}}>Sin movimientos.</p> :
-                history.map((h, i) => (
-                  <div key={i} style={s.historyItem}>
-                    <div style={{textAlign:'left'}}>
-                      <div style={{fontSize:'12px', color:'#fff'}}>{new Date(h.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div style={{textAlign:'right'}}>
-                      <div style={{color:'#ff4444', fontWeight:'bold'}}>-{h.amount} TON</div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          </div>
-        </div>
-      )}
-
-      {status === 'guest' ? (
-        <div style={s.main}>
-          <div style={s.card}>
-            <div style={s.iconCircle}>🔔</div>
-            <h2>Canal Requerido</h2>
-            <button style={s.btnBlue} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>1. UNIRME</button>
-            <button style={{...s.btnOutline, marginTop:'12px'}} onClick={handleCheckSubscription}>2. VERIFICAR</button>
-          </div>
-        </div>
-      ) : (
-        <div style={s.main}>
-           <div style={s.cardBalance}>
-              {!isWithdrawing ? (
-                <>
-                  <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
-                  <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(3) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
-                  <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
-                  <div style={s.badge}>Min: 0.01 TON | Límite: 0.2 TON/Día</div>
-                </>
-              ) : (
-                <div style={{width: '100%'}}>
-                  <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
-                  
-                  <input type="number" placeholder="Monto a retirar (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
-                  <input type="text" placeholder="Tu Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
-                  
-                  <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
-                  
-                  <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
-                    <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
-                    <button 
-                      style={{
-                        ...s.btnConfirm, 
-                        opacity: isSubmitting ? 0.5 : 1,
-                        backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff' 
-                      }} 
-                      onClick={executeWithdraw}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? '...' : 'CONFIRMAR'}
-                    </button>
-                  </div>
-                </div>
-              )}
-           </div>
-
-           <div style={s.card}>
-              <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
-              <div style={s.row}>
-                <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.003</b></div>
-                <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.002</b></div>
-                <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.001</b></div>
-              </div>
-              <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
-           </div>
-
-           <div style={{...s.card, marginTop:'20px'}}>
-              <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px', marginBottom:'15px'}}>TU RED DE TRABAJO</h4>
-              <div style={s.statsGrid}>
-                <div style={s.statCol}>
-                  <p style={s.statLabel}>DIRECTOS</p>
-                  <p style={s.statValue}>{stats.n1}</p>
-                  <p style={s.statCom}>+{stats.c1} TON</p>
-                </div>
-                <div style={s.statCol}>
-                  <p style={s.statLabel}>NIVEL 2</p>
-                  <p style={s.statValue}>{stats.n2}</p>
-                  <p style={s.statCom}>+{stats.c2} TON</p>
-                </div>
-                <div style={s.statCol}>
-                  <p style={s.statLabel}>NIVEL 3</p>
-                  <p style={s.statValue}>{stats.n3}</p>
-                  <p style={s.statCom}>+{stats.c3} TON</p>
-                </div>
-              </div>
-              <div style={s.totalRow}>
-                <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
-                <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>
-                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
-                </p>
-              </div>
-           </div>
-        </div>
-      )}
-    </div>
-  );
+async function notifyAdmin(adminMsg) {
+  try {
+    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      chat_id: ADMIN_ID,
+      text: adminMsg,
+      parse_mode: 'HTML'
+    });
+  } catch (e) { console.error("Error notifyAdmin"); }
 }
 
-const s = {
-  container: { backgroundColor:'#000', color:'#fff', minHeight:'100vh', padding:'20px', fontFamily:'Inter, sans-serif' },
-  center: { height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center' },
-  loader: { width:'40px', height:'40px', border:'3px solid #333', borderTop:'3px solid #0088cc', borderRadius:'50%' },
-  main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto', width:'100%' },
-  cardBalance: { background:'linear-gradient(135deg, #0088cc 0%, #005588 100%)', padding:'30px 20px', borderRadius:'24px', textAlign:'center', marginBottom:'20px', display:'flex', flexDirection:'column', alignItems:'center', width:'100%', boxSizing:'border-box' },
-  card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #1a1a1a', width:'100%', boxSizing:'border-box' },
-  badge: { fontSize:'10px', backgroundColor:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'20px', marginTop:'10px', display:'inline-block' },
-  iconCircle: { width:'60px', height:'60px', backgroundColor:'#1a1a1a', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto', fontSize:'24px' },
-  btnBlue: { width:'100%', padding:'16px', backgroundColor:'#0088cc', border:'none', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
-  btnOutline: { width:'100%', padding:'16px', backgroundColor:'transparent', border:'2px solid #333', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
-  btnWhite: { width:'100%', padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'14px', fontWeight:'900' },
-  btnGreen: { width:'100%', padding:'16px', backgroundColor:'#28a745', border:'none', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
-  row: { display:'flex', justifyContent:'space-around', margin:'20px 0' },
-  box: { fontSize:'10px', color:'#666', textAlign:'center' },
-  statsGrid: { display:'flex', justifyContent:'space-between', marginTop:'10px' },
-  statCol: { flex:1, textAlign:'center' },
-  statLabel: { fontSize:'10px', color:'#555', marginBottom:'5px' },
-  statValue: { fontSize:'18px', fontWeight:'bold', margin:'0' },
-  statCom: { fontSize:'11px', color:'#28a745', fontWeight:'bold', marginTop:'5px' },
-  totalRow: { marginTop:'20px', paddingTop:'15px', borderTop:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between', alignItems:'center' },
-  inputStyle: { width:'100%', padding:'15px', borderRadius:'12px', border:'none', textAlign:'center', backgroundColor:'#fff', color:'#000', fontWeight:'bold', boxSizing:'border-box' },
-  btnCancel: { flex:1, padding:'14px', backgroundColor:'rgba(0,0,0,0.3)', color:'#fff', border:'none', borderRadius:'12px' },
-  btnConfirm: { flex:1, padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'12px', fontWeight:'bold' },
-  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px', zIndex:10 },
-  modalOverlay: { position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.9)', zIndex:100, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px' },
-  historyCard: { backgroundColor:'#0a0a0a', border:'2px solid #ff4444', borderRadius:'20px', width:'100%', maxWidth:'380px', maxHeight:'80vh', display:'flex', flexDirection:'column' },
-  modalHeader: { padding:'20px', borderBottom:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between' },
-  historyList: { flex:1, overflowY:'auto', padding:'10px' },
-  historyItem: { display:'flex', justifyContent:'space-between', padding:'15px', borderBottom:'1px solid #1a1a1a' },
-  btnClose: { background:'none', border:'1px solid #ff4444', color:'#ff4444', borderRadius:'8px', padding:'5px' },
-  errorBox: { backgroundColor:'#1a0000', color:'#ff8888', padding:'15px', borderRadius:'12px', border:'1px solid #ff4444', margin:'20px' }
-};
+async function verifyTurnstile(token) {
+  try {
+    if (!token || !CLOUDFLARE_SECRET) return false;
+    const response = await axios.post(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      `secret=${CLOUDFLARE_SECRET}&response=${token}`,
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    return response.data.success;
+  } catch (e) { return false; }
+}
 
-export default App;
+function isValidTonAddress(address) {
+  // Validación básica de formato TON (Bounceable o Non-bounceable)
+  return typeof address === 'string' && (address.startsWith('U') || address.startsWith('E')) && address.length === 48;
+}
+
+/* --- [ LÓGICA DE REGISTRO E IDENTIFICACIÓN ] --- */
+
+app.post('/api/verify', async (req, res) => {
+  try {
+    const { user, start_param } = req.body;
+    if (!user || !user.id) return res.status(400).json({ success: false });
+
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || "127.0.0.1";
+    const userAgent = req.headers['user-agent'] || "unknown";
+    const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
+
+    let { data: dbUser, error: fetchError } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+    
+    if (dbUser?.is_banned) {
+      return res.json({ success: false, error: 'USER_BANNED', message: "Acceso denegado permanentemente." });
+    }
+
+    try {
+        const pCheck = await axios.get(`https://proxycheck.io/v2/${userIp}?vpn=1`);
+        if (pCheck.data[userIp]?.proxy === "yes") {
+            await notifyAdmin(`🛡️ <b>VPN DETECTADA</b>\nUser: <code>${user.id}</code>\nIP: <code>${userIp}</code>`);
+            return res.json({ success: false, error: 'PROXY_DETECTED', message: "Desactiva tu VPN para entrar." });
+        }
+    } catch (e) { console.log("ProxyCheck Skip"); }
+
+    let isMember = false;
+    try {
+        const tgRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${user.id}`);
+        const status = tgRes.data.result?.status;
+        isMember = ['member', 'administrator', 'creator'].includes(status);
+    } catch (e) { isMember = false; }
+
+    if (!isMember) return res.json({ success: false, error: 'NOT_MEMBER' });
+
+    if (!dbUser) {
+      const { data: hashExists } = await supabase.from('users').select('id').eq('device_hash', deviceHash).maybeSingle();
+      
+      if (hashExists) {
+        await supabase.from('users').insert([{ id: user.id, username: user.username, is_banned: true, device_hash: deviceHash }]);
+        await notifyAdmin(`🚫 <b>MULTICUENTA DETECTADA</b>\nID: <code>${user.id}</code> intentó usar dispositivo de <code>${hashExists.id}</code>`);
+        return res.json({ success: false, error: 'USER_BANNED' });
+      }
+
+      const referrerId = start_param ? parseInt(start_param) : null;
+      const { data: newUser, error: insErr } = await supabase.from('users').insert([{
+        id: user.id,
+        username: user.username || 'user',
+        referred_by: (referrerId && referrerId !== user.id) ? referrerId : null,
+        balance: 0,
+        device_hash: deviceHash,
+        is_verified: true,
+        is_banned: false
+      }]).select().single();
+
+      if (insErr) throw insErr;
+      dbUser = newUser;
+
+      const validRef = (referrerId && referrerId !== user.id) ? referrerId : null;
+      if (validRef) {
+          await supabase.rpc('increment_balance', { user_id: validRef, amount: REWARDS.level1 });
+          const { data: p1 } = await supabase.from('users').select('referred_by').eq('id', validRef).maybeSingle();
+          if (p1?.referred_by) {
+              await supabase.rpc('increment_balance', { user_id: p1.referred_by, amount: REWARDS.level2 });
+              const { data: p2 } = await supabase.from('users').select('referred_by').eq('id', p1.referred_by).maybeSingle();
+              if (p2?.referred_by) {
+                  await supabase.rpc('increment_balance', { user_id: p2.referred_by, amount: REWARDS.level3 });
+              }
+          }
+      }
+    } else {
+        if (!dbUser.device_hash) {
+            await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
+            dbUser.device_hash = deviceHash;
+        }
+    }
+
+    const { data: l1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
+    const idsL1 = l1 ? l1.map(u => u.id) : [];
+    let n2 = 0, n3 = 0;
+
+    if (idsL1.length > 0) {
+        const { data: l2 } = await supabase.from('users').select('id').in('referred_by', idsL1);
+        const idsL2 = l2 ? l2.map(u => u.id) : [];
+        n2 = idsL2.length;
+        if (idsL2.length > 0) {
+            const { data: l3 } = await supabase.from('users').select('id').in('referred_by', idsL2);
+            n3 = l3 ? l3.length : 0;
+        }
+    }
+
+    return res.json({ 
+      success: true, 
+      user: dbUser,
+      stats: {
+        n1: idsL1.length, n2, n3,
+        c1: (idsL1.length * REWARDS.level1).toFixed(3),
+        c2: (n2 * REWARDS.level2).toFixed(3),
+        c3: (n3 * REWARDS.level3).toFixed(3)
+      }
+    });
+
+  } catch (err) {
+    console.error("Critical Error:", err.message);
+    return res.status(500).json({ success: false, error: 'SERVER_ERROR' });
+  }
+});
+
+/* --- [ LÓGICA DE PAGOS Y RETIROS ] --- */
+
+app.post('/api/withdraw', async (req, res) => {
+    try {
+        const { userId, address, captchaToken, amount } = req.body;
+        const MNEMONIC = process.env.ADMIN_MNEMONIC;
+        const cleanAddress = address?.trim();
+        const withdrawAmount = parseFloat(amount);
+
+        // 1. Validaciones estructurales
+        if (!userId || !cleanAddress || isNaN(withdrawAmount)) return res.json({ success: false, error: "Datos incompletos o inválidos." });
+        if (!isValidTonAddress(cleanAddress)) return res.json({ success: false, error: "La dirección de la billetera TON no es válida." });
+        if (withdrawAmount < MIN_WITHDRAW) return res.json({ success: false, error: `El retiro mínimo es ${MIN_WITHDRAW} TON.` });
+        if (!(await verifyTurnstile(captchaToken))) return res.json({ success: false, error: "Captcha inválido." });
+
+        // 2. Verificar usuario y saldo base
+        const { data: user, error: userErr } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+        if (userErr || !user) return res.json({ success: false, error: "Usuario no encontrado" });
+        if (user.is_banned) return res.json({ success: false, error: "Usuario no autorizado." });
+        if (user.balance < withdrawAmount) return res.json({ success: false, error: "Saldo insuficiente." });
+
+        // 3. Verificación de Límite Diario (Seguridad P2P)
+        const startOfDay = new Date();
+        startOfDay.setUTCHours(0, 0, 0, 0);
+
+        const { data: todayWithdrawals } = await supabase
+            .from('withdrawals')
+            .select('amount')
+            .eq('user_id', userId)
+            .gte('created_at', startOfDay.toISOString());
+
+        const dailyTotal = todayWithdrawals ? todayWithdrawals.reduce((sum, tx) => sum + tx.amount, 0) : 0;
+        
+        if ((dailyTotal + withdrawAmount) > MAX_DAILY_WITHDRAW) {
+            const availableToday = Math.max(0, MAX_DAILY_WITHDRAW - dailyTotal).toFixed(3);
+            return res.json({ success: false, error: `Límite de ${MAX_DAILY_WITHDRAW} TON diario excedido. Disponible hoy: ${availableToday} TON.` });
+        }
+
+        // 4. Ejecución en Blockchain
+        let txHash;
+        try {
+            const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
+            const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
+            const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
+            
+            const seqno = await wallet.getSeqno().catch(() => 0);
+            
+            const transfer = wallet.createTransfer({
+                seqno,
+                secretKey: keyPair.secretKey,
+                sendMode: 3,
+                messages: [internal({ to: cleanAddress, value: toNano(withdrawAmount.toString()), bounce: false, body: "IA Profit" })]
+            });
+
+            await wallet.send(transfer);
+            txHash = transfer.hash().toString('hex');
+        } catch (tonError) {
+            console.error("Error en red TON:", tonError.message);
+            return res.json({ success: false, error: "Error en la red TON: Intenta más tarde." });
+        }
+
+        // 5. Asentamiento en Base de Datos
+        if (txHash) {
+            try {
+                await supabase.rpc('decrement_balance', { user_id: userId, amount: withdrawAmount });
+                await supabase.from('withdrawals').insert([{ 
+                    user_id: Number(userId), 
+                    amount: withdrawAmount, 
+                    status: 'SUCCESS', 
+                    tx_hash: txHash, 
+                    address: cleanAddress 
+                }]);
+            } catch (dbErr) {
+                console.error("Pago enviado pero error en DB:", dbErr.message);
+            }
+
+            // 6. Notificación al Canal
+            const messageText = 
+                `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+                `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
+                `💸 <b>Monto Total:</b> ${withdrawAmount} TON\n` +
+                `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+                `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+                `🔹 <b>TXID:</b>\n` +
+                `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
+                `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
+          
+            await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                chat_id: PAYMENTS_CHANNEL,
+                text: messageText,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_markup: {
+                    inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/IAProfitTonBot` }]]
+                }
+            }).catch(e => console.log("Error Telegram"));
+
+            return res.json({ success: true, txHash });
+        }
+
+    } catch (e) {
+        console.error("CATCH FINAL:", e.message);
+        return res.json({ success: false, error: "Error interno: " + e.message });
+    }
+});
+
+/* --- [ ENDPOINT DE HISTORIAL ] --- */
+
+app.get('/api/history', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const { data: history } = await supabase.from('withdrawals').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    res.json({ success: true, history: history || [] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+module.exports = app;
