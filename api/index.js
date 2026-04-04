@@ -200,28 +200,20 @@ app.post('/api/withdraw', async (req, res) => {
         }
 
         // 4. Ejecución en Blockchain
-        // 4. Ejecución en Blockchain
         let txHash;
         try {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
             const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
             const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
             
-            // --- NUEVO: VERIFICAR FONDOS DE LA WALLET DEL BOT ---
+            // Verificar saldo antes de proceder
             const balanceAdmin = await wallet.getBalance(); 
             const withdrawInNano = toNano(withdrawAmount.toString());
-            const gasFeeReserve = toNano("0.01"); // Margen de seguridad para el gas de la red
-
-            if (balanceAdmin < (withdrawInNano + gasFeeReserve)) {
-                return res.json({ 
-                    success: false, 
-                    error: "El sistema de pagos está en mantenimiento o sin liquidez temporal. Intenta más tarde." 
-                });
+            if (balanceAdmin < (withdrawInNano + toNano("0.02"))) {
+                return res.json({ success: false, error: "Liquidez temporal insuficiente." });
             }
-            // -----------------------------------------------------
 
-            const seqno = await wallet.getSeqno().catch(() => 0);
-            
+            const seqno = await wallet.getSeqno();
             const transfer = wallet.createTransfer({
                 seqno,
                 secretKey: keyPair.secretKey,
@@ -230,12 +222,31 @@ app.post('/api/withdraw', async (req, res) => {
             });
 
             await wallet.send(transfer);
-txHash = transfer.hash().toString('base64').replace(/\+/g, '-').replace(/\//g, '_'); // <--- NUEVA LÍNEA
-        } catch (tonError) {
-            console.error("Error en red TON:", tonError.message);
-            return res.json({ success: false, error: "Error en la red TON: Intenta más tarde." });
-                             }
 
+            // --- NUEVO: ESPERAR Y BUSCAR EL TXID REAL ---
+            let attempts = 0;
+            while (attempts < 10) { // Reintenta por ~20 segundos
+                await new Promise(res => setTimeout(res, 2000)); // Espera 2 seg entre intentos
+                const transactions = await client.getTransactions(wallet.address, { limit: 1 });
+                
+                if (transactions.length > 0) {
+                    const lastTx = transactions[0];
+                    // Si el mensaje de salida coincide con nuestro envío, tenemos el Hash real
+                    txHash = lastTx.hash().toString('hex'); 
+                    break;
+                }
+                attempts++;
+            }
+
+            // Si falló la búsqueda pero se envió, usamos el hash del mensaje como fallback (hex)
+            if (!txHash) txHash = transfer.hash().toString('hex');
+
+        } catch (tonError) {
+            console.error("Error TON:", tonError.message);
+            return res.json({ success: false, error: "Error en red TON." });
+        }
+
+        // ... (Paso 5 igual) ...
         // 5. Asentamiento en Base de Datos
         if (txHash) {
             try {
