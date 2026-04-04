@@ -200,19 +200,33 @@ app.post('/api/withdraw', async (req, res) => {
         }
 
         // 4. Ejecución en Blockchain
+        // 4. Ejecución en Blockchain
         let txHash;
         try {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
             const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
             const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
             
+            // --- NUEVO: VERIFICAR FONDOS DE LA WALLET DEL BOT ---
+            const balanceAdmin = await wallet.getBalance(); 
+            const withdrawInNano = toNano(withdrawAmount.toString());
+            const gasFeeReserve = toNano("0.01"); // Margen de seguridad para el gas de la red
+
+            if (balanceAdmin < (withdrawInNano + gasFeeReserve)) {
+                return res.json({ 
+                    success: false, 
+                    error: "El sistema de pagos está en mantenimiento o sin liquidez temporal. Intenta más tarde." 
+                });
+            }
+            // -----------------------------------------------------
+
             const seqno = await wallet.getSeqno().catch(() => 0);
             
             const transfer = wallet.createTransfer({
                 seqno,
                 secretKey: keyPair.secretKey,
                 sendMode: 3,
-                messages: [internal({ to: cleanAddress, value: toNano(withdrawAmount.toString()), bounce: false, body: "IA Profit" })]
+                messages: [internal({ to: cleanAddress, value: withdrawInNano, bounce: false, body: "IA Profit" })]
             });
 
             await wallet.send(transfer);
@@ -220,7 +234,7 @@ app.post('/api/withdraw', async (req, res) => {
         } catch (tonError) {
             console.error("Error en red TON:", tonError.message);
             return res.json({ success: false, error: "Error en la red TON: Intenta más tarde." });
-        }
+                             }
 
         // 5. Asentamiento en Base de Datos
         if (txHash) {
