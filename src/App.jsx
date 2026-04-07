@@ -60,8 +60,16 @@ function App() {
         if (res.data.success) {
           setUserData(res.data.user);
           setStats(res.data.stats);
+          
+          // --- ESTO ES LO NUEVO: Carga el progreso del día ---
+          if (res.data.dailyStats) {
+            setAdsWatchedCount(res.data.dailyStats.adsWatched || 0);
+            setClaimedMissions(res.data.dailyStats.claimedMissions || []);
+          }
+          
           setStatus('member');
         } else {
+          // ... resto de tu lógica de errores (BANNED, PROXY, etc)
           if (res.data.error === 'USER_BANNED') {
             setStatus('error');
             setErrorInfo(res.data.message || 'Cuenta suspendida.');
@@ -82,7 +90,6 @@ function App() {
         setErrorInfo('Servidor fuera de línea.');
       });
   };
-
   useEffect(() => {
     try {
       WebApp.ready();
