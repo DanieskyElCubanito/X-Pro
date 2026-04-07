@@ -4,13 +4,13 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Dev: @DannyElCallejero | Versión: 3.5 - INTEGRACIÓN ADS Y TABS
+ * Dev: @DannyElCallejero | Versión: 3.6 - MISIONES DE ANUNCIOS
  */
 
 function App() {
   /* --- [ ESTADOS GENERALES Y NAVEGACIÓN ] --- */
   const [status, setStatus] = useState('loading');
-  const [activeTab, setActiveTab] = useState('home'); // Pestañas: 'home', 'share', 'missions'
+  const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
   const [errorInfo, setErrorInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,11 +26,24 @@ function App() {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
   
-  /* --- [ ESTADOS DE HISTORIAL Y ADS ] --- */
+  /* --- [ ESTADOS DE HISTORIAL, ADS Y MISIONES ] --- */
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isAdLoading, setIsAdLoading] = useState(false);
+  
+  // Variables para las Misiones (Frontend)
+  const [adsWatchedCount, setAdsWatchedCount] = useState(0); 
+  const [claimedMissions, setClaimedMissions] = useState([]);
+
+  const missionsData = [
+    { id: 1, target: 1, reward: 0.00001 },
+    { id: 2, target: 5, reward: 0.00005 },
+    { id: 3, target: 10, reward: 0.00010 },
+    { id: 4, target: 15, reward: 0.00015 },
+    { id: 5, target: 20, reward: 0.00020 },
+    { id: 6, target: 25, reward: 0.00025 },
+  ];
 
   /* --- [ LÓGICA DE INICIO Y SESIÓN ] --- */
   const verifyUser = (user, startParam) => {
@@ -111,7 +124,11 @@ function App() {
           if (res.data.success) {
             WebApp.HapticFeedback.notificationOccurred('success');
             WebApp.showAlert(`¡Felicidades! Has ganado ${res.data.reward} TON.`);
+            
+            // Actualizamos saldo y aumentamos el contador de anuncios vistos
             setUserData(prev => ({ ...prev, balance: prev.balance + res.data.reward }));
+            setAdsWatchedCount(prev => prev + 1);
+            
           } else if (res.data.error === 'COOLDOWN') {
             WebApp.HapticFeedback.notificationOccurred('warning');
             WebApp.showAlert(res.data.message);
@@ -128,6 +145,18 @@ function App() {
         console.log("Anuncio cerrado o cancelado antes de tiempo", e);
         setIsAdLoading(false);
       });
+  };
+
+  /* --- [ LÓGICA DE RECLAMAR MISIONES ] --- */
+  const handleClaimMission = (mission) => {
+    // Registramos que ya se reclamó esta misión para no repetir
+    setClaimedMissions(prev => [...prev, mission.id]);
+    
+    // Sumamos la recompensa al balance
+    setUserData(prev => ({ ...prev, balance: prev.balance + mission.reward }));
+    
+    WebApp.HapticFeedback.notificationOccurred('success');
+    WebApp.showAlert(`¡Reclamaste ${mission.reward.toFixed(5)} TON por completar la misión!`);
   };
 
   /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
@@ -239,7 +268,7 @@ function App() {
 
   return (
     <div style={s.container}>
-      {/* BOTÓN DE HISTORIAL (Global para Miembros) */}
+      {/* BOTÓN DE HISTORIAL */}
       {status === 'member' && (
         <button onClick={loadHistory} style={s.btnHistoryIcon} disabled={loadingHistory}>
           {loadingHistory ? '...' : '📜'}
@@ -272,7 +301,7 @@ function App() {
         </div>
       )}
 
-      {/* PANTALLA GUEST (Canal Requerido) */}
+      {/* PANTALLA GUEST */}
       {status === 'guest' ? (
         <div style={s.main}>
           <div style={s.card}>
@@ -283,10 +312,10 @@ function App() {
           </div>
         </div>
       ) : (
-        /* PANTALLA MIEMBRO (Con Pestañas) */
+        /* PANTALLA MIEMBRO */
         <div style={s.main}>
            
-           {/* --- PESTAÑA: HOME (Retiro y Saldo) --- */}
+           {/* --- PESTAÑA: HOME --- */}
            {activeTab === 'home' && (
              <div className="tab-content fade-in">
                <div style={s.cardBalance}>
@@ -300,7 +329,6 @@ function App() {
                   ) : (
                     <div style={{width: '100%'}}>
                       <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
-                      
                       <input type="number" placeholder="Monto a retirar (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
                       <input type="text" placeholder="Tu Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
                       
@@ -308,15 +336,7 @@ function App() {
                       
                       <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
                         <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
-                        <button 
-                          style={{
-                            ...s.btnConfirm, 
-                            opacity: isSubmitting ? 0.5 : 1,
-                            backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff' 
-                          }} 
-                          onClick={executeWithdraw}
-                          disabled={isSubmitting}
-                        >
+                        <button style={{...s.btnConfirm, opacity: isSubmitting ? 0.5 : 1, backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff'}} onClick={executeWithdraw} disabled={isSubmitting}>
                           {isSubmitting ? '...' : 'CONFIRMAR'}
                         </button>
                       </div>
@@ -326,7 +346,7 @@ function App() {
              </div>
            )}
 
-           {/* --- PESTAÑA: SHARE (Referidos y Niveles) --- */}
+           {/* --- PESTAÑA: SHARE --- */}
            {activeTab === 'share' && (
              <div className="tab-content fade-in">
                <div style={s.card}>
@@ -342,79 +362,77 @@ function App() {
                <div style={{...s.card, marginTop:'20px'}}>
                   <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px', marginBottom:'15px'}}>TU RED DE TRABAJO</h4>
                   <div style={s.statsGrid}>
-                    <div style={s.statCol}>
-                      <p style={s.statLabel}>DIRECTOS</p>
-                      <p style={s.statValue}>{stats.n1}</p>
-                      <p style={s.statCom}>+{stats.c1} TON</p>
-                    </div>
-                    <div style={s.statCol}>
-                      <p style={s.statLabel}>NIVEL 2</p>
-                      <p style={s.statValue}>{stats.n2}</p>
-                      <p style={s.statCom}>+{stats.c2} TON</p>
-                    </div>
-                    <div style={s.statCol}>
-                      <p style={s.statLabel}>NIVEL 3</p>
-                      <p style={s.statValue}>{stats.n3}</p>
-                      <p style={s.statCom}>+{stats.c3} TON</p>
-                    </div>
+                    <div style={s.statCol}><p style={s.statLabel}>DIRECTOS</p><p style={s.statValue}>{stats.n1}</p><p style={s.statCom}>+{stats.c1} TON</p></div>
+                    <div style={s.statCol}><p style={s.statLabel}>NIVEL 2</p><p style={s.statValue}>{stats.n2}</p><p style={s.statCom}>+{stats.c2} TON</p></div>
+                    <div style={s.statCol}><p style={s.statLabel}>NIVEL 3</p><p style={s.statValue}>{stats.n3}</p><p style={s.statCom}>+{stats.c3} TON</p></div>
                   </div>
                   <div style={s.totalRow}>
                     <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
-                    <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>
-                      {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
-                    </p>
+                    <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>{(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON</p>
                   </div>
                </div>
              </div>
            )}
 
-           {/* --- PESTAÑA: MISSIONS (Anuncios y Tareas) --- */}
+           {/* --- PESTAÑA: MISSIONS --- */}
            {activeTab === 'missions' && (
              <div className="tab-content fade-in">
-               <div style={{...s.card, border:'1px solid #28a745'}}>
+               <div style={{...s.card, border:'1px solid #28a745', marginBottom:'20px'}}>
                   <h4 style={{marginTop:0, color:'#28a745'}}>📺 ANUNCIOS RECOMPENSADOS</h4>
                   <p style={{fontSize:'12px', color:'#aaa', marginBottom:'15px'}}>
                     Mira un video corto para ganar <b>0.0005 TON</b>.<br/> Disponible 1 vez por hora.
                   </p>
-                  <button 
-                    style={{
-                      ...s.btnGreen, 
-                      backgroundColor: isAdLoading ? '#1a3a1a' : '#28a745',
-                      opacity: isAdLoading ? 0.7 : 1 
-                    }} 
-                    onClick={handleWatchAd}
-                    disabled={isAdLoading}
-                  >
+                  <button style={{...s.btnGreen, backgroundColor: isAdLoading ? '#1a3a1a' : '#28a745', opacity: isAdLoading ? 0.7 : 1}} onClick={handleWatchAd} disabled={isAdLoading}>
                     {isAdLoading ? 'CARGANDO VIDEO...' : '🎥 VER VIDEO Y GANAR'}
                   </button>
                </div>
 
-               {/* Placeholder para futuras tareas */}
-               <div style={{...s.card, marginTop:'20px', border:'1px dashed #333', backgroundColor:'transparent'}}>
-                 <h4 style={{color:'#666', marginTop:0}}>🛠️ TAREAS DIARIAS</h4>
-                 <p style={{color:'#555', fontSize:'12px', margin:0}}>
-                   Próximamente agregaremos misiones sociales y tareas especiales para que ganes más TON. ¡Mantente atento!
-                 </p>
+               {/* LISTA DE MISIONES */}
+               <div style={{...s.card}}>
+                  <h4 style={{marginTop:0, color:'#fff', textAlign:'left'}}>🎯 Misiones por Anuncios</h4>
+                  <p style={{fontSize:'12px', color:'#aaa', textAlign:'left', marginBottom:'15px'}}>
+                    Anuncios vistos actualmente: <b style={{color:'#0088cc'}}>{adsWatchedCount}</b>
+                  </p>
+                  
+                  {missionsData.map((m) => {
+                    const isClaimed = claimedMissions.includes(m.id);
+                    const isUnlocked = adsWatchedCount >= m.target;
+                    
+                    return (
+                      <div key={m.id} style={s.missionRow}>
+                        <div style={{textAlign:'left', fontSize:'13px'}}>
+                          📺 Ver {m.target} Anuncio{m.target > 1 ? 's' : ''} <br/>
+                          <span style={{color:'#28a745', fontWeight:'bold'}}>🎁 {m.reward.toFixed(5)} TON</span>
+                        </div>
+                        <div>
+                          {isClaimed ? (
+                            <button style={s.btnMissionClaimed} disabled>✅ Reclamado</button>
+                          ) : isUnlocked ? (
+                            <button style={s.btnMissionClaim} onClick={() => handleClaimMission(m)}>✅ Reclamar</button>
+                          ) : (
+                            <button style={s.btnMissionLocked} disabled>🔒 Bloqueado</button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                </div>
              </div>
            )}
         </div>
       )}
 
-      {/* --- BARRA DE NAVEGACIÓN INFERIOR (Solo visible si es miembro) --- */}
+      {/* --- BARRA INFERIOR --- */}
       {status === 'member' && (
         <div style={s.bottomNav}>
           <div onClick={() => setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
-            <span style={{fontSize:'20px'}}>🏠</span>
-            <span>Home</span>
+            <span style={{fontSize:'20px'}}>🏠</span><span>Home</span>
           </div>
           <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
-            <span style={{fontSize:'20px'}}>👥</span>
-            <span>Share</span>
+            <span style={{fontSize:'20px'}}>👥</span><span>Share</span>
           </div>
           <div onClick={() => setActiveTab('missions')} style={activeTab === 'missions' ? s.navItemActive : s.navItem}>
-            <span style={{fontSize:'20px'}}>🚀</span>
-            <span>Missions</span>
+            <span style={{fontSize:'20px'}}>🚀</span><span>Missions</span>
           </div>
         </div>
       )}
@@ -427,7 +445,6 @@ const s = {
   container: { backgroundColor:'#000', color:'#fff', minHeight:'100vh', padding:'20px', fontFamily:'Inter, sans-serif' },
   center: { height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center' },
   loader: { width:'40px', height:'40px', border:'3px solid #333', borderTop:'3px solid #0088cc', borderRadius:'50%' },
-  // Se agregó paddingBottom para que el contenido no quede oculto detrás de la barra inferior
   main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto', width:'100%', paddingBottom: '80px', paddingTop: '40px' }, 
   cardBalance: { background:'linear-gradient(135deg, #0088cc 0%, #005588 100%)', padding:'30px 20px', borderRadius:'24px', textAlign:'center', marginBottom:'20px', display:'flex', flexDirection:'column', alignItems:'center', width:'100%', boxSizing:'border-box' },
   card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #1a1a1a', width:'100%', boxSizing:'border-box' },
@@ -448,20 +465,56 @@ const s = {
   inputStyle: { width:'100%', padding:'15px', borderRadius:'12px', border:'none', textAlign:'center', backgroundColor:'#fff', color:'#000', fontWeight:'bold', boxSizing:'border-box' },
   btnCancel: { flex:1, padding:'14px', backgroundColor:'rgba(0,0,0,0.3)', color:'#fff', border:'none', borderRadius:'12px' },
   btnConfirm: { flex:1, padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'12px', fontWeight:'bold' },
-  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px', zIndex:10 },
-  
-  // ESTILOS DE LA BARRA INFERIOR
+  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px', zIndex:10, cursor:'pointer' },
   bottomNav: { position:'fixed', bottom:0, left:0, right:0, backgroundColor:'#0a0a0a', display:'flex', justifyContent:'space-around', padding:'12px 0 20px 0', borderTop:'1px solid #222', zIndex:100 },
   navItem: { color:'#555', display:'flex', flexDirection:'column', alignItems:'center', fontSize:'11px', fontWeight:'bold', cursor:'pointer', transition: 'color 0.2s', width: '33%' },
   navItemActive: { color:'#0088cc', display:'flex', flexDirection:'column', alignItems:'center', fontSize:'11px', fontWeight:'bold', cursor:'pointer', width: '33%' },
-  
-  // MODAL
   modalOverlay: { position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.8)', zIndex:200, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px' },
   historyCard: { backgroundColor:'#111', width:'100%', maxWidth:'400px', borderRadius:'24px', border:'1px solid #333', display:'flex', flexDirection:'column', maxHeight:'80vh' },
   modalHeader: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px', borderBottom:'1px solid #222' },
   btnClose: { backgroundColor:'transparent', color:'#aaa', border:'none', fontWeight:'bold', cursor:'pointer' },
   historyList: { padding:'20px', overflowY:'auto' },
-  historyItem: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #222' }
+  historyItem: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #222' },
+  
+  /* --- ESTILOS DE LAS MISIONES --- */
+  missionRow: { 
+    display:'flex', 
+    justifyContent:'space-between', 
+    alignItems:'center', 
+    padding:'15px 0', 
+    borderBottom:'1px solid #222' 
+  },
+  btnMissionLocked: { 
+    backgroundColor:'#222', 
+    color:'#666', 
+    border:'1px solid #333', 
+    padding:'8px 14px', 
+    borderRadius:'10px', 
+    fontSize:'11px', 
+    fontWeight:'bold',
+    minWidth:'100px'
+  },
+  btnMissionClaim: { 
+    backgroundColor:'#0088cc', 
+    color:'#fff', 
+    border:'none', 
+    padding:'8px 14px', 
+    borderRadius:'10px', 
+    fontSize:'11px', 
+    fontWeight:'bold', 
+    cursor:'pointer',
+    minWidth:'100px'
+  },
+  btnMissionClaimed: { 
+    backgroundColor:'transparent', 
+    color:'#28a745', 
+    border:'1px solid #28a745', 
+    padding:'8px 14px', 
+    borderRadius:'10px', 
+    fontSize:'11px', 
+    fontWeight:'bold',
+    minWidth:'100px'
+  }
 };
 
 export default App;
