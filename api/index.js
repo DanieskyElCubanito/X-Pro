@@ -214,19 +214,17 @@ app.post('/api/ad-reward', async (req, res) => {
 // 2. Reclamo de misión (CON PROTECCIÓN ANTI-DUPLICADOS)
 app.post('/api/claim-mission', async (req, res) => {
     try {
-        const { userId, missionId } = req.body; // Viene como 'm1', 'm2', etc.
+        const { userId, missionId } = req.body; 
         
-        // Buscamos la misión en tu array de constantes
+        // 1. Validar misión (Soporta tanto "1" como "m1")
         const mission = MISSIONS_DATA.find(m => m.id === missionId || `m${m.id}` === missionId);
-        if (!mission) return res.json({ success: false, error: "Misión no válida" });
+        if (!mission) return res.json({ success: false, error: "MISSION_INVALID" });
 
         const startOfDay = new Date();
         startOfDay.setUTCHours(0, 0, 0, 0);
         const isoStart = startOfDay.toISOString();
 
-        // --- PASO 1: Verificar si ya reclamó hoy (Seguridad de DB) ---
-        // IMPORTANTE: Tu tabla 'mission_claims' DEBE tener una restricción UNIQUE 
-        // para la combinación (user_id, mission_id, fecha) si quieres seguridad total.
+        // 2. Verificar si ya reclamó hoy
         const { data: alreadyClaimed } = await supabase
             .from('mission_claims')
             .select('id')
@@ -235,9 +233,9 @@ app.post('/api/claim-mission', async (req, res) => {
             .gte('created_at', isoStart)
             .maybeSingle();
 
-        if (alreadyClaimed) return res.json({ success: false, error: "Ya reclamada hoy" });
+        if (alreadyClaimed) return res.json({ success: false, error: "ALREADY_CLAIMED" });
 
-        // --- PASO 2: Contar anuncios de forma eficiente ---
+        // 3. Contar anuncios de hoy
         const { count, error: countError } = await supabase
             .from('ad_logs')
             .select('*', { count: 'exact', head: true })
@@ -245,11 +243,15 @@ app.post('/api/claim-mission', async (req, res) => {
             .gte('created_at', isoStart);
 
         if (count < mission.target) {
-            return res.json({ success: false, error: `Te faltan ${mission.target - count} anuncios` });
+            return res.json({ 
+                success: false, 
+                error: "NOT_ENOUGH_ADS",
+                current: count,
+                target: mission.target 
+            });
         }
 
-        // --- PASO 3: Pagar e Insertar (Transacción balanceada) ---
-        // Usamos RPC para el balance para evitar que el usuario se sume dinero de más
+        // 4. Ejecutar el pago en la DB
         const { error: rpcError } = await supabase.rpc('increment_balance', { 
             user_id_param: userId, 
             amount_param: mission.reward 
@@ -257,17 +259,21 @@ app.post('/api/claim-mission', async (req, res) => {
 
         if (rpcError) throw rpcError;
 
-        // Registramos el reclamo
+        // 5. REGISTRAR EL RECLAMO (Esto es lo que bloquea el botón)
         await supabase.from('mission_claims').insert([{ 
             user_id: userId, 
             mission_id: missionId 
         }]);
 
-        return res.json({ success: true, reward: mission.reward });
+        return res.json({ 
+            success: true, 
+            reward: mission.reward,
+            claimedMissionId: missionId // Devolvemos el ID para que el frontend lo marque
+        });
 
     } catch (e) {
-        console.error("Error en claim:", e);
-        return res.status(500).json({ success: false, error: "Error interno" });
+        console.error("Error crítico en claim-mission:", e.message);
+        return res.status(500).json({ success: false, error: "INTERNAL_ERROR" });
     }
 });
 
