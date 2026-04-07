@@ -138,55 +138,34 @@ function App() {
   };
 
   /* --- [ LÓGICA DE RECLAMAR MISIONES ] --- */
-  const handleClaimMission = async (mission) => {
-    // 1. BLOQUEO DE SEGURIDAD INICIAL
-    // Si la misión ya aparece como reclamada en el estado local, abortamos de inmediato.
-    const missionKey = `m${mission.id}`;
-    if (claimedMissions.includes(missionKey) || claimedMissions.includes(mission.id)) {
-      return; 
-    }
-
-    // 2. EVITAR DOBLE CLICK (Spam)
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
+const handleClaimMission = async (mission) => {
     try {
-      // Llamamos al backend para procesar el pago y guardar el registro
-      const res = await axios.post('/api/claim-mission', {
-        userId: userData.id,
-        missionId: missionKey 
-      });
+        const res = await axios.post('/api/claim-mission', {
+            userId: userData.id,
+            missionId: mission.id
+        });
 
-      if (res.data.success) {
-        // 3. ACTUALIZACIÓN DEL ESTADO
-        // Es vital usar la misma llave (missionKey) que usas en el renderizado para comparar
-        setClaimedMissions(prev => [...prev, missionKey]);
-        
-        // Actualizamos el balance con el dato real del servidor si es posible, 
-        // o sumamos la recompensa al estado actual.
-        setUserData(prev => ({ 
-          ...prev, 
-          balance: (prev.balance || 0) + mission.reward 
-        }));
+        if (res.data.success) {
+            // 1. Hacemos que el teléfono vibre (feedback)
+            WebApp.HapticFeedback.notificationOccurred('success');
+            
+            // 2. Actualizamos el balance visualmente
+            setUserData(prev => ({ 
+                ...prev, 
+                balance: parseFloat(prev.balance) + parseFloat(res.data.reward) 
+            }));
 
-        WebApp.HapticFeedback.notificationOccurred('success');
-        WebApp.showAlert(`✅ ¡Reclamaste ${mission.reward.toFixed(5)} TON!`);
-      } else {
-        // Si el backend dice que ya se reclamó hoy, lo añadimos al estado para que el botón se bloquee
-        if (res.data.error?.includes("ya reclamada")) {
-            setClaimedMissions(prev => [...prev, missionKey]);
+            // 3. AGREGAMOS LA MISIÓN AL ARRAY DE RECLAMADAS (Esto cambia el botón)
+            setClaimedMissions(prev => [...prev, mission.id]);
+
+            WebApp.showAlert(`✅ ¡Reclamaste ${res.data.reward} TON!`);
+        } else {
+            WebApp.showAlert("Error: " + res.data.error);
         }
-        WebApp.showAlert(`⚠️ ${res.data.error}`);
-      }
     } catch (e) {
-      console.error(e);
-      const msg = e.response?.data?.error || 'Error al conectar con el servidor.';
-      WebApp.showAlert(`❌ ${msg}`);
-    } finally {
-      // 4. LIBERAR EL BOTÓN
-      setIsSubmitting(false);
+        WebApp.showAlert("❌ Error al procesar el reclamo");
     }
-  };
+};
 
   /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
   const handleStartWithdraw = () => {
