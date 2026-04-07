@@ -191,50 +191,82 @@ app.post('/api/verify', async (req, res) => {
 
 /* --- [ LÓGICA DE MISIONES Y ANUNCIOS ] --- */
 
+// 1. Registro de anuncios (Simplemente inserta el log)
 app.post('/api/ad-reward', async (req, res) => {
     try {
         const { userId } = req.body;
         if (!userId) return res.status(400).json({ success: false });
 
-        const { data: user } = await supabase.from('users').select('is_banned').eq('id', userId).maybeSingle();
+        // Verificación rápida de baneo
+        const { data: user, error } = await supabase.from('users').select('is_banned').eq('id', userId).maybeSingle();
         if (!user || user.is_banned) return res.json({ success: false, error: "BANNED" });
 
-        await supabase.from('ad_logs').insert([{ user_id: userId, amount: 0 }]);
+        // Insertamos el log del anuncio visto hoy
+        await supabase.from('ad_logs').insert([{ user_id: userId }]);
 
-        return res.json({ success: true, message: "Progreso actualizado" });
+        return res.json({ success: true });
     } catch (e) {
         return res.status(500).json({ success: false });
     }
 });
 
+// 2. Reclamo de misión (CON PROTECCIÓN ANTI-DUPLICADOS)
 app.post('/api/claim-mission', async (req, res) => {
     try {
-        const { userId, missionId } = req.body;
-        const mission = MISSIONS_DATA.find(m => m.id === missionId);
-        if (!mission) return res.json({ success: false, error: "MISSION_INVALID" });
+        const { userId, missionId } = req.body; // Viene como 'm1', 'm2', etc.
+        
+        // Buscamos la misión en tu array de constantes
+        const mission = MISSIONS_DATA.find(m => m.id === missionId || `m${m.id}` === missionId);
+        if (!mission) return res.json({ success: false, error: "Misión no válida" });
 
         const startOfDay = new Date();
         startOfDay.setUTCHours(0, 0, 0, 0);
+        const isoStart = startOfDay.toISOString();
 
-        const { data: claimed } = await supabase.from('mission_claims')
-            .select('id').eq('user_id', userId).eq('mission_id', missionId)
-            .gte('created_at', startOfDay.toISOString()).maybeSingle();
+        // --- PASO 1: Verificar si ya reclamó hoy (Seguridad de DB) ---
+        // IMPORTANTE: Tu tabla 'mission_claims' DEBE tener una restricción UNIQUE 
+        // para la combinación (user_id, mission_id, fecha) si quieres seguridad total.
+        const { data: alreadyClaimed } = await supabase
+            .from('mission_claims')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('mission_id', missionId)
+            .gte('created_at', isoStart)
+            .maybeSingle();
 
-        if (claimed) return res.json({ success: false, error: "ALREADY_CLAIMED" });
+        if (alreadyClaimed) return res.json({ success: false, error: "Ya reclamada hoy" });
 
-        const { data: adsToday } = await supabase.from('ad_logs')
-            .select('id').eq('user_id', userId).gte('created_at', startOfDay.toISOString());
+        // --- PASO 2: Contar anuncios de forma eficiente ---
+        const { count, error: countError } = await supabase
+            .from('ad_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', isoStart);
 
-        if (!adsToday || adsToday.length < mission.target) {
-            return res.json({ success: false, error: "NOT_ENOUGH_ADS" });
+        if (count < mission.target) {
+            return res.json({ success: false, error: `Te faltan ${mission.target - count} anuncios` });
         }
 
-        await supabase.rpc('increment_balance', { user_id: userId, amount: mission.reward });
-        await supabase.from('mission_claims').insert([{ user_id: userId, mission_id: missionId }]);
+        // --- PASO 3: Pagar e Insertar (Transacción balanceada) ---
+        // Usamos RPC para el balance para evitar que el usuario se sume dinero de más
+        const { error: rpcError } = await supabase.rpc('increment_balance', { 
+            user_id_param: userId, 
+            amount_param: mission.reward 
+        });
+
+        if (rpcError) throw rpcError;
+
+        // Registramos el reclamo
+        await supabase.from('mission_claims').insert([{ 
+            user_id: userId, 
+            mission_id: missionId 
+        }]);
 
         return res.json({ success: true, reward: mission.reward });
+
     } catch (e) {
-        return res.status(500).json({ success: false });
+        console.error("Error en claim:", e);
+        return res.status(500).json({ success: false, error: "Error interno" });
     }
 });
 
