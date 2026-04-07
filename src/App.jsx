@@ -138,15 +138,28 @@ function App() {
   };
 
   /* --- [ LÓGICA DE RECLAMAR MISIONES ] --- */
-  const handleClaimMission = (mission) => {
-    // Registramos que ya se reclamó esta misión para no repetir
-    setClaimedMissions(prev => [...prev, mission.id]);
-    
-    // Sumamos la recompensa al balance
-    setUserData(prev => ({ ...prev, balance: prev.balance + mission.reward }));
-    
-    WebApp.HapticFeedback.notificationOccurred('success');
-    WebApp.showAlert(`¡Reclamaste ${mission.reward.toFixed(5)} TON por completar la misión!`);
+  const handleClaimMission = async (mission) => {
+    try {
+      // Llamamos al backend para procesar el pago y guardar el registro
+      const res = await axios.post('/api/claim-mission', {
+        userId: userData.id,
+        missionId: `m${mission.id}` // Ajustamos el ID para que coincida con el backend ('m1', 'm2', etc)
+      });
+
+      if (res.data.success) {
+        // Actualizamos el estado local solo si el servidor confirmó el pago
+        setClaimedMissions(prev => [...prev, `m${mission.id}`]);
+        setUserData(prev => ({ ...prev, balance: prev.balance + mission.reward }));
+        
+        WebApp.HapticFeedback.notificationOccurred('success');
+        WebApp.showAlert(`✅ ¡Reclamaste ${mission.reward.toFixed(5)} TON!`);
+      } else {
+        WebApp.showAlert(`⚠️ ${res.data.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      WebApp.showAlert('❌ Error al conectar con el servidor.');
+    }
   };
 
   /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
