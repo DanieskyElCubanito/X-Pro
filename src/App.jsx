@@ -4,12 +4,13 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Dev: @DannyElCallejero | Versión: 3.4 - INTEGRACIÓN ADS
+ * Dev: @DannyElCallejero | Versión: 3.5 - INTEGRACIÓN ADS Y TABS
  */
 
 function App() {
-  /* --- [ ESTADOS Y REFERENCIAS ] --- */
+  /* --- [ ESTADOS GENERALES Y NAVEGACIÓN ] --- */
   const [status, setStatus] = useState('loading');
+  const [activeTab, setActiveTab] = useState('home'); // Pestañas: 'home', 'share', 'missions'
   const [userData, setUserData] = useState(null);
   const [errorInfo, setErrorInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,21 +19,20 @@ function App() {
     c1: "0.000", c2: "0.000", c3: "0.000" 
   });
   
+  /* --- [ ESTADOS DE RETIRO ] --- */
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [walletAddr, setWalletAddr] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
+  
+  /* --- [ ESTADOS DE HISTORIAL Y ADS ] --- */
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // Estado para los anuncios
   const [isAdLoading, setIsAdLoading] = useState(false);
 
   /* --- [ LÓGICA DE INICIO Y SESIÓN ] --- */
-  
   const verifyUser = (user, startParam) => {
     const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const userLang = navigator.language || navigator.userLanguage;
@@ -93,10 +93,8 @@ function App() {
   }, []);
 
   /* --- [ LÓGICA DE ANUNCIOS GIGAPUB ] --- */
-
   const handleWatchAd = () => {
     if (isAdLoading) return;
-    
     setIsAdLoading(true);
     
     if (typeof window.showGiga !== 'function') {
@@ -133,7 +131,6 @@ function App() {
   };
 
   /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
-
   const handleStartWithdraw = () => {
     if ((userData?.balance || 0) < 0.01) {
       WebApp.showAlert('⚠️ Mínimo de retiro: 0.01 TON');
@@ -145,7 +142,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (isWithdrawing && window.turnstile) {
+    if (isWithdrawing && window.turnstile && activeTab === 'home') {
       const timeout = setTimeout(() => {
         if (turnstileRef.current) {
           turnstileRef.current.innerHTML = ''; 
@@ -158,26 +155,22 @@ function App() {
       }, 300);
       return () => clearTimeout(timeout);
     }
-  }, [isWithdrawing]);
+  }, [isWithdrawing, activeTab]);
 
   const executeWithdraw = async () => {
     const amountFloat = parseFloat(withdrawAmount);
 
     if (!walletAddr || walletAddr.trim().length < 40) { 
-      WebApp.showAlert('⚠️ Dirección TON inválida.');
-      return;
+      WebApp.showAlert('⚠️ Dirección TON inválida.'); return; 
     }
     if (isNaN(amountFloat) || amountFloat < 0.01) {
-      WebApp.showAlert('⚠️ Ingresa una cantidad válida (Mín: 0.01 TON).');
-      return;
+      WebApp.showAlert('⚠️ Ingresa una cantidad válida (Mín: 0.01 TON).'); return;
     }
     if (amountFloat > userData.balance) {
-      WebApp.showAlert('⚠️ No tienes saldo suficiente.');
-      return;
+      WebApp.showAlert('⚠️ No tienes saldo suficiente.'); return;
     }
     if (!turnstileToken) {
-      WebApp.showAlert('⚠️ Completa el captcha de seguridad.');
-      return;
+      WebApp.showAlert('⚠️ Completa el captcha de seguridad.'); return;
     }
 
     setIsSubmitting(true);
@@ -206,7 +199,6 @@ function App() {
   }; 
 
   /* --- [ UTILIDADES SECUNDARIAS ] --- */
-
   const handleCheckSubscription = () => {
     const user = WebApp.initDataUnsafe?.user;
     const startParam = WebApp.initDataUnsafe?.start_param;
@@ -247,12 +239,14 @@ function App() {
 
   return (
     <div style={s.container}>
+      {/* BOTÓN DE HISTORIAL (Global para Miembros) */}
       {status === 'member' && (
         <button onClick={loadHistory} style={s.btnHistoryIcon} disabled={loadingHistory}>
           {loadingHistory ? '...' : '📜'}
         </button>
       )}
 
+      {/* MODAL DE HISTORIAL */}
       {showHistory && (
         <div style={s.modalOverlay}>
           <div style={s.historyCard}>
@@ -278,6 +272,7 @@ function App() {
         </div>
       )}
 
+      {/* PANTALLA GUEST (Canal Requerido) */}
       {status === 'guest' ? (
         <div style={s.main}>
           <div style={s.card}>
@@ -288,108 +283,152 @@ function App() {
           </div>
         </div>
       ) : (
+        /* PANTALLA MIEMBRO (Con Pestañas) */
         <div style={s.main}>
-           <div style={s.cardBalance}>
-              {!isWithdrawing ? (
-                <>
-                  <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
-                  <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(5) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
-                  <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
-                  <div style={s.badge}>Min: 0.01 TON | Límite: 0.2 TON/Día</div>
-                </>
-              ) : (
-                <div style={{width: '100%'}}>
-                  <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
-                  
-                  <input type="number" placeholder="Monto a retirar (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
-                  <input type="text" placeholder="Tu Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
-                  
-                  <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
-                  
-                  <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
-                    <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
-                    <button 
-                      style={{
-                        ...s.btnConfirm, 
-                        opacity: isSubmitting ? 0.5 : 1,
-                        backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff' 
-                      }} 
-                      onClick={executeWithdraw}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? '...' : 'CONFIRMAR'}
-                    </button>
+           
+           {/* --- PESTAÑA: HOME (Retiro y Saldo) --- */}
+           {activeTab === 'home' && (
+             <div className="tab-content fade-in">
+               <div style={s.cardBalance}>
+                  {!isWithdrawing ? (
+                    <>
+                      <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
+                      <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(5) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
+                      <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
+                      <div style={s.badge}>Min: 0.01 TON | Límite: 0.2 TON/Día</div>
+                    </>
+                  ) : (
+                    <div style={{width: '100%'}}>
+                      <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
+                      
+                      <input type="number" placeholder="Monto a retirar (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
+                      <input type="text" placeholder="Tu Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
+                      
+                      <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
+                      
+                      <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
+                        <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
+                        <button 
+                          style={{
+                            ...s.btnConfirm, 
+                            opacity: isSubmitting ? 0.5 : 1,
+                            backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff' 
+                          }} 
+                          onClick={executeWithdraw}
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? '...' : 'CONFIRMAR'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+               </div>
+             </div>
+           )}
+
+           {/* --- PESTAÑA: SHARE (Referidos y Niveles) --- */}
+           {activeTab === 'share' && (
+             <div className="tab-content fade-in">
+               <div style={s.card}>
+                  <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
+                  <div style={s.row}>
+                    <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.003</b></div>
+                    <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.002</b></div>
+                    <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.001</b></div>
                   </div>
-                </div>
-              )}
-           </div>
+                  <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
+               </div>
 
-           {/* SECCIÓN DE GANANCIAS POR ANUNCIOS */}
-           <div style={{...s.card, marginBottom:'20px', border:'1px solid #28a745'}}>
-              <h4 style={{marginTop:0, color:'#28a745'}}>📺 ANUNCIOS RECOMPENSADOS</h4>
-              <p style={{fontSize:'12px', color:'#aaa', marginBottom:'15px'}}>
-                Mira un video corto para ganar <b>0.0005 TON</b>.<br/> Disponible 1 vez por hora.
-              </p>
-              <button 
-                style={{
-                  ...s.btnGreen, 
-                  backgroundColor: isAdLoading ? '#1a3a1a' : '#28a745',
-                  opacity: isAdLoading ? 0.7 : 1 
-                }} 
-                onClick={handleWatchAd}
-                disabled={isAdLoading}
-              >
-                {isAdLoading ? 'CARGANDO VIDEO...' : '🎥 VER VIDEO Y GANAR'}
-              </button>
-           </div>
+               <div style={{...s.card, marginTop:'20px'}}>
+                  <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px', marginBottom:'15px'}}>TU RED DE TRABAJO</h4>
+                  <div style={s.statsGrid}>
+                    <div style={s.statCol}>
+                      <p style={s.statLabel}>DIRECTOS</p>
+                      <p style={s.statValue}>{stats.n1}</p>
+                      <p style={s.statCom}>+{stats.c1} TON</p>
+                    </div>
+                    <div style={s.statCol}>
+                      <p style={s.statLabel}>NIVEL 2</p>
+                      <p style={s.statValue}>{stats.n2}</p>
+                      <p style={s.statCom}>+{stats.c2} TON</p>
+                    </div>
+                    <div style={s.statCol}>
+                      <p style={s.statLabel}>NIVEL 3</p>
+                      <p style={s.statValue}>{stats.n3}</p>
+                      <p style={s.statCom}>+{stats.c3} TON</p>
+                    </div>
+                  </div>
+                  <div style={s.totalRow}>
+                    <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
+                    <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>
+                      {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
+                    </p>
+                  </div>
+               </div>
+             </div>
+           )}
 
-           <div style={s.card}>
-              <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
-              <div style={s.row}>
-                <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.003</b></div>
-                <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.002</b></div>
-                <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.001</b></div>
-              </div>
-              <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
-           </div>
+           {/* --- PESTAÑA: MISSIONS (Anuncios y Tareas) --- */}
+           {activeTab === 'missions' && (
+             <div className="tab-content fade-in">
+               <div style={{...s.card, border:'1px solid #28a745'}}>
+                  <h4 style={{marginTop:0, color:'#28a745'}}>📺 ANUNCIOS RECOMPENSADOS</h4>
+                  <p style={{fontSize:'12px', color:'#aaa', marginBottom:'15px'}}>
+                    Mira un video corto para ganar <b>0.0005 TON</b>.<br/> Disponible 1 vez por hora.
+                  </p>
+                  <button 
+                    style={{
+                      ...s.btnGreen, 
+                      backgroundColor: isAdLoading ? '#1a3a1a' : '#28a745',
+                      opacity: isAdLoading ? 0.7 : 1 
+                    }} 
+                    onClick={handleWatchAd}
+                    disabled={isAdLoading}
+                  >
+                    {isAdLoading ? 'CARGANDO VIDEO...' : '🎥 VER VIDEO Y GANAR'}
+                  </button>
+               </div>
 
-           <div style={{...s.card, marginTop:'20px'}}>
-              <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px', marginBottom:'15px'}}>TU RED DE TRABAJO</h4>
-              <div style={s.statsGrid}>
-                <div style={s.statCol}>
-                  <p style={s.statLabel}>DIRECTOS</p>
-                  <p style={s.statValue}>{stats.n1}</p>
-                  <p style={s.statCom}>+{stats.c1} TON</p>
-                </div>
-                <div style={s.statCol}>
-                  <p style={s.statLabel}>NIVEL 2</p>
-                  <p style={s.statValue}>{stats.n2}</p>
-                  <p style={s.statCom}>+{stats.c2} TON</p>
-                </div>
-                <div style={s.statCol}>
-                  <p style={s.statLabel}>NIVEL 3</p>
-                  <p style={s.statValue}>{stats.n3}</p>
-                  <p style={s.statCom}>+{stats.c3} TON</p>
-                </div>
-              </div>
-              <div style={s.totalRow}>
-                <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
-                <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>
-                  {(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON
-                </p>
-              </div>
-           </div>
+               {/* Placeholder para futuras tareas */}
+               <div style={{...s.card, marginTop:'20px', border:'1px dashed #333', backgroundColor:'transparent'}}>
+                 <h4 style={{color:'#666', marginTop:0}}>🛠️ TAREAS DIARIAS</h4>
+                 <p style={{color:'#555', fontSize:'12px', margin:0}}>
+                   Próximamente agregaremos misiones sociales y tareas especiales para que ganes más TON. ¡Mantente atento!
+                 </p>
+               </div>
+             </div>
+           )}
+        </div>
+      )}
+
+      {/* --- BARRA DE NAVEGACIÓN INFERIOR (Solo visible si es miembro) --- */}
+      {status === 'member' && (
+        <div style={s.bottomNav}>
+          <div onClick={() => setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
+            <span style={{fontSize:'20px'}}>🏠</span>
+            <span>Home</span>
+          </div>
+          <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
+            <span style={{fontSize:'20px'}}>👥</span>
+            <span>Share</span>
+          </div>
+          <div onClick={() => setActiveTab('missions')} style={activeTab === 'missions' ? s.navItemActive : s.navItem}>
+            <span style={{fontSize:'20px'}}>🚀</span>
+            <span>Missions</span>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+/* --- ESTILOS CSS --- */
 const s = {
   container: { backgroundColor:'#000', color:'#fff', minHeight:'100vh', padding:'20px', fontFamily:'Inter, sans-serif' },
   center: { height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center' },
   loader: { width:'40px', height:'40px', border:'3px solid #333', borderTop:'3px solid #0088cc', borderRadius:'50%' },
-  main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto', width:'100%' },
+  // Se agregó paddingBottom para que el contenido no quede oculto detrás de la barra inferior
+  main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto', width:'100%', paddingBottom: '80px', paddingTop: '40px' }, 
   cardBalance: { background:'linear-gradient(135deg, #0088cc 0%, #005588 100%)', padding:'30px 20px', borderRadius:'24px', textAlign:'center', marginBottom:'20px', display:'flex', flexDirection:'column', alignItems:'center', width:'100%', boxSizing:'border-box' },
   card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #1a1a1a', width:'100%', boxSizing:'border-box' },
   badge: { fontSize:'10px', backgroundColor:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'20px', marginTop:'10px', display:'inline-block' },
@@ -410,13 +449,19 @@ const s = {
   btnCancel: { flex:1, padding:'14px', backgroundColor:'rgba(0,0,0,0.3)', color:'#fff', border:'none', borderRadius:'12px' },
   btnConfirm: { flex:1, padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'12px', fontWeight:'bold' },
   btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px', zIndex:10 },
-  modalOverlay: { position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.9)', zIndex:100, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px' },
-  historyCard: { backgroundColor:'#0a0a0a', border:'2px solid #ff4444', borderRadius:'20px', width:'100%', maxWidth:'380px', maxHeight:'80vh', display:'flex', flexDirection:'column' },
-  modalHeader: { padding:'20px', borderBottom:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between' },
-  historyList: { flex:1, overflowY:'auto', padding:'10px' },
-  historyItem: { display:'flex', justifyContent:'space-between', padding:'15px', borderBottom:'1px solid #1a1a1a' },
-  btnClose: { background:'none', border:'1px solid #ff4444', color:'#ff4444', borderRadius:'8px', padding:'5px' },
-  errorBox: { backgroundColor:'#1a0000', color:'#ff8888', padding:'15px', borderRadius:'12px', border:'1px solid #ff4444', margin:'20px' }
+  
+  // ESTILOS DE LA BARRA INFERIOR
+  bottomNav: { position:'fixed', bottom:0, left:0, right:0, backgroundColor:'#0a0a0a', display:'flex', justifyContent:'space-around', padding:'12px 0 20px 0', borderTop:'1px solid #222', zIndex:100 },
+  navItem: { color:'#555', display:'flex', flexDirection:'column', alignItems:'center', fontSize:'11px', fontWeight:'bold', cursor:'pointer', transition: 'color 0.2s', width: '33%' },
+  navItemActive: { color:'#0088cc', display:'flex', flexDirection:'column', alignItems:'center', fontSize:'11px', fontWeight:'bold', cursor:'pointer', width: '33%' },
+  
+  // MODAL
+  modalOverlay: { position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.8)', zIndex:200, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px' },
+  historyCard: { backgroundColor:'#111', width:'100%', maxWidth:'400px', borderRadius:'24px', border:'1px solid #333', display:'flex', flexDirection:'column', maxHeight:'80vh' },
+  modalHeader: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px', borderBottom:'1px solid #222' },
+  btnClose: { backgroundColor:'transparent', color:'#aaa', border:'none', fontWeight:'bold', cursor:'pointer' },
+  historyList: { padding:'20px', overflowY:'auto' },
+  historyItem: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #222' }
 };
 
 export default App;
