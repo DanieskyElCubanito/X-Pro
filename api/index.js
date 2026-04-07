@@ -71,11 +71,57 @@ app.post('/api/verify', async (req, res) => {
     const userAgent = req.headers['user-agent'] || "unknown";
     const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
 
+    // 1. Obtener datos básicos del usuario
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
-    
+
     if (dbUser?.is_banned) {
       return res.json({ success: false, error: 'USER_BANNED', message: "Acceso denegado permanentemente." });
     }
+
+    // 2. Definir el inicio del día (UTC) para resetear misiones diarias
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const isoStart = startOfDay.toISOString();
+
+    // 3. Obtener estadísticas de RED (Referidos)
+    // Suponiendo que tienes una función o lógica para contar niveles 1, 2 y 3
+    const stats = await getReferralStats(user.id); 
+
+    // 4. --- [ LO MÁS IMPORTANTE ]: Obtener progreso del día ---
+    
+    // Contar cuántos anuncios ha visto hoy
+    const { count: adsCount } = await supabase
+      .from('ad_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', isoStart);
+
+    // Obtener qué misiones ya reclamó hoy
+    const { data: claims } = await supabase
+      .from('mission_claims')
+      .select('mission_id')
+      .eq('user_id', user.id)
+      .gte('created_at', isoStart);
+
+    // Convertimos el resultado de claims en un array de strings: ["m1", "m2"]
+    const claimedMissions = claims ? claims.map(c => c.mission_id) : [];
+
+    // 5. Responder al Frontend con TODO el contexto necesario
+    return res.json({
+      success: true,
+      user: dbUser,
+      stats: stats,
+      dailyStats: {
+        adsWatched: adsCount || 0,
+        claimedMissions: claimedMissions
+      }
+    });
+
+  } catch (e) {
+    console.error("Error en verify:", e);
+    return res.status(500).json({ success: false, error: 'SERVER_ERROR' });
+  }
+});
 
     // Verificación de Proxy/VPN
     try {
