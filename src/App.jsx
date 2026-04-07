@@ -111,38 +111,21 @@ function App() {
     setIsAdLoading(true);
     
     if (typeof window.showGiga !== 'function') {
-      WebApp.showAlert('⚠️ El sistema de anuncios se está cargando o hay un bloqueador activo.');
+      WebApp.showAlert('⚠️ El sistema de anuncios se está cargando...');
       setIsAdLoading(false);
       return;
     }
 
     window.showGiga()
-      .then(async () => {
-        try {
-          const res = await axios.post('/api/ad-reward', { userId: userData.id });
-          
-          if (res.data.success) {
-            WebApp.HapticFeedback.notificationOccurred('success');
-            WebApp.showAlert(`¡Felicidades! Has ganado ${res.data.reward} TON.`);
-            
-            // Actualizamos saldo y aumentamos el contador de anuncios vistos
-            setUserData(prev => ({ ...prev, balance: prev.balance + res.data.reward }));
-            setAdsWatchedCount(prev => prev + 1);
-            
-          } else if (res.data.error === 'COOLDOWN') {
-            WebApp.HapticFeedback.notificationOccurred('warning');
-            WebApp.showAlert(res.data.message);
-          } else {
-            WebApp.showAlert('❌ Error: ' + (res.data.message || 'Recompensa no procesada.'));
-          }
-        } catch (e) {
-          WebApp.showAlert('❌ Error al conectar con el servidor.');
-        } finally {
-          setIsAdLoading(false);
-        }
+      .then(() => {
+        // El anuncio ya no da dinero directo, solo suma al contador de misiones
+        setAdsWatchedCount(prev => prev + 1);
+        WebApp.HapticFeedback.notificationOccurred('success');
+        WebApp.showAlert('✅ ¡Anuncio visto! Tu progreso ha aumentado.');
+        setIsAdLoading(false);
       })
       .catch(e => {
-        console.log("Anuncio cerrado o cancelado antes de tiempo", e);
+        console.log("Anuncio cerrado");
         setIsAdLoading(false);
       });
   };
