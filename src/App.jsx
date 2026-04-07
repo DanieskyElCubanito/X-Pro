@@ -139,26 +139,52 @@ function App() {
 
   /* --- [ LÓGICA DE RECLAMAR MISIONES ] --- */
   const handleClaimMission = async (mission) => {
+    // 1. BLOQUEO DE SEGURIDAD INICIAL
+    // Si la misión ya aparece como reclamada en el estado local, abortamos de inmediato.
+    const missionKey = `m${mission.id}`;
+    if (claimedMissions.includes(missionKey) || claimedMissions.includes(mission.id)) {
+      return; 
+    }
+
+    // 2. EVITAR DOBLE CLICK (Spam)
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
       // Llamamos al backend para procesar el pago y guardar el registro
       const res = await axios.post('/api/claim-mission', {
         userId: userData.id,
-        missionId: `m${mission.id}` // Ajustamos el ID para que coincida con el backend ('m1', 'm2', etc)
+        missionId: missionKey 
       });
 
       if (res.data.success) {
-        // Actualizamos el estado local solo si el servidor confirmó el pago
-        setClaimedMissions(prev => [...prev, `m${mission.id}`]);
-        setUserData(prev => ({ ...prev, balance: prev.balance + mission.reward }));
+        // 3. ACTUALIZACIÓN DEL ESTADO
+        // Es vital usar la misma llave (missionKey) que usas en el renderizado para comparar
+        setClaimedMissions(prev => [...prev, missionKey]);
         
+        // Actualizamos el balance con el dato real del servidor si es posible, 
+        // o sumamos la recompensa al estado actual.
+        setUserData(prev => ({ 
+          ...prev, 
+          balance: (prev.balance || 0) + mission.reward 
+        }));
+
         WebApp.HapticFeedback.notificationOccurred('success');
         WebApp.showAlert(`✅ ¡Reclamaste ${mission.reward.toFixed(5)} TON!`);
       } else {
+        // Si el backend dice que ya se reclamó hoy, lo añadimos al estado para que el botón se bloquee
+        if (res.data.error?.includes("ya reclamada")) {
+            setClaimedMissions(prev => [...prev, missionKey]);
+        }
         WebApp.showAlert(`⚠️ ${res.data.error}`);
       }
     } catch (e) {
       console.error(e);
-      WebApp.showAlert('❌ Error al conectar con el servidor.');
+      const msg = e.response?.data?.error || 'Error al conectar con el servidor.';
+      WebApp.showAlert(`❌ ${msg}`);
+    } finally {
+      // 4. LIBERAR EL BOTÓN
+      setIsSubmitting(false);
     }
   };
 
