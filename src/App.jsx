@@ -363,7 +363,7 @@ function App() {
                <div style={{...s.card, border:'1px solid #28a745', marginBottom:'20px'}}>
                   <h4 style={{marginTop:0, color:'#28a745'}}>📺 ANUNCIOS RECOMPENSADOS</h4>
                   <p style={{fontSize:'12px', color:'#aaa', marginBottom:'15px'}}>
-                    Mira un video corto para ganar increíbles recompensas<br/>.
+                    Mira un video corto para ganar increíbles recompensas<br/>
                   </p>
                   <button style={{...s.btnGreen, backgroundColor: isAdLoading ? '#1a3a1a' : '#28a745', opacity: isAdLoading ? 0.7 : 1}} onClick={handleWatchAd} disabled={isAdLoading}>
                     {isAdLoading ? 'CARGANDO VIDEO...' : '🎥 VER VIDEO Y GANAR'}
