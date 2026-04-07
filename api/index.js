@@ -298,21 +298,35 @@ app.post('/api/withdraw', async (req, res) => {
                 user_id: Number(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: cleanAddress 
             }]);
 
-            const messageText = `💎 <b>PAGO VERIFICADO</b>\n\n👤 <b>Beneficiario:</b> ${user.username}\n💸 <b>Monto:</b> ${withdrawAmount} TON\n🔹 <a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`;
+            const messageText = 
+                `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+                `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${user.username || 'Usuario'}</a>\n` +
+                `💸 <b>Monto Total:</b> ${withdrawAmount} TON\n` +
+                `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+                `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+                `🔹 <b>TXID:</b>\n` +
+                `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
+                `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
           
             await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 chat_id: PAYMENTS_CHANNEL,
                 text: messageText,
                 parse_mode: 'HTML',
-                disable_web_page_preview: true
-            }).catch(e => console.log("Error Notify"));
+                disable_web_page_preview: true,
+                reply_markup: {
+                    inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/IAProfitTonBot` }]]
+                }
+            }).catch(e => console.log("Error Telegram Notification"));
 
             return res.json({ success: true, txHash });
         }
+
     } catch (e) {
         return res.json({ success: false, error: "Error crítico: " + e.message });
     }
 });
+
+
 
 /* --- [ HISTORIAL ] --- */
 app.get('/api/history', async (req, res) => {
