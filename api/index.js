@@ -139,7 +139,20 @@ app.post('/api/verify', async (req, res) => {
         }
     }
 
-    // CÁLCULO DE ESTADÍSTICAS PARA EL FRONTEND
+    // --- NUEVO: CÁLCULO DE PROGRESO DIARIO (PARA REINICIAR MISIONES A LAS 00:00 UTC) ---
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const { data: adsTodayData } = await supabase.from('ad_logs')
+        .select('id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString());
+    const adsTodayCount = adsTodayData ? adsTodayData.length : 0;
+
+    const { data: missionsTodayData } = await supabase.from('mission_claims')
+        .select('mission_id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString());
+    const claimedMissionsToday = missionsTodayData ? missionsTodayData.map(m => m.mission_id) : [];
+    // ---------------------------------------------------------------------------------
+
+    // CÁLCULO DE ESTADÍSTICAS DE REFERIDOS
     const { data: l1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
     const idsL1 = l1 ? l1.map(u => u.id) : [];
     let n2 = 0, n3 = 0;
@@ -154,9 +167,14 @@ app.post('/api/verify', async (req, res) => {
         }
     }
 
+    // AHORA MANDAMOS "dailyStats" AL FRONTEND
     return res.json({ 
       success: true, 
       user: dbUser,
+      dailyStats: {
+        adsWatched: adsTodayCount,
+        claimedMissions: claimedMissionsToday
+      },
       stats: {
         n1: idsL1.length, n2, n3,
         c1: (idsL1.length * REWARDS.level1).toFixed(3),
@@ -173,7 +191,6 @@ app.post('/api/verify', async (req, res) => {
 
 /* --- [ LÓGICA DE MISIONES Y ANUNCIOS ] --- */
 
-// Endpoint para registrar que vio un anuncio (SIN RECOMPENSA DIRECTA)
 app.post('/api/ad-reward', async (req, res) => {
     try {
         const { userId } = req.body;
@@ -182,7 +199,6 @@ app.post('/api/ad-reward', async (req, res) => {
         const { data: user } = await supabase.from('users').select('is_banned').eq('id', userId).maybeSingle();
         if (!user || user.is_banned) return res.json({ success: false, error: "BANNED" });
 
-        // Solo insertamos el log con amount 0. El cooldown de 1 hora es opcional aquí.
         await supabase.from('ad_logs').insert([{ user_id: userId, amount: 0 }]);
 
         return res.json({ success: true, message: "Progreso actualizado" });
@@ -191,7 +207,6 @@ app.post('/api/ad-reward', async (req, res) => {
     }
 });
 
-// Endpoint para RECLAMAR el premio de la misión
 app.post('/api/claim-mission', async (req, res) => {
     try {
         const { userId, missionId } = req.body;
@@ -201,14 +216,12 @@ app.post('/api/claim-mission', async (req, res) => {
         const startOfDay = new Date();
         startOfDay.setUTCHours(0, 0, 0, 0);
 
-        // 1. Verificar si ya la reclamó hoy
         const { data: claimed } = await supabase.from('mission_claims')
             .select('id').eq('user_id', userId).eq('mission_id', missionId)
             .gte('created_at', startOfDay.toISOString()).maybeSingle();
 
         if (claimed) return res.json({ success: false, error: "ALREADY_CLAIMED" });
 
-        // 2. Verificar si tiene suficientes anuncios hoy
         const { data: adsToday } = await supabase.from('ad_logs')
             .select('id').eq('user_id', userId).gte('created_at', startOfDay.toISOString());
 
@@ -216,7 +229,6 @@ app.post('/api/claim-mission', async (req, res) => {
             return res.json({ success: false, error: "NOT_ENOUGH_ADS" });
         }
 
-        // 3. Pagar y registrar
         await supabase.rpc('increment_balance', { user_id: userId, amount: mission.reward });
         await supabase.from('mission_claims').insert([{ user_id: userId, mission_id: missionId }]);
 
@@ -325,8 +337,6 @@ app.post('/api/withdraw', async (req, res) => {
         return res.json({ success: false, error: "Error crítico: " + e.message });
     }
 });
-
-
 
 /* --- [ HISTORIAL ] --- */
 app.get('/api/history', async (req, res) => {
