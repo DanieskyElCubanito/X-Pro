@@ -60,8 +60,7 @@ function isValidTonAddress(address) {
   return typeof address === 'string' && (address.startsWith('U') || address.startsWith('E')) && address.length === 48;
 }
 
-/* --- [ LÓGICA DE REGISTRO E IDENTIFICACIÓN ] --- */
-
+/* --- [ LÓGICA DE REGISTRO E IDENTIFICACIÓN UNIFICADA ] --- */
 app.post('/api/verify', async (req, res) => {
   try {
     const { user, start_param } = req.body;
@@ -71,59 +70,14 @@ app.post('/api/verify', async (req, res) => {
     const userAgent = req.headers['user-agent'] || "unknown";
     const deviceHash = crypto.createHash('md5').update(userIp + userAgent).digest('hex');
 
-    // 1. Obtener datos básicos del usuario
+    // 1. OBTENER USUARIO Y CHEQUEAR BANEO
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
 
     if (dbUser?.is_banned) {
       return res.json({ success: false, error: 'USER_BANNED', message: "Acceso denegado permanentemente." });
     }
 
-    // 2. Definir el inicio del día (UTC) para resetear misiones diarias
-    const startOfDay = new Date();
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const isoStart = startOfDay.toISOString();
-
-    // 3. Obtener estadísticas de RED (Referidos)
-    // Suponiendo que tienes una función o lógica para contar niveles 1, 2 y 3
-    const stats = await getReferralStats(user.id); 
-
-    // 4. --- [ LO MÁS IMPORTANTE ]: Obtener progreso del día ---
-    
-    // Contar cuántos anuncios ha visto hoy
-    const { count: adsCount } = await supabase
-      .from('ad_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', isoStart);
-
-    // Obtener qué misiones ya reclamó hoy
-    const { data: claims } = await supabase
-      .from('mission_claims')
-      .select('mission_id')
-      .eq('user_id', user.id)
-      .gte('created_at', isoStart);
-
-    // Convertimos el resultado de claims en un array de strings: ["m1", "m2"]
-    const claimedMissions = claims ? claims.map(c => c.mission_id) : [];
-
-    // 5. Responder al Frontend con TODO el contexto necesario
-    return res.json({
-      success: true,
-      user: dbUser,
-      stats: stats,
-      dailyStats: {
-        adsWatched: adsCount || 0,
-        claimedMissions: claimedMissions
-      }
-    });
-
-  } catch (e) {
-    console.error("Error en verify:", e);
-    return res.status(500).json({ success: false, error: 'SERVER_ERROR' });
-  }
-});
-
-    // Verificación de Proxy/VPN
+    // 2. VERIFICACIÓN DE PROXY / VPN
     try {
         const pCheck = await axios.get(`https://proxycheck.io/v2/${userIp}?vpn=1`);
         if (pCheck.data[userIp]?.proxy === "yes") {
@@ -132,7 +86,7 @@ app.post('/api/verify', async (req, res) => {
         }
     } catch (e) { console.log("ProxyCheck Skip"); }
 
-    // Verificación de canal de Telegram
+    // 3. VERIFICACIÓN DE CANAL DE TELEGRAM
     let isMember = false;
     try {
         const tgRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${user.id}`);
@@ -141,10 +95,10 @@ app.post('/api/verify', async (req, res) => {
 
     if (!isMember) return res.json({ success: false, error: 'NOT_MEMBER' });
 
-    // Lógica de Nuevo Usuario y Referidos (Nivel 1, 2 y 3)
+    // 4. LÓGICA DE REGISTRO (NUEVOS USUARIOS) Y MULTICUENTA
     if (!dbUser) {
       const { data: hashExists } = await supabase.from('users').select('id').eq('device_hash', deviceHash).maybeSingle();
-      
+
       if (hashExists) {
         await supabase.from('users').insert([{ id: user.id, username: user.username, is_banned: true, device_hash: deviceHash }]);
         await notifyAdmin(`🚫 <b>MULTICUENTA DETECTADA</b>\nID: <code>${user.id}</code> usó dispositivo de <code>${hashExists.id}</code>`);
@@ -152,7 +106,7 @@ app.post('/api/verify', async (req, res) => {
       }
 
       const referrerId = (start_param && parseInt(start_param) !== user.id) ? parseInt(start_param) : null;
-      
+
       const { data: newUser, error: insErr } = await supabase.from('users').insert([{
         id: user.id,
         username: user.username || 'user',
@@ -166,39 +120,40 @@ app.post('/api/verify', async (req, res) => {
       if (insErr) throw insErr;
       dbUser = newUser;
 
-      // PAGO DE REFERIDOS EN CADENA
+      // PAGO DE REFERIDOS EN CADENA (Nivel 1, 2 y 3)
       if (referrerId) {
-          await supabase.rpc('increment_balance', { user_id: referrerId, amount: REWARDS.level1 });
+          await supabase.rpc('increment_balance', { user_id_param: referrerId, amount_param: REWARDS.level1 });
           const { data: p1 } = await supabase.from('users').select('referred_by').eq('id', referrerId).maybeSingle();
           if (p1?.referred_by) {
-              await supabase.rpc('increment_balance', { user_id: p1.referred_by, amount: REWARDS.level2 });
+              await supabase.rpc('increment_balance', { user_id_param: p1.referred_by, amount_param: REWARDS.level2 });
               const { data: p2 } = await supabase.from('users').select('referred_by').eq('id', p1.referred_by).maybeSingle();
               if (p2?.referred_by) {
-                  await supabase.rpc('increment_balance', { user_id: p2.referred_by, amount: REWARDS.level3 });
+                  await supabase.rpc('increment_balance', { user_id_param: p2.referred_by, amount_param: REWARDS.level3 });
               }
           }
       }
     } else {
+        // Actualizar hash si no lo tiene
         if (!dbUser.device_hash) {
             await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
             dbUser.device_hash = deviceHash;
         }
     }
 
-    // --- NUEVO: CÁLCULO DE PROGRESO DIARIO (PARA REINICIAR MISIONES A LAS 00:00 UTC) ---
+    // 5. CÁLCULO DE PROGRESO DIARIO (MISIONES)
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
+    const isoStart = startOfDay.toISOString();
 
-    const { data: adsTodayData } = await supabase.from('ad_logs')
-        .select('id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString());
-    const adsTodayCount = adsTodayData ? adsTodayData.length : 0;
+    const { count: adsTodayCount } = await supabase.from('ad_logs')
+        .select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', isoStart);
 
     const { data: missionsTodayData } = await supabase.from('mission_claims')
-        .select('mission_id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString());
+        .select('mission_id').eq('user_id', user.id).gte('created_at', isoStart);
+    
     const claimedMissionsToday = missionsTodayData ? missionsTodayData.map(m => m.mission_id) : [];
-    // ---------------------------------------------------------------------------------
 
-    // CÁLCULO DE ESTADÍSTICAS DE REFERIDOS
+    // 6. CÁLCULO DE ESTADÍSTICAS DE RED (PARA LA PESTAÑA SHARE)
     const { data: l1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
     const idsL1 = l1 ? l1.map(u => u.id) : [];
     let n2 = 0, n3 = 0;
@@ -213,24 +168,24 @@ app.post('/api/verify', async (req, res) => {
         }
     }
 
-    // AHORA MANDAMOS "dailyStats" AL FRONTEND
+    // 7. RESPUESTA FINAL ÚNICA
     return res.json({ 
       success: true, 
       user: dbUser,
       dailyStats: {
-        adsWatched: adsTodayCount,
+        adsWatched: adsTodayCount || 0,
         claimedMissions: claimedMissionsToday
       },
       stats: {
         n1: idsL1.length, n2, n3,
-        c1: (idsL1.length * REWARDS.level1).toFixed(3),
-        c2: (n2 * REWARDS.level2).toFixed(3),
-        c3: (n3 * REWARDS.level3).toFixed(3)
+        c1: (idsL1.length * REWARDS.level1).toFixed(5),
+        c2: (n2 * REWARDS.level2).toFixed(5),
+        c3: (n3 * REWARDS.level3).toFixed(5)
       }
     });
 
   } catch (err) {
-    console.error("Critical Error:", err.message);
+    console.error("Critical Error en Verify:", err);
     return res.status(500).json({ success: false, error: 'SERVER_ERROR' });
   }
 });
