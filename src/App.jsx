@@ -4,7 +4,7 @@ import axios from 'axios';
 
 /**
  * IA PROFIT TON BOT - FRONTEND CORE
- * Dev: @DannyElCallejero | Versión: 3.8 - MISIÓN DIARIA ÚNICA
+ * Dev: @DannyElCallejero | Versión: 4.0 - SOLO ADS (SIN MISIONES)
  */
 
 function App() {
@@ -26,40 +26,23 @@ function App() {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const turnstileRef = useRef(null);
 
-  /* --- [ ESTADOS DE HISTORIAL, ADS Y MISIONES ] --- */
+  /* --- [ ESTADOS DE HISTORIAL Y ADS ] --- */
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isAdLoading, setIsAdLoading] = useState(false);
-
-  // Variables para las Misiones (Frontend)
   const [adsWatchedCount, setAdsWatchedCount] = useState(0); 
-  const [claimedMissions, setClaimedMissions] = useState([]);
-
-  // SE ELIMINÓ EL ARRAY DE MISIONES. AHORA USAMOS ESTA ÚNICA:
-  const DAILY_MISSION = { id: 'daily_100', target: 100, reward: 0.0010 };
 
   /* --- [ LÓGICA DE INICIO Y SESIÓN ] --- */
   const verifyUser = (user, startParam) => {
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const userLang = navigator.language || navigator.userLanguage;
-
-    axios.post('/api/verify', { 
-      user, 
-      start_param: startParam,
-      tz: userTimezone,
-      ln: userLang
-    })
+    axios.post('/api/verify', { user, start_param: startParam })
       .then(res => {
         if (res.data.success) {
           setUserData(res.data.user);
           setStats(res.data.stats);
-
           if (res.data.dailyStats) {
             setAdsWatchedCount(res.data.dailyStats.adsWatched || 0);
-            setClaimedMissions(res.data.dailyStats.claimedMissions || []);
           }
-
           setStatus('member');
         } else {
           if (res.data.error === 'USER_BANNED') {
@@ -77,7 +60,6 @@ function App() {
         }
       })
       .catch(err => {
-        console.error(err);
         setStatus('error');
         setErrorInfo('Servidor fuera de línea.');
       });
@@ -87,9 +69,6 @@ function App() {
     try {
       WebApp.ready();
       WebApp.expand();
-      WebApp.setHeaderColor('#000000');
-      WebApp.setBackgroundColor('#000000');
-
       const user = WebApp.initDataUnsafe?.user;
       const startParam = WebApp.initDataUnsafe?.start_param;
 
@@ -117,43 +96,32 @@ function App() {
     }
 
     window.showGiga()
-      .then(() => {
-        setAdsWatchedCount(prev => prev + 1);
-        WebApp.HapticFeedback.notificationOccurred('success');
-        WebApp.showAlert('✅ ¡Anuncio visto! Tu progreso ha aumentado.');
+      .then(async (result) => {
+        // Determinamos la recompensa según la acción (clic o vista)
+        const action = result?.clicked ? 'click' : 'view';
+        const reward = action === 'click' ? 0.0005 : 0.0002;
+
+        try {
+          const res = await axios.post('/api/ad-reward', { userId: userData.id, action });
+          if (res.data.success) {
+            setUserData(prev => ({ ...prev, balance: prev.balance + reward }));
+            setAdsWatchedCount(prev => prev + 1);
+            WebApp.HapticFeedback.notificationOccurred('success');
+            WebApp.showAlert(`✅ +${reward} TON acreditados (${action === 'click' ? 'Clic' : 'Vista'})`);
+          } else if (res.data.error === 'LIMIT_REACHED') {
+            WebApp.showAlert('⚠️ Has alcanzado el límite diario de 100 anuncios.');
+          }
+        } catch (e) {
+          console.error("Error guardando recompensa");
+        }
         setIsAdLoading(false);
       })
-      .catch(e => {
-        console.log("Anuncio cerrado");
+      .catch(() => {
         setIsAdLoading(false);
       });
   };
 
-  /* --- [ LÓGICA DE RECLAMAR MISIONES ] --- */
-  const handleClaimMission = async () => {
-    try {
-        const res = await axios.post('/api/claim-mission', {
-            userId: userData.id,
-            missionId: DAILY_MISSION.id
-        });
-
-        if (res.data.success) {
-            WebApp.HapticFeedback.notificationOccurred('success');
-            setUserData(prev => ({ 
-                ...prev, 
-                balance: parseFloat(prev.balance) + DAILY_MISSION.reward 
-            }));
-            setClaimedMissions(prev => [...prev, DAILY_MISSION.id]);
-            WebApp.showAlert(`✅ ¡Reclamaste ${DAILY_MISSION.reward} TON!`);
-        } else {
-            WebApp.showAlert("Error: " + res.data.error);
-        }
-    } catch (e) {
-        WebApp.showAlert("❌ Error al procesar el reclamo");
-    }
-  };
-
-  /* --- [ LÓGICA DE RETIROS FINANCIEROS ] --- */
+  /* --- [ LÓGICA DE RETIROS ] --- */
   const handleStartWithdraw = () => {
     if ((userData?.balance || 0) < 0.01) {
       WebApp.showAlert('⚠️ Mínimo de retiro: 0.01 TON');
@@ -165,36 +133,26 @@ function App() {
   };
 
   useEffect(() => {
-    if (isWithdrawing && window.turnstile && activeTab === 'home') {
+    if (isWithdrawing && window.turnstile) {
       const timeout = setTimeout(() => {
         if (turnstileRef.current) {
           turnstileRef.current.innerHTML = ''; 
           window.turnstile.render(turnstileRef.current, {
             sitekey: '0x4AAAAAACqyiOXggbsrQdnA',
             callback: (token) => setTurnstileToken(token),
-            'expired-callback': () => setTurnstileToken(null),
           });
         }
       }, 300);
       return () => clearTimeout(timeout);
     }
-  }, [isWithdrawing, activeTab]);
+  }, [isWithdrawing]);
 
   const executeWithdraw = async () => {
     const amountFloat = parseFloat(withdrawAmount);
-
-    if (!walletAddr || walletAddr.trim().length < 40) { 
-      WebApp.showAlert('⚠️ Dirección TON inválida.'); return; 
-    }
-    if (isNaN(amountFloat) || amountFloat < 0.01) {
-      WebApp.showAlert('⚠️ Ingresa una cantidad válida (Mín: 0.01 TON).'); return;
-    }
-    if (amountFloat > userData.balance) {
-      WebApp.showAlert('⚠️ No tienes saldo suficiente.'); return;
-    }
-    if (!turnstileToken) {
-      WebApp.showAlert('⚠️ Completa el captcha de seguridad.'); return;
-    }
+    if (!walletAddr || walletAddr.trim().length < 40) return WebApp.showAlert('⚠️ Dirección TON inválida.');
+    if (isNaN(amountFloat) || amountFloat < 0.01) return WebApp.showAlert('⚠️ Mínimo: 0.01 TON.');
+    if (amountFloat > userData.balance) return WebApp.showAlert('⚠️ Saldo insuficiente.');
+    if (!turnstileToken) return WebApp.showAlert('⚠️ Completa el captcha.');
 
     setIsSubmitting(true);
     try {
@@ -210,21 +168,13 @@ function App() {
         WebApp.showAlert('✅ Retiro procesado con éxito.');
         window.location.reload();
       } else {
-        WebApp.HapticFeedback.notificationOccurred('error');
         WebApp.showAlert('❌ ERROR: ' + res.data.error);
         setIsSubmitting(false);
       }
     } catch (e) {
-      const errorMsg = e.response?.data?.error || e.message;
-      WebApp.showAlert('❌ DETALLE DEL ERROR: ' + errorMsg);
+      WebApp.showAlert('❌ Error de conexión.');
       setIsSubmitting(false);
     }
-  };/* --- [ UTILIDADES SECUNDARIAS ] --- */
-  const handleCheckSubscription = () => {
-    const user = WebApp.initDataUnsafe?.user;
-    const startParam = WebApp.initDataUnsafe?.start_param;
-    setStatus('loading');
-    verifyUser(user, startParam);
   };
 
   const loadHistory = async () => {
@@ -233,22 +183,16 @@ function App() {
       const res = await axios.get(`/api/history?userId=${userData.id}`);
       setHistory(res.data.history || []);
       setShowHistory(true);
-      WebApp.HapticFeedback.impactOccurred('light');
     } catch (e) { WebApp.showAlert('Error obteniendo historial.'); }
     finally { setLoadingHistory(false); }
   };
 
   const handleShare = () => {
     const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
-    const text = `💰 ¡Gana TON con IA Profit! 🚀`;
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
+    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('💰 ¡Gana TON con IA Profit! 🚀')}`);
   };
 
-  /* --- [ RENDERIZADO VISUAL ] --- */
-
-  if (status === 'loading') return (
-    <div style={s.center}><div style={s.loader}></div><p style={{marginTop:'20px'}}>Cargando...</p></div>
-  );
+  if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
   if (status === 'error') return (
     <div style={s.center}>
@@ -260,14 +204,10 @@ function App() {
 
   return (
     <div style={s.container}>
-      {/* BOTÓN DE HISTORIAL */}
       {status === 'member' && (        
-        <button onClick={loadHistory} style={s.btnHistoryIcon} disabled={loadingHistory}>
-          {loadingHistory ? '...' : '📜'}
-        </button>
+        <button onClick={loadHistory} style={s.btnHistoryIcon}>📜</button>
       )}
 
-      {/* MODAL DE HISTORIAL */}
       {showHistory && (
         <div style={s.modalOverlay}>
           <div style={s.historyCard}>
@@ -279,12 +219,8 @@ function App() {
               {history.length === 0 ? <p style={{textAlign:'center', padding:'20px'}}>Sin movimientos.</p> :
                 history.map((h, i) => (
                   <div key={i} style={s.historyItem}>
-                    <div style={{textAlign:'left'}}>
-                      <div style={{fontSize:'12px', color:'#fff'}}>{new Date(h.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div style={{textAlign:'right'}}>
-                      <div style={{color:'#ff4444', fontWeight:'bold'}}>-{h.amount} TON</div>
-                    </div>
+                    <span>{new Date(h.created_at).toLocaleDateString()}</span>
+                    <span style={{color:'#ff4444', fontWeight:'bold'}}>-{h.amount} TON</span>
                   </div>
                 ))
               }
@@ -293,21 +229,17 @@ function App() {
         </div>
       )}
 
-      {/* PANTALLA GUEST */}
       {status === 'guest' ? (
         <div style={s.main}>
           <div style={s.card}>
             <div style={s.iconCircle}>🔔</div>
             <h2>Canal Requerido</h2>
             <button style={s.btnBlue} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>1. UNIRME</button>
-            <button style={{...s.btnOutline, marginTop:'12px'}} onClick={handleCheckSubscription}>2. VERIFICAR</button>
+            <button style={{...s.btnOutline, marginTop:'12px'}} onClick={() => verifyUser(WebApp.initDataUnsafe.user)}>2. VERIFICAR</button>
           </div>
         </div>
       ) : (
-        /* PANTALLA MIEMBRO */
         <div style={s.main}>
-
-           {/* --- PESTAÑA: HOME --- */}
            {activeTab === 'home' && (
              <div className="tab-content fade-in">
                <div style={s.cardBalance}>
@@ -315,106 +247,55 @@ function App() {
                     <>
                       <p style={{fontSize:'13px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
                       <h1 style={{fontSize:'48px', margin:'10px 0'}}>{userData?.balance?.toFixed(5) || '0.000'} <span style={{fontSize:'18px'}}>TON</span></h1>
-                      <button style={s.btnWhite} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
-                      <div style={s.badge}>Min: 0.01 TON | Límite: 0.2 TON/Día</div>
+                      <button style={{...s.btnBlue, backgroundColor:'#fff', color:'#0088cc', marginBottom:'15px'}} onClick={handleWatchAd} disabled={isAdLoading}>
+                        {isAdLoading ? 'CARGANDO...' : '🎥 VER ANUNCIO Y GANAR'}
+                      </button>
+                      <button style={s.btnOutline} onClick={handleStartWithdraw}>SOLICITAR RETIRO</button>
+                      <div style={s.badge}>Vistas hoy: {adsWatchedCount}/100</div>
                     </>
                   ) : (
                     <div style={{width: '100%'}}>
-                      <p style={{fontWeight:'bold', marginBottom:'15px'}}>RETIRO DE FONDOS</p>
-                      <input type="number" placeholder="Monto a retirar (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
+                      <input type="number" placeholder="Monto (Min: 0.01)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{...s.inputStyle, marginBottom:'10px'}}/>
                       <input type="text" placeholder="Tu Dirección TON" value={walletAddr} onChange={(e) => setWalletAddr(e.target.value)} style={s.inputStyle}/>
-
                       <div ref={turnstileRef} style={{marginTop:'15px', display:'flex', justifyContent:'center', minHeight:'65px'}}></div>
-
                       <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
-                        <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
-                        <button style={{...s.btnConfirm, opacity: isSubmitting ? 0.5 : 1, backgroundColor: !turnstileToken && !isSubmitting ? '#555' : '#fff'}} onClick={executeWithdraw} disabled={isSubmitting}>
-                          {isSubmitting ? '...' : 'CONFIRMAR'}
-                        </button>
+                        <button style={s.btnCancel} onClick={() => setIsWithdrawing(false)}>ATRÁS</button>
+                        <button style={s.btnConfirm} onClick={executeWithdraw} disabled={isSubmitting}>{isSubmitting ? '...' : 'RETIRAR'}</button>
                       </div>
                     </div>
                   )}
                </div>
+               <div style={{...s.card, marginTop:'10px', backgroundColor:'transparent', border:'1px dashed #333'}}>
+                  <p style={{fontSize:'12px', color:'#aaa'}}>Ganancia por Clic: <b>0.0005 TON</b><br/>Ganancia por Vista: <b>0.0002 TON</b></p>
+               </div>
              </div>
            )}
 
-           {/* --- PESTAÑA: SHARE --- */}
            {activeTab === 'share' && (
              <div className="tab-content fade-in">
                <div style={s.card}>
                   <h4 style={{marginTop:0, color:'#0088cc'}}>SISTEMA DE AFILIADOS</h4>
-                  <div style={s.row}>
-                    <div style={s.box}>NIVEL 1<br/><b style={{color:'#fff'}}>0.003</b></div>
-                    <div style={s.box}>NIVEL 2<br/><b style={{color:'#fff'}}>0.002</b></div>
-                    <div style={s.box}>NIVEL 3<br/><b style={{color:'#fff'}}>0.001</b></div>
-                  </div>
                   <button style={s.btnGreen} onClick={handleShare}>🚀 INVITAR AMIGOS</button>
                </div>
-
                <div style={{...s.card, marginTop:'20px'}}>
-                  <h4 style={{color:'#aaa', textAlign:'left', fontSize:'12px', marginBottom:'15px'}}>TU RED DE TRABAJO</h4>
                   <div style={s.statsGrid}>
-                    <div style={s.statCol}><p style={s.statLabel}>DIRECTOS</p><p style={s.statValue}>{stats.n1}</p><p style={s.statCom}>+{stats.c1} TON</p></div>
-                    <div style={s.statCol}><p style={s.statLabel}>NIVEL 2</p><p style={s.statValue}>{stats.n2}</p><p style={s.statCom}>+{stats.c2} TON</p></div>
-                    <div style={s.statCol}><p style={s.statLabel}>NIVEL 3</p><p style={s.statValue}>{stats.n3}</p><p style={s.statCom}>+{stats.c3} TON</p></div>
+                    <div style={s.statCol}><p style={s.statLabel}>L1</p><p style={s.statValue}>{stats.n1}</p></div>
+                    <div style={s.statCol}><p style={s.statLabel}>L2</p><p style={s.statValue}>{stats.n2}</p></div>
+                    <div style={s.statCol}><p style={s.statLabel}>L3</p><p style={s.statValue}>{stats.n3}</p></div>
                   </div>
-                  <div style={s.totalRow}>
-                    <p style={{fontSize:'11px'}}>TOTAL GANADO:</p>
-                    <p style={{fontSize:'16px', fontWeight:'bold', color:'#28a745'}}>{(parseFloat(stats.c1) + parseFloat(stats.c2) + parseFloat(stats.c3)).toFixed(3)} TON</p>
-                  </div>
-               </div>
-             </div>
-           )}
-
-           {/* --- PESTAÑA: MISSIONS (MODIFICADA: UNA SOLA MISIÓN) --- */}
-           {activeTab === 'missions' && (
-             <div className="tab-content fade-in">
-               <div style={{...s.card, border:'1px solid #0088cc'}}>
-                  <h4 style={{marginTop:0, color:'#0088cc', fontSize:'18px'}}>🎯 DESAFÍO DIARIO</h4>
-                  <p style={{fontSize:'13px', color:'#aaa', marginBottom:'15px'}}>
-                    Mira 100 anuncios hoy para ganar la recompensa especial de <b style={{color:'#28a745'}}>0.0010 TON</b>.
-                  </p>
-
-                  {/* BARRA DE PROGRESO */}
-                  <div style={s.progressContainer}>
-                    <div style={{...s.progressBar, width: `${Math.min(adsWatchedCount, 100)}%`}}></div>
-                  </div>
-                  
-                  <div style={{display:'flex', justifyContent:'space-between', margin: '10px 0 20px 0'}}>
-                    <span style={{fontSize:'12px'}}>Progreso: <b style={{color:'#0088cc'}}>{adsWatchedCount}/100</b></span>
-                    <span style={{fontSize:'12px'}}>Premio: <b style={{color:'#28a745'}}>0.0010 TON</b></span>
-                  </div>
-
-                  {/* BOTÓN DE VER ANUNCIOS */}
-                  <button style={{...s.btnBlue, marginBottom:'15px', opacity: isAdLoading ? 0.7 : 1}} onClick={handleWatchAd} disabled={isAdLoading}>
-                    {isAdLoading ? 'CARGANDO VIDEO...' : '🎥 VER VIDEO Y GANAR (+1)'}
-                  </button>
-
-                  {/* BOTÓN DE RECLAMAR */}
-                  {claimedMissions.includes('daily_100') ? (
-                    <button style={s.btnOutline} disabled>✅ RECOMPENSA COBRADA</button>
-                  ) : adsWatchedCount >= 100 ? (
-                    <button style={s.btnGreen} onClick={handleClaimMission}>🎁 RECLAMAR 0.0010 TON</button>
-                  ) : (
-                    <button style={{...s.btnOutline, color:'#666', borderColor:'#333'}} disabled>🔒 COMPLETA LOS 100 ANUNCIOS</button>
-                  )}
                </div>
              </div>
            )}
         </div>
       )}
 
-      {/* --- BARRA INFERIOR --- */}
       {status === 'member' && (
         <div style={s.bottomNav}>
           <div onClick={() => setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
-            <span style={{fontSize:'20px'}}>🏠</span><span>Home</span>
+            <span>🏠</span><span>Home</span>
           </div>
           <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
-            <span style={{fontSize:'20px'}}>👥</span><span>Share</span>
-          </div>
-          <div onClick={() => setActiveTab('missions')} style={activeTab === 'missions' ? s.navItemActive : s.navItem}>
-            <span style={{fontSize:'20px'}}>🚀</span><span>Missions</span>
+            <span>👥</span><span>Share</span>
           </div>
         </div>
       )}
@@ -422,45 +303,31 @@ function App() {
   );
 }
 
-/* --- ESTILOS CSS ORIGINALES INTACTOS --- */
 const s = {
-  container: { backgroundColor:'#000', color:'#fff', minHeight:'100vh', padding:'20px', fontFamily:'Inter, sans-serif' },
-  center: { height:'100vh', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center' },
-  loader: { width:'40px', height:'40px', border:'3px solid #333', borderTop:'3px solid #0088cc', borderRadius:'50%' },
-  main: { display:'flex', flexDirection:'column', maxWidth:'500px', margin:'0 auto', width:'100%', paddingBottom: '80px', paddingTop: '40px' }, 
-  cardBalance: { background:'linear-gradient(135deg, #0088cc 0%, #005588 100%)', padding:'30px 20px', borderRadius:'24px', textAlign:'center', marginBottom:'20px', display:'flex', flexDirection:'column', alignItems:'center', width:'100%', boxSizing:'border-box' },
-  card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #1a1a1a', width:'100%', boxSizing:'border-box' },
-  badge: { fontSize:'10px', backgroundColor:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'20px', marginTop:'10px', display:'inline-block' },
-  iconCircle: { width:'60px', height:'60px', backgroundColor:'#1a1a1a', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto', fontSize:'24px' },
-  btnBlue: { width:'100%', padding:'16px', backgroundColor:'#0088cc', border:'none', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
-  btnOutline: { width:'100%', padding:'16px', backgroundColor:'transparent', border:'2px solid #333', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
-  btnWhite: { width:'100%', padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'14px', fontWeight:'900' },
-  btnGreen: { width:'100%', padding:'16px', backgroundColor:'#28a745', border:'none', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
-  row: { display:'flex', justifyContent:'space-around', margin:'20px 0' },
-  box: { fontSize:'10px', color:'#666', textAlign:'center' },
-  statsGrid: { display:'flex', justifyContent:'space-between', marginTop:'10px' },
-  statCol: { flex:1, textAlign:'center' },
-  statLabel: { fontSize:'10px', color:'#555', marginBottom:'5px' },
-  statValue: { fontSize:'18px', fontWeight:'bold', margin:'0' },
-  statCom: { fontSize:'11px', color:'#28a745', fontWeight:'bold', marginTop:'5px' },
-  totalRow: { marginTop:'20px', paddingTop:'15px', borderTop:'1px solid #1a1a1a', display:'flex', justifyContent:'space-between', alignItems:'center' },
-  inputStyle: { width:'100%', padding:'15px', borderRadius:'12px', border:'none', textAlign:'center', backgroundColor:'#fff', color:'#000', fontWeight:'bold', boxSizing:'border-box' },
-  btnCancel: { flex:1, padding:'14px', backgroundColor:'rgba(0,0,0,0.3)', color:'#fff', border:'none', borderRadius:'12px' },
-  btnConfirm: { flex:1, padding:'14px', backgroundColor:'#fff', color:'#0088cc', border:'none', borderRadius:'12px', fontWeight:'bold' },
-  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', backgroundColor:'#111', border:'1px solid #222', borderRadius:'50%', width:'45px', height:'45px', fontSize:'20px', zIndex:10, cursor:'pointer' },
-  bottomNav: { position:'fixed', bottom:0, left:0, right:0, backgroundColor:'#0a0a0a', display:'flex', justifyContent:'space-around', padding:'12px 0 20px 0', borderTop:'1px solid #222', zIndex:100 },
-  navItem: { color:'#555', display:'flex', flexDirection:'column', alignItems:'center', fontSize:'11px', fontWeight:'bold', cursor:'pointer', transition: 'color 0.2s', width: '33%' },
-  navItemActive: { color:'#0088cc', display:'flex', flexDirection:'column', alignItems:'center', fontSize:'11px', fontWeight:'bold', cursor:'pointer', width: '33%' },
-  modalOverlay: { position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.8)', zIndex:200, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px' },
-  historyCard: { backgroundColor:'#111', width:'100%', maxWidth:'400px', borderRadius:'24px', border:'1px solid #333', display:'flex', flexDirection:'column', maxHeight:'80vh' },
-  modalHeader: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px', borderBottom:'1px solid #222' },
-  btnClose: { backgroundColor:'transparent', color:'#aaa', border:'none', fontWeight:'bold', cursor:'pointer' },
-  historyList: { padding:'20px', overflowY:'auto' },
-  historyItem: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #222' },
-  
-  /* --- ESTILOS AÑADIDOS SOLO PARA LA NUEVA BARRA DE PROGRESO --- */
-  progressContainer: { width: '100%', height: '10px', backgroundColor: '#222', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
-  progressBar: { height: '100%', backgroundColor: '#0088cc', transition: 'width 0.3s ease' }
+  container: { backgroundColor:'#000', color:'#fff', minHeight:'100vh', padding:'20px', fontFamily:'sans-serif' },
+  center: { height:'100vh', display:'flex', justifyContent:'center', alignItems:'center', flexDirection:'column' },
+  loader: { width:'30px', height:'30px', border:'3px solid #222', borderTop:'3px solid #0088cc', borderRadius:'50%', animation:'spin 1s linear infinite' },
+  main: { maxWidth:'500px', margin:'0 auto', paddingBottom: '80px', paddingTop:'20px' },
+  cardBalance: { background:'linear-gradient(135deg, #0088cc, #004466)', padding:'25px', borderRadius:'24px', textAlign:'center', marginBottom:'15px' },
+  card: { backgroundColor:'#111', padding:'20px', borderRadius:'24px', textAlign:'center', border:'1px solid #222' },
+  btnBlue: { width:'100%', padding:'15px', borderRadius:'14px', border:'none', fontWeight:'bold', cursor:'pointer' },
+  btnOutline: { width:'100%', padding:'15px', borderRadius:'14px', border:'1px solid #fff', background:'transparent', color:'#fff', fontWeight:'bold' },
+  btnGreen: { width:'100%', padding:'15px', backgroundColor:'#28a745', border:'none', borderRadius:'14px', color:'#fff', fontWeight:'bold' },
+  inputStyle: { width:'100%', padding:'12px', borderRadius:'10px', border:'none', boxSizing:'border-box' },
+  bottomNav: { position:'fixed', bottom:0, left:0, right:0, backgroundColor:'#0a0a0a', display:'flex', padding:'15px 0', borderTop:'1px solid #222' },
+  navItem: { flex:1, textAlign:'center', color:'#555', display:'flex', flexDirection:'column', fontSize:'12px' },
+  navItemActive: { flex:1, textAlign:'center', color:'#0088cc', display:'flex', flexDirection:'column', fontSize:'12px' },
+  modalOverlay: { position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:1000 },
+  historyCard: { backgroundColor:'#111', width:'90%', borderRadius:'20px', border:'1px solid #333' },
+  modalHeader: { padding:'15px', borderBottom:'1px solid #222', display:'flex', justifyContent:'space-between' },
+  historyList: { padding:'15px', maxHeight:'300px', overflowY:'auto' },
+  historyItem: { display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #222' },
+  btnHistoryIcon: { position:'absolute', top:'20px', right:'20px', background:'#111', border:'none', fontSize:'20px', cursor:'pointer' },
+  statsGrid: { display:'flex', justifyContent:'space-around' },
+  statLabel: { fontSize:'12px', color:'#666' },
+  statValue: { fontSize:'20px', fontWeight:'bold' },
+  btnCancel: { flex:1, padding:'12px', background:'#333', color:'#fff', border:'none', borderRadius:'10px' },
+  btnConfirm: { flex:1, padding:'12px', background:'#fff', color:'#0088cc', border:'none', borderRadius:'10px', fontWeight:'bold' }
 };
 
 export default App;
