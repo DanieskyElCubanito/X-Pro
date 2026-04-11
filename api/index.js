@@ -25,13 +25,6 @@ const REWARDS = { level1: 0.003, level2: 0.002, level3: 0.001 };
 const MIN_WITHDRAW = 0.01; 
 const MAX_DAILY_WITHDRAW = 0.2;
 
-// Definición de Misiones (Debe coincidir con el Frontend)
-const MISSIONS_DATA = [
-  { id: 'm1', target: 1, reward: 0.0005 },
-  { id: 'm2', target: 5, reward: 0.0025 },
-  { id: 'm3', target: 10, reward: 0.0050 }
-];
-
 /* --- [ FUNCIONES AUXILIARES DE SEGURIDAD ] --- */
 
 async function notifyAdmin(adminMsg) {
@@ -133,27 +126,19 @@ app.post('/api/verify', async (req, res) => {
           }
       }
     } else {
-        // Actualizar hash si no lo tiene
         if (!dbUser.device_hash) {
             await supabase.from('users').update({ device_hash: deviceHash }).eq('id', user.id);
             dbUser.device_hash = deviceHash;
         }
     }
 
-    // 5. CÁLCULO DE PROGRESO DIARIO (MISIONES)
+    // 5. CÁLCULO DE PROGRESO DIARIO (MISIONES ELIMINADAS - SOLO LOGS DE ADS)
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
-    const isoStart = startOfDay.toISOString();
-
     const { count: adsTodayCount } = await supabase.from('ad_logs')
-        .select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', isoStart);
+        .select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', startOfDay.toISOString());
 
-    const { data: missionsTodayData } = await supabase.from('mission_claims')
-        .select('mission_id').eq('user_id', user.id).gte('created_at', isoStart);
-    
-    const claimedMissionsToday = missionsTodayData ? missionsTodayData.map(m => m.mission_id) : [];
-
-    // 6. CÁLCULO DE ESTADÍSTICAS DE RED (PARA LA PESTAÑA SHARE)
+    // 6. CÁLCULO DE ESTADÍSTICAS DE RED
     const { data: l1 } = await supabase.from('users').select('id').eq('referred_by', user.id);
     const idsL1 = l1 ? l1.map(u => u.id) : [];
     let n2 = 0, n3 = 0;
@@ -168,13 +153,11 @@ app.post('/api/verify', async (req, res) => {
         }
     }
 
-    // 7. RESPUESTA FINAL ÚNICA
     return res.json({ 
       success: true, 
       user: dbUser,
       dailyStats: {
-        adsWatched: adsTodayCount || 0,
-        claimedMissions: claimedMissionsToday
+        adsWatched: adsTodayCount || 0
       },
       stats: {
         n1: idsL1.length, n2, n3,
@@ -185,95 +168,25 @@ app.post('/api/verify', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Critical Error en Verify:", err);
     return res.status(500).json({ success: false, error: 'SERVER_ERROR' });
   }
 });
 
-/* --- [ LÓGICA DE MISIONES Y ANUNCIOS ] --- */
+/* --- [ LÓGICA DE ANUNCIOS ] --- */
 
-// 1. Registro de anuncios (Simplemente inserta el log)
 app.post('/api/ad-reward', async (req, res) => {
     try {
         const { userId } = req.body;
         if (!userId) return res.status(400).json({ success: false });
 
-        // Verificación rápida de baneo
-        const { data: user, error } = await supabase.from('users').select('is_banned').eq('id', userId).maybeSingle();
+        const { data: user } = await supabase.from('users').select('is_banned').eq('id', userId).maybeSingle();
         if (!user || user.is_banned) return res.json({ success: false, error: "BANNED" });
 
-        // Insertamos el log del anuncio visto hoy
         await supabase.from('ad_logs').insert([{ user_id: userId }]);
 
         return res.json({ success: true });
     } catch (e) {
         return res.status(500).json({ success: false });
-    }
-});
-
-// 2. Reclamo de misión (CON PROTECCIÓN ANTI-DUPLICADOS)
-app.post('/api/claim-mission', async (req, res) => {
-    try {
-        const { userId, missionId } = req.body; 
-        
-        // 1. Validar misión (Soporta tanto "1" como "m1")
-        const mission = MISSIONS_DATA.find(m => m.id === missionId || `m${m.id}` === missionId);
-        if (!mission) return res.json({ success: false, error: "MISSION_INVALID" });
-
-        const startOfDay = new Date();
-        startOfDay.setUTCHours(0, 0, 0, 0);
-        const isoStart = startOfDay.toISOString();
-
-        // 2. Verificar si ya reclamó hoy
-        const { data: alreadyClaimed } = await supabase
-            .from('mission_claims')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('mission_id', missionId)
-            .gte('created_at', isoStart)
-            .maybeSingle();
-
-        if (alreadyClaimed) return res.json({ success: false, error: "ALREADY_CLAIMED" });
-
-        // 3. Contar anuncios de hoy
-        const { count, error: countError } = await supabase
-            .from('ad_logs')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .gte('created_at', isoStart);
-
-        if (count < mission.target) {
-            return res.json({ 
-                success: false, 
-                error: "NOT_ENOUGH_ADS",
-                current: count,
-                target: mission.target 
-            });
-        }
-
-        // 4. Ejecutar el pago en la DB
-        const { error: rpcError } = await supabase.rpc('increment_balance', { 
-            user_id_param: userId, 
-            amount_param: mission.reward 
-        });
-
-        if (rpcError) throw rpcError;
-
-        // 5. REGISTRAR EL RECLAMO (Esto es lo que bloquea el botón)
-        await supabase.from('mission_claims').insert([{ 
-            user_id: userId, 
-            mission_id: missionId 
-        }]);
-
-        return res.json({ 
-            success: true, 
-            reward: mission.reward,
-            claimedMissionId: missionId // Devolvemos el ID para que el frontend lo marque
-        });
-
-    } catch (e) {
-        console.error("Error crítico en claim-mission:", e.message);
-        return res.status(500).json({ success: false, error: "INTERNAL_ERROR" });
     }
 });
 
@@ -301,7 +214,7 @@ app.post('/api/withdraw', async (req, res) => {
         const { data: todayWithdrawals } = await supabase.from('withdrawals').select('amount')
             .eq('user_id', userId).gte('created_at', startOfDay.toISOString());
         const dailyTotal = todayWithdrawals ? todayWithdrawals.reduce((sum, tx) => sum + tx.amount, 0) : 0;
-        
+
         if ((dailyTotal + withdrawAmount) > MAX_DAILY_WITHDRAW) {
             return res.json({ success: false, error: `Límite diario: ${MAX_DAILY_WITHDRAW} TON.` });
         }
@@ -311,7 +224,7 @@ app.post('/api/withdraw', async (req, res) => {
             const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
             const keyPair = await mnemonicToPrivateKey(MNEMONIC.trim().split(/\s+/));
             const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
-            
+
             const balanceAdmin = await wallet.getBalance(); 
             const withdrawInNano = toNano(withdrawAmount.toString());
             if (balanceAdmin < (withdrawInNano + toNano("0.02"))) {
@@ -344,7 +257,7 @@ app.post('/api/withdraw', async (req, res) => {
         }
 
         if (txHash) {
-            await supabase.rpc('decrement_balance', { user_id: userId, amount: withdrawAmount });
+            await supabase.rpc('decrement_balance', { user_id_param: userId, amount_param: withdrawAmount });
             await supabase.from('withdrawals').insert([{ 
                 user_id: Number(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: cleanAddress 
             }]);
@@ -358,7 +271,7 @@ app.post('/api/withdraw', async (req, res) => {
                 `🔹 <b>TXID:</b>\n` +
                 `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
                 `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
-          
+
             await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 chat_id: PAYMENTS_CHANNEL,
                 text: messageText,
