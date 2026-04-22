@@ -1,39 +1,64 @@
 import axios from 'axios';
 
-// Configuración base por si decides cambiar de dominio luego
+// Detectar si estamos en local o en Vercel
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : ''; // En Vercel dejamos vacío para que sea relativa
+
 const api = axios.create({
-  baseURL: '/', // Aquí puedes poner tu URL base si no es relativa
+  baseURL: API_URL,
+  timeout: 10000, // 10 segundos de espera
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 export const botApi = {
-  // Verificar usuario al iniciar
   verifyUser: async (user, startParam) => {
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const userLang = navigator.language || navigator.userLanguage;
-    const res = await api.post('/api/verify', { 
-      user, 
-      start_param: startParam,
-      tz: userTimezone,
-      ln: userLang
-    });
-    return res.data;
+    try {
+      // Enviamos SOLO lo que el backend espera para evitar errores de validación
+      const res = await api.post('/api/verify', { 
+        user: {
+          id: user.id,
+          username: user.username,
+          first_name: user.first_name
+        }, 
+        start_param: startParam
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en verifyUser:", error.response?.data || error.message);
+      throw error; // Re-lanzamos para que el App.jsx lo capture
+    }
   },
 
-  // Reclamar recompensa de misión
   claimMission: async (userId, missionId) => {
-    const res = await api.post('/api/claim-mission', { userId, missionId });
-    return res.data;
+    try {
+      const res = await api.post('/api/claim', { userId, missionId });
+      return res.data;
+    } catch (error) {
+      console.error("Error en claimMission:", error);
+      throw error;
+    }
   },
 
-  // Ejecutar retiro
   executeWithdraw: async (withdrawData) => {
-    const res = await api.post('/api/withdraw', withdrawData);
-    return res.data;
+    try {
+      const res = await api.post('/api/withdraw', withdrawData);
+      return res.data;
+    } catch (error) {
+      console.error("Error en withdraw:", error);
+      throw error;
+    }
   },
 
-  // Cargar historial
   getHistory: async (userId) => {
-    const res = await api.get(`/api/history?userId=${userId}`);
-    return res.data;
+    try {
+      const res = await api.get(`/api/history?userId=${userId}`);
+      return res.data;
+    } catch (error) {
+      console.error("Error en history:", error);
+      throw error;
+    }
   }
 };
