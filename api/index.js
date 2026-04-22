@@ -1,90 +1,75 @@
 import { createClient } from '@supabase/supabase-js';
 
-const CONFIG = {
-  SUPABASE_SERVICE_KEY: "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
-  SUPABASE_URL: "https://shfogfihzkwmusarhlxv.supabase.co",
-  REWARD_AD: 0.0001
-};
-
-const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_SERVICE_KEY);
+const supabase = createClient(
+  "https://shfogfihzkwmusarhlxv.supabase.co",
+  "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx"
+);
 
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  // Extraemos la ruta de forma segura
-  const url = req.url || '';
-  
   try {
-    // --- RUTA: VERIFICAR USUARIO ---
-    if (url.includes('/api/verify') && req.method === 'POST') {
-      const { user, start_param } = req.body;
-      if (!user?.id) throw new Error("Falta el ID de usuario en la petición");
+    const { user, start_param } = req.body;
 
-      let { data: dbUser, error: fetchError } = await supabase
+    if (!user || !user.id) {
+      return res.status(400).json({ error: 'Datos de usuario incompletos' });
+    }
+
+    // 1. Intentar buscar o crear el usuario
+    let { data: dbUser, error: dbError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 es "no encontrado"
+      return res.status(500).json({ error: 'Error de Supabase al buscar', detalle: dbError.message });
+    }
+
+    if (!dbUser) {
+      const refId = (start_param && !isNaN(start_param)) ? parseInt(start_param) : null;
+      const { data: newUser, error: insError } = await supabase
         .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+        .insert([{ 
+          id: user.id, 
+          username: user.username || `User_${user.id}`,
+          referred_by: refId,
+          balance: 0,
+          ads_watched: 0
+        }])
+        .select().single();
 
-      if (!dbUser) {
-        const refId = (start_param && !isNaN(start_param)) ? parseInt(start_param) : null;
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert([{ 
-            id: user.id, 
-            username: user.username || `User_${user.id}`, 
-            balance: 0, 
-            referred_by: refId,
-            ads_watched: 0 
-          }])
-          .select().single();
-
-        if (createError) throw new Error(`Error creando usuario: ${createError.message}`);
-        dbUser = newUser;
+      if (insError) {
+        return res.status(500).json({ error: 'Error al crear usuario', detalle: insError.message });
       }
-
-      const { data: L1 } = await supabase.from('users').select('balance').eq('referred_by', user.id);
-      
-      return res.status(200).json({ 
-        success: true, 
-        user: dbUser, 
-        stats: { 
-          n1: L1?.length || 0, 
-          c1: L1?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4) || "0.000" 
-        } 
-      });
+      dbUser = newUser;
     }
 
-    // --- RUTA: RECOMPENSA ANUNCIO ---
-    if (url.includes('/api/ad-reward') && req.method === 'POST') {
-      const { userId } = req.body;
-      const { data: user, error: userErr } = await supabase.from('users').select('*').eq('id', userId).single();
-      
-      if (userErr) throw new Error("Usuario no encontrado en DB");
+    // 2. Obtener estadísticas simples
+    const { data: refs } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('referred_by', user.id);
 
-      const { error: upErr } = await supabase.from('users')
-        .update({ 
-          balance: (user.balance || 0) + CONFIG.REWARD_AD, 
-          ads_watched: (user.ads_watched || 0) + 1 
-        })
-        .eq('id', userId);
-
-      if (upErr) throw new Error(`Error al actualizar saldo: ${upErr.message}`);
-      
-      return res.status(200).json({ success: true, newBalance: (user.balance || 0) + CONFIG.REWARD_AD, newAdsCount: (user.ads_watched || 0) + 1 });
-    }
-
-    return res.status(404).json({ error: "Ruta no encontrada" });
+    return res.status(200).json({
+      success: true,
+      user: dbUser,
+      stats: {
+        n1: refs?.length || 0,
+        c1: refs?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4) || "0.0000"
+      }
+    });
 
   } catch (error) {
-    console.error("DEBUG SERVER ERROR:", error);
-    // Enviamos el mensaje de error como STRING para que no salga [object Object]
     return res.status(500).json({ 
-      success: false, 
-      error: error.message || "Error desconocido en el servidor" 
+      error: 'Crash total del servidor', 
+      mensaje: error.message 
     });
   }
 }
