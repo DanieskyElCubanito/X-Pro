@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
+// --- CONFIGURACIÓN INTEGRADA ---
 const CONFIG = {
   BOT_TOKEN: "8101312620:AAG3lo7rOipTAUUMQr8c89RJkEa2Rj2-j7s",
   ADMIN_MNEMONIC: "victory end nothing roast ice begin paddle orient dish three poem salute bright term mixed under nature bacon make amazing add round dynamic market",
@@ -7,10 +8,25 @@ const CONFIG = {
   CHANNEL_ID: "-1002228067712",
   SUPABASE_SERVICE_KEY: "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
   SUPABASE_URL: "https://shfogfihzkwmusarhlxv.supabase.co",
-  REWARDS: { DAILY: 0.005, AD: 0.0001, REF_L1: 0.003, REF_L2: 0.002, REF_L3: 0.001 }
+  REWARDS: {
+    DAILY: 0.005,
+    AD: 0.0001,
+    REF_L1: 0.003,
+    REF_L2: 0.002,
+    REF_L3: 0.001
+  }
 };
 
 const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_SERVICE_KEY);
+
+// --- FUNCIONES DE APOYO ---
+async function isMemberOfChannel(userId) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${CONFIG.BOT_TOKEN}/getChatMember?chat_id=${CONFIG.CHANNEL_ID}&user_id=${userId}`);
+    const data = await res.json();
+    return ['member', 'administrator', 'creator'].includes(data.result?.status);
+  } catch (e) { return false; }
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,21 +39,15 @@ export default async function handler(req, res) {
   const path = url.pathname;
 
   try {
+    // 1. VERIFICACIÓN Y REGISTRO
     if (path === '/api/verify' && req.method === 'POST') {
       const { user, start_param } = req.body;
       if (!user?.id) return res.status(400).json({ error: 'NO_USER' });
 
-      // 1. Buscar usuario
-      let { data: dbUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).single();
 
-      // 2. Si no existe, crearlo (Solo campos básicos para evitar error 400)
       if (!dbUser) {
         const referrerId = start_param ? parseInt(start_param) : null;
-        
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert([{ 
@@ -47,17 +57,13 @@ export default async function handler(req, res) {
             referred_by: isNaN(referrerId) ? null : referrerId,
             last_bonus: new Date(0).toISOString()
           }])
-          .select()
-          .single();
+          .select().single();
 
-        if (createError) {
-            console.error("Error de Supabase:", createError);
-            return res.status(400).json({ error: createError.message });
-        }
+        if (createError) throw createError;
         dbUser = newUser;
       }
 
-      // 3. Obtener estadísticas de red
+      // Red de 3 niveles
       const { data: L1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
       const idsL1 = L1?.map(u => u.id) || [];
       const { data: L2 } = idsL1.length ? await supabase.from('users').select('id, balance').in('referred_by', idsL1) : { data: [] };
@@ -68,9 +74,7 @@ export default async function handler(req, res) {
         success: true,
         user: dbUser,
         stats: {
-          n1: L1?.length || 0,
-          n2: L2?.length || 0,
-          n3: L3?.length || 0,
+          n1: L1?.length || 0, n2: L2?.length || 0, n3: L3?.length || 0,
           c1: L1?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4),
           c2: L2?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4),
           c3: L3?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4)
@@ -78,84 +82,48 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. RUTA: DAILY BONUS
-    if (path === '/api/daily-bonus' && method === 'POST') {
+    // 2. BONO DIARIO + COMISIONES ASCENDENTES
+    if (path === '/api/daily-bonus' && req.method === 'POST') {
       const { userId } = req.body;
       const { data: user } = await supabase.from('users').select('*').eq('id', userId).single();
 
-      if (!user) return res.status(404).json({ success: false, error: 'USER_NOT_FOUND' });
-
       const lastClaim = new Date(user.last_bonus);
-      const now = new Date();
-      if ((now - lastClaim) / (1000 * 60 * 60) < 24) {
-        return res.status(200).json({ success: false, error: 'ALREADY_CLAIMED' });
-      }
+      if ((new Date() - lastClaim) / (1000 * 60 * 60) < 24) return res.status(200).json({ success: false, error: 'ALREADY_CLAIMED' });
 
       await supabase.rpc('increment_balance', { user_id: userId, amount: CONFIG.REWARDS.DAILY });
-      await supabase.from('users').update({ last_bonus: now.toISOString() }).eq('id', userId);
+      await supabase.from('users').update({ last_bonus: new Date().toISOString() }).eq('id', userId);
 
-      // Comisiones en cascada
+      // Pagar a referidores (L1, L2, L3)
       if (user.referred_by) {
         await supabase.rpc('increment_balance', { user_id: user.referred_by, amount: CONFIG.REWARDS.REF_L1 });
         const { data: r1 } = await supabase.from('users').select('referred_by').eq('id', user.referred_by).single();
         if (r1?.referred_by) {
           await supabase.rpc('increment_balance', { user_id: r1.referred_by, amount: CONFIG.REWARDS.REF_L2 });
           const { data: r2 } = await supabase.from('users').select('referred_by').eq('id', r1.referred_by).single();
-          if (r2?.referred_by) {
-            await supabase.rpc('increment_balance', { user_id: r2.referred_by, amount: CONFIG.REWARDS.REF_L3 });
-          }
+          if (r2?.referred_by) await supabase.rpc('increment_balance', { user_id: r2.referred_by, amount: CONFIG.REWARDS.REF_L3 });
         }
       }
       return res.status(200).json({ success: true, reward: CONFIG.REWARDS.DAILY });
     }
 
-    // 3. RUTA: AD REWARD
-    if (path === '/api/ad-reward' && method === 'POST') {
+    // 3. ANUNCIOS
+    if (path === '/api/ad-reward' && req.method === 'POST') {
       const { userId } = req.body;
       await supabase.rpc('increment_balance', { user_id: userId, amount: CONFIG.REWARDS.AD });
-      return res.status(200).json({ success: true, reward: CONFIG.REWARDS.AD });
+      return res.status(200).json({ success: true });
     }
 
-    // 4. RUTA: WITHDRAW (Retiros)
-    if (path === '/api/withdraw' && method === 'POST') {
-      const { userId, address, amount, turnstileToken } = req.body;
-
-      const captchaValid = await verifyTurnstile(turnstileToken);
-      if (!captchaValid) return res.status(403).json({ error: 'CAPTCHA_FAILED' });
-
-      const memberStatus = await isMemberOfChannel(userId);
-      if (!memberStatus) return res.status(403).json({ error: 'NOT_A_MEMBER' });
-
-      const { data: user } = await supabase.from('users').select('balance').eq('id', userId).single();
-      if (!user || user.balance < amount) return res.status(400).json({ error: 'INSUFFICIENT_BALANCE' });
-
-      await supabase.rpc('increment_balance', { user_id: userId, amount: -amount });
-      const { data: withdraw } = await supabase.from('withdraws').insert([{
-        user_id: userId,
-        address: address,
-        amount: amount,
-        status: 'PENDING'
-      }]).select().single();
-
-      return res.status(200).json({ success: true, withdrawId: withdraw.id });
-    }
-
-    // 5. RUTA: MISSIONS (Misiones)
-    if (path === '/api/claim' && method === 'POST') {
-      return res.status(200).json({ success: true, message: 'Mission claimed' });
-    }
-
-    // 6. RUTA: HISTORY
-    if (path === '/api/history' && method === 'GET') {
+    // 4. HISTORIAL
+    if (path === '/api/history' && req.method === 'GET') {
       const userId = url.searchParams.get('userId');
       const { data } = await supabase.from('withdraws').select('*').eq('user_id', userId).order('created_at', { ascending: false });
       return res.status(200).json({ success: true, history: data || [] });
     }
 
-    return res.status(404).json({ error: 'ROUTE_NOT_FOUND' });
+    return res.status(404).json({ error: 'NOT_FOUND' });
 
   } catch (error) {
-    console.error("Backend Error:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    console.error(error);
+    return res.status(500).json({ error: error.message });
   }
 }
