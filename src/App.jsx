@@ -47,17 +47,17 @@ function App() {
         setErrorInfo(data.message || 'Acceso no autorizado.');
       }
     } catch (err) {
-      console.error("Error detallado en el frontend:", err);
+      console.error("Error detallado:", err);
       
-      // DIAGNÓSTICO EN PANTALLA
-      const statusCode = err.response?.status; // 403 (Cloudflare), 404 (Ruta mal), 500 (Server)
-      const errorMsg = err.response?.data?.error || err.message;
+      // Forzamos a que el error se convierta en texto real
+      const serverError = err.response?.data;
+      const errorMsg = typeof serverError === 'object' 
+        ? JSON.stringify(serverError) 
+        : (err.response?.data?.error || err.message);
       
       setStatus('error');
-      setErrorInfo(`[Error ${statusCode || 'Red'}] ${errorMsg}`);
+      setErrorInfo(`[Error ${err.response?.status || 'Red'}] ${errorMsg}`);
     }
-  };
-
   useEffect(() => {
     WebApp.ready();
     WebApp.expand();
