@@ -2,14 +2,14 @@
   "name": "ia-profit-ton",
   "version": "1.0.0",
   "private": true,
-  "type": "module", // <--- AÑADE ESTO
+  "type": "module", /*<--- AÑADE ESTO*/
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "engines": {
-    "node": "20.x" // <--- AÑADE ESTO (o 18.x)
+    "node": "20.x" /* <--- AÑADE ESTO (o 18.x)*/
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
