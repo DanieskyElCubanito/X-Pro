@@ -87,24 +87,30 @@ export default async function handler(req, res) {
         .eq('id', user.id)
         .single();
 
-      if (!dbUser) {
-        const referrerId = start_param ? parseInt(start_param) : null;
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert([{ 
-            id: user.id, 
-            username: user.username || `User_${user.id}`, 
-            balance: 0, 
-            referred_by: referrerId,
-            last_bonus: new Date(0).toISOString(),
-            ip_address: headers['x-forwarded-for'] || '127.0.0.1'
-          }])
-          .select()
-          .single();
-        
-        if (createError) throw createError;
-        dbUser = newUser;
-      }
+      // Busca esta parte en tu api/index.js (alrededor de la línea 75-80)
+if (!dbUser) {
+  const referrerId = start_param ? parseInt(start_param) : null;
+  
+  // REGISTRO SIMPLIFICADO PARA EVITAR ERROR 400
+  const { data: newUser, error: createError } = await supabase
+    .from('users')
+    .insert([{ 
+      id: user.id, 
+      username: user.username || `User_${user.id}`, 
+      balance: 0, 
+      referred_by: referrerId,
+      last_bonus: new Date(0).toISOString()
+      // Quitamos ip_address por ahora para asegurar que funcione
+    }])
+    .select()
+    .single();
+  
+  if (createError) {
+    console.error("Error detallado de Supabase:", createError);
+    throw createError;
+  }
+  dbUser = newUser;
+}
 
       // Cálculo de Estadísticas de Red (3 Niveles)
       const { data: L1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
