@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-// --- CONFIGURACIÓN INTEGRADA (HARDCODED) ---
 const CONFIG = {
   BOT_TOKEN: "8101312620:AAG3lo7rOipTAUUMQr8c89RJkEa2Rj2-j7s",
   ADMIN_MNEMONIC: "victory end nothing roast ice begin paddle orient dish three poem salute bright term mixed under nature bacon make amazing add round dynamic market",
@@ -8,49 +7,10 @@ const CONFIG = {
   CHANNEL_ID: "-1002228067712",
   SUPABASE_SERVICE_KEY: "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
   SUPABASE_URL: "https://shfogfihzkwmusarhlxv.supabase.co",
-  ADMIN_ADDRESS: "UQDJwJrxD_sAVmsG-4Kq-mRpQ4apPBpGmzXQovokLVlDQGky",
-  REWARDS: {
-    DAILY: 0.005,
-    AD: 0.0001,
-    REF_L1: 0.003,
-    REF_L2: 0.002,
-    REF_L3: 0.001
-  }
+  REWARDS: { DAILY: 0.005, AD: 0.0001, REF_L1: 0.003, REF_L2: 0.002, REF_L3: 0.001 }
 };
 
-// Inicialización de Supabase
 const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_SERVICE_KEY);
-
-// --- FUNCIONES DE SEGURIDAD Y VALIDACIÓN ---
-
-async function verifyTurnstile(token) {
-  if (!token) return false;
-  try {
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `secret=${CONFIG.CLOUDFLARE_SECRET}&response=${token}`
-    });
-    const data = await res.json();
-    return data.success;
-  } catch (e) { return false; }
-}
-
-async function isMemberOfChannel(userId) {
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${CONFIG.BOT_TOKEN}/getChatMember?chat_id=${CONFIG.CHANNEL_ID}&user_id=${userId}`);
-    const data = await res.json();
-    return ['member', 'administrator', 'creator'].includes(data.result?.status);
-  } catch (e) { return false; }
-}
-
-function detectProxy(req) {
-  const headers = req.headers;
-  const proxyHeaders = ['x-forwarded-for', 'proxy-client-ip', 'wl-proxy-client-ip', 'fastly-client-ip', 'z-forwarded-for'];
-  return proxyHeaders.some(h => headers[h] !== undefined);
-}
-
-// --- HANDLER PRINCIPAL ---
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -59,59 +19,63 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { method, headers } = req;
-  const url = new URL(req.url, `http://${headers.host}`);
+  const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname;
 
   try {
-    // 1. RUTA: VERIFY (Login y Registro)
-    if (path === '/api/verify' && method === 'POST') {
+    if (path === '/api/verify' && req.method === 'POST') {
       const { user, start_param } = req.body;
-      if (!user?.id) return res.status(400).json({ success: false, error: 'NO_USER' });
+      if (!user?.id) return res.status(400).json({ error: 'NO_USER' });
 
-      if (detectProxy(req)) { /* Log security */ }
-
+      // 1. Buscar usuario
       let { data: dbUser } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
 
+      // 2. Si no existe, crearlo (Solo campos básicos para evitar error 400)
       if (!dbUser) {
         const referrerId = start_param ? parseInt(start_param) : null;
+        
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert([{ 
             id: user.id, 
             username: user.username || `User_${user.id}`, 
             balance: 0, 
-            referred_by: referrerId,
+            referred_by: isNaN(referrerId) ? null : referrerId,
             last_bonus: new Date(0).toISOString()
           }])
           .select()
           .single();
 
-        if (createError) throw createError;
+        if (createError) {
+            console.error("Error de Supabase:", createError);
+            return res.status(400).json({ error: createError.message });
+        }
         dbUser = newUser;
       }
 
-      // Cálculo de Estadísticas de Red (3 Niveles)
+      // 3. Obtener estadísticas de red
       const { data: L1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
       const idsL1 = L1?.map(u => u.id) || [];
       const { data: L2 } = idsL1.length ? await supabase.from('users').select('id, balance').in('referred_by', idsL1) : { data: [] };
       const idsL2 = L2?.map(u => u.id) || [];
       const { data: L3 } = idsL2.length ? await supabase.from('users').select('id, balance').in('referred_by', idsL2) : { data: [] };
 
-      const stats = {
-        n1: L1?.length || 0,
-        n2: L2?.length || 0,
-        n3: L3?.length || 0,
-        c1: L1?.reduce((a, b) => a + b.balance, 0).toFixed(4),
-        c2: L2?.reduce((a, b) => a + b.balance, 0).toFixed(4),
-        c3: L3?.reduce((a, b) => a + b.balance, 0).toFixed(4)
-      };
-
-      return res.status(200).json({ success: true, user: dbUser, stats });
+      return res.status(200).json({
+        success: true,
+        user: dbUser,
+        stats: {
+          n1: L1?.length || 0,
+          n2: L2?.length || 0,
+          n3: L3?.length || 0,
+          c1: L1?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4),
+          c2: L2?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4),
+          c3: L3?.reduce((a, b) => a + (b.balance || 0), 0).toFixed(4)
+        }
+      });
     }
 
     // 2. RUTA: DAILY BONUS
