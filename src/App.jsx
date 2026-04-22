@@ -37,7 +37,6 @@ function App() {
         setUserData(data.user);
         setStats(data.stats);
 
-        // SINCRONIZACIÓN TOTAL: Usamos ads_watched del objeto user que viene de api/verify.js
         const savedAds = data.user?.ads_watched ?? 0;
         setAdsWatchedCount(Number(savedAds));
 
@@ -48,21 +47,31 @@ function App() {
         setErrorInfo(data.message || 'Acceso no autorizado.');
       }
     } catch (err) {
-      console.error("Error verifying user:", err);
+      console.error("Error detallado en el frontend:", err);
+      
+      // DIAGNÓSTICO EN PANTALLA
+      const statusCode = err.response?.status; // 403 (Cloudflare), 404 (Ruta mal), 500 (Server)
+      const errorMsg = err.response?.data?.error || err.message;
+      
       setStatus('error');
-      setErrorInfo('No se pudo conectar con el servidor.');
+      setErrorInfo(`[Error ${statusCode || 'Red'}] ${errorMsg}`);
     }
   };
 
   useEffect(() => {
     WebApp.ready();
     WebApp.expand();
+    
+    // Intentar obtener el usuario de Telegram
     const user = WebApp.initDataUnsafe?.user;
+    
     if (!user) {
+      // Si entras por navegador normal, esto fallará.
       setStatus('error');
-      setErrorInfo('Por favor, abre la app desde Telegram.');
+      setErrorInfo('Por favor, abre la app desde Telegram (User no detectado).');
       return;
     }
+    
     verifyUser(user, WebApp.initDataUnsafe?.start_param);
   }, []);
 
@@ -77,40 +86,31 @@ function App() {
     window.showGiga().then(async () => {
       try {
         const res = await botApi.adReward(userData.id);
-
         if (res.success) {
             setAdsWatchedCount(res.newAdsCount); 
-            setUserData(prev => ({ 
-              ...prev, 
-              balance: res.newBalance 
-            }));
-
+            setUserData(prev => ({ ...prev, balance: res.newBalance }));
             WebApp.HapticFeedback.notificationOccurred('success');
             toast.success("¡Anuncio cobrado con éxito!");
         } else {
             toast.error(res.error || "Error al procesar el premio");
         }
       } catch (e) {
-        console.error("Error al cobrar ad", e);
-        toast.error("Error de conexión con el servidor");
+        toast.error("Error de conexión");
       } finally {
         setIsAdLoading(false);
       }
     }).catch((err) => {
-      console.error("Error en showGiga", err);
       setIsAdLoading(false);
     });
   };
 
   const processWithdraw = async () => {
     const amount = parseFloat(withdrawAmount);
-
-    // Validaciones
     if (!withdrawAddress.startsWith('U') && !withdrawAddress.startsWith('E')) {
       return toast.error("Dirección TON inválida");
     }
     if (isNaN(amount) || amount < WITHDRAW_LIMITS.min) {
-      return toast.error(`El mínimo es ${WITHDRAW_LIMITS.min} TON`);
+      return toast.error(`Mínimo ${WITHDRAW_LIMITS.min} TON`);
     }
     if (amount > (userData?.balance || 0)) {
       return toast.error("Saldo insuficiente");
@@ -121,12 +121,11 @@ function App() {
     try {
       const data = await botApi.withdraw(userData.id, withdrawAddress, amount);
       if (data.success) {
-        // Actualizamos balance restando el monto exacto
         setUserData(prev => ({ ...prev, balance: prev.balance - amount }));
         setIsWithdrawing(false);
-        toast.success("Retiro enviado con éxito", { id: toastId });
+        toast.success("Retiro enviado", { id: toastId });
       } else {
-        toast.error(data.error || 'Error al procesar', { id: toastId });
+        toast.error(data.error || 'Error', { id: toastId });
       }
     } catch (e) {
       toast.error("Error de conexión", { id: toastId });
@@ -147,8 +146,8 @@ function App() {
   if (status === 'error' || status === 'guest') {
     return (
       <div style={s.center}>
-        <h2 style={{color: '#ff4444', fontSize: '24px'}}>{status === 'guest' ? 'ACCESO BLOQUEADO' : 'ERROR'}</h2>
-        <p style={{...s.errorText, marginBottom: '20px'}}>{errorInfo}</p>
+        <h2 style={{color: '#ff4444', fontSize: '20px'}}>{status === 'guest' ? 'ACCESO BLOQUEADO' : 'ERROR DE CONEXIÓN'}</h2>
+        <p style={{...s.errorText, marginBottom: '20px', padding: '0 20px', fontSize: '14px'}}>{errorInfo}</p>
         <button style={s.btnWhite} onClick={() => window.location.reload()}>REINTENTAR</button>
       </div>
     );
@@ -156,66 +155,31 @@ function App() {
 
   return (
     <div style={s.container}>
-      {/* Contenedor de Toasts con estilo Dark */}
       <Toaster position="top-center" toastOptions={{
-        style: { background: '#1a1a1a', color: '#fff', borderRadius: '12px', border: '1px solid #333' },
-        duration: 3000
+        style: { background: '#1a1a1a', color: '#fff', borderRadius: '12px', border: '1px solid #333' }
       }} />
 
       <div style={s.main}>
-
-        {/* --- VISTA DE RETIRO --- */}
         {isWithdrawing ? (
           <div className="fade-in" style={{ padding: '20px' }}>
             <div style={{ textAlign: 'center', marginBottom: '30px' }}>
               <span style={{ fontSize: '40px' }}>💸</span>
-              <h3 style={{ color: '#fff', margin: '15px 0 10px 0', fontSize: '22px' }}>Solicitar Retiro</h3>
-
-              <div style={s.helpText}>
-                <div style={{ marginBottom: '5px' }}>
-                  ✅ Mínimo: <b>{WITHDRAW_LIMITS.min} TON</b>
-                </div>
-                <div>
-                  📅 Máx Diario: <b>{WITHDRAW_LIMITS.maxDaily} TON</b>
-                </div>
-              </div>
+              <h3 style={{ color: '#fff', margin: '15px 0' }}>Solicitar Retiro</h3>
             </div>
 
             <div style={s.withdrawContainer}>
               <div style={s.inputGroup}>
-                <label style={s.label}>💎 Dirección TON (Wallet):</label>
-                <input 
-                  style={s.input} 
-                  placeholder="UQ..." 
-                  value={withdrawAddress}
-                  onChange={(e) => setWithdrawAddress(e.target.value)}
-                />
+                <label style={s.label}>Dirección TON:</label>
+                <input style={s.input} value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)} placeholder="UQ..." />
               </div>
-
               <div style={s.inputGroup}>
-                <label style={s.label}>💰 Monto a retirar:</label>
-                <input 
-                  style={s.input} 
-                  type="number"
-                  step="0.01"
-                  placeholder="0.10"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                />
+                <label style={s.label}>Monto:</label>
+                <input style={s.input} type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
               </div>
-
-              <div style={{ marginTop: '15px' }}>
-                <button 
-                  style={{...s.btnGreen, opacity: isSending ? 0.6 : 1}}
-                  onClick={processWithdraw}
-                  disabled={isSending}
-                >
-                  {isSending ? '🔄 PROCESANDO...' : 'CONFIRMAR RETIRO'}
-                </button>
-                <button style={s.btnOutline} onClick={() => setIsWithdrawing(false)}>
-                  CANCELAR
-                </button>
-              </div>
+              <button style={s.btnGreen} onClick={processWithdraw} disabled={isSending}>
+                {isSending ? 'PROCESANDO...' : 'CONFIRMAR'}
+              </button>
+              <button style={s.btnOutline} onClick={() => setIsWithdrawing(false)}>CANCELAR</button>
             </div>
           </div>
         ) : (
@@ -223,27 +187,17 @@ function App() {
             {activeTab === 'home' && (
               <div className="fade-in">
                 <div style={s.cardBalance}>
-                   <p style={{fontSize:'12px', fontWeight:'bold', opacity: 0.8}}>SALDO DISPONIBLE</p>
+                   <p style={{fontSize:'12px', fontWeight:'bold'}}>SALDO DISPONIBLE</p>
                    <h1 style={{fontSize:'38px', margin:'10px 0'}}>
                      {Number(userData?.balance || 0).toFixed(5)} <span style={{fontSize:'16px'}}>TON</span>
                    </h1>
-                   <button style={s.btnWhite} onClick={() => setIsWithdrawing(true)}>SOLICITAR RETIRO</button>
-                </div>
-                <div style={s.card}>
-                    <p style={{fontSize: '12px', color: '#888'}}>Hola, {userData?.username || 'Usuario'}</p>
-                    <p style={{fontSize: '11px', color: '#555'}}>Recuerda desactivar VPN para evitar baneos.</p>
+                   <button style={s.btnWhite} onClick={() => setIsWithdrawing(true)}>RETIRO</button>
                 </div>
               </div>
             )}
-
             {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
-
             {activeTab === 'missions' && (
-              <MissionsTab 
-                adsWatchedCount={adsWatchedCount}
-                isAdLoading={isAdLoading}
-                handleWatchAd={handleWatchAd}
-              />
+              <MissionsTab adsWatchedCount={adsWatchedCount} isAdLoading={isAdLoading} handleWatchAd={handleWatchAd} />
             )}
           </>
         )}
@@ -252,13 +206,13 @@ function App() {
       {!isWithdrawing && (
         <div style={s.bottomNav}>
           <div onClick={() => setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
-             <span style={{ fontSize: '24px' }}>🏠</span><span>Home</span>
+             <span>🏠</span><span>Home</span>
           </div>
           <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
-             <span style={{ fontSize: '24px' }}>👥</span><span>Red</span>
+             <span>👥</span><span>Red</span>
           </div>
           <div onClick={() => setActiveTab('missions')} style={activeTab === 'missions' ? s.navItemActive : s.navItem}>
-             <span style={{ fontSize: '24px' }}>🎥</span><span>Anuncios</span>
+             <span>🎥</span><span>Ads</span>
           </div>
         </div>
       )}
