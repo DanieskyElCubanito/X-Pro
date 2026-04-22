@@ -46,20 +46,13 @@ async function isMemberOfChannel(userId) {
 
 function detectProxy(req) {
   const headers = req.headers;
-  const proxyHeaders = [
-    'x-forwarded-for',
-    'proxy-client-ip',
-    'wl-proxy-client-ip',
-    'fastly-client-ip',
-    'z-forwarded-for'
-  ];
+  const proxyHeaders = ['x-forwarded-for', 'proxy-client-ip', 'wl-proxy-client-ip', 'fastly-client-ip', 'z-forwarded-for'];
   return proxyHeaders.some(h => headers[h] !== undefined);
 }
 
 // --- HANDLER PRINCIPAL ---
 
 export default async function handler(req, res) {
-  // Configuración de Headers CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -76,41 +69,31 @@ export default async function handler(req, res) {
       const { user, start_param } = req.body;
       if (!user?.id) return res.status(400).json({ success: false, error: 'NO_USER' });
 
-      // Detección de Proxy
-      if (detectProxy(req)) {
-        // Log opcional de seguridad aquí
-      }
+      if (detectProxy(req)) { /* Log security */ }
 
-      let { data: dbUser, error: fetchError } = await supabase
+      let { data: dbUser } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      // Busca esta parte en tu api/index.js (alrededor de la línea 75-80)
-if (!dbUser) {
-  const referrerId = start_param ? parseInt(start_param) : null;
-  
-  // REGISTRO SIMPLIFICADO PARA EVITAR ERROR 400
-  const { data: newUser, error: createError } = await supabase
-    .from('users')
-    .insert([{ 
-      id: user.id, 
-      username: user.username || `User_${user.id}`, 
-      balance: 0, 
-      referred_by: referrerId,
-      last_bonus: new Date(0).toISOString()
-      // Quitamos ip_address por ahora para asegurar que funcione
-    }])
-    .select()
-    .single();
-  
-  if (createError) {
-    console.error("Error detallado de Supabase:", createError);
-    throw createError;
-  }
-  dbUser = newUser;
-}
+      if (!dbUser) {
+        const referrerId = start_param ? parseInt(start_param) : null;
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert([{ 
+            id: user.id, 
+            username: user.username || `User_${user.id}`, 
+            balance: 0, 
+            referred_by: referrerId,
+            last_bonus: new Date(0).toISOString()
+          }])
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        dbUser = newUser;
+      }
 
       // Cálculo de Estadísticas de Red (3 Niveles)
       const { data: L1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
@@ -144,7 +127,6 @@ if (!dbUser) {
         return res.status(200).json({ success: false, error: 'ALREADY_CLAIMED' });
       }
 
-      // Pago de bono y actualización de fecha
       await supabase.rpc('increment_balance', { user_id: userId, amount: CONFIG.REWARDS.DAILY });
       await supabase.from('users').update({ last_bonus: now.toISOString() }).eq('id', userId);
 
@@ -160,15 +142,13 @@ if (!dbUser) {
           }
         }
       }
-
       return res.status(200).json({ success: true, reward: CONFIG.REWARDS.DAILY });
     }
 
     // 3. RUTA: AD REWARD
     if (path === '/api/ad-reward' && method === 'POST') {
       const { userId } = req.body;
-      const { error } = await supabase.rpc('increment_balance', { user_id: userId, amount: CONFIG.REWARDS.AD });
-      if (error) throw error;
+      await supabase.rpc('increment_balance', { user_id: userId, amount: CONFIG.REWARDS.AD });
       return res.status(200).json({ success: true, reward: CONFIG.REWARDS.AD });
     }
 
@@ -176,7 +156,6 @@ if (!dbUser) {
     if (path === '/api/withdraw' && method === 'POST') {
       const { userId, address, amount, turnstileToken } = req.body;
 
-      // Seguridad: Turnstile + Telegram Channel
       const captchaValid = await verifyTurnstile(turnstileToken);
       if (!captchaValid) return res.status(403).json({ error: 'CAPTCHA_FAILED' });
 
@@ -186,7 +165,6 @@ if (!dbUser) {
       const { data: user } = await supabase.from('users').select('balance').eq('id', userId).single();
       if (!user || user.balance < amount) return res.status(400).json({ error: 'INSUFFICIENT_BALANCE' });
 
-      // Transacción: Descontar y registrar
       await supabase.rpc('increment_balance', { user_id: userId, amount: -amount });
       const { data: withdraw } = await supabase.from('withdraws').insert([{
         user_id: userId,
@@ -200,9 +178,6 @@ if (!dbUser) {
 
     // 5. RUTA: MISSIONS (Misiones)
     if (path === '/api/claim' && method === 'POST') {
-      const { userId, missionId } = req.body;
-      // Aquí iría tu lógica de misiones (ej. unirse a otro canal, etc.)
-      // Por brevedad, simulamos éxito
       return res.status(200).json({ success: true, message: 'Mission claimed' });
     }
 
