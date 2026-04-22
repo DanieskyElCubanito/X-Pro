@@ -29,11 +29,8 @@ function App() {
   const WITHDRAW_LIMITS = { min: 0.1, maxDaily: 1.0 };
 
   /* --- [ LÓGICA DE INICIO ] --- */
-const verifyUser = useCallback(async (user, startParam) => {
-    console.log("Intentando verificar usuario:", user); // <--- AÑADE ESTO
-    try {
-      // ... resto del código
   const verifyUser = async (user, startParam) => {
+    console.log("Intentando verificar usuario:", user); 
     try {
       const data = await botApi.verifyUser(user, startParam);
       if (data.success) {
@@ -107,7 +104,7 @@ const verifyUser = useCallback(async (user, startParam) => {
 
   const processWithdraw = async () => {
     const amount = parseFloat(withdrawAmount);
-    
+
     // Validaciones
     if (!withdrawAddress.startsWith('U') && !withdrawAddress.startsWith('E')) {
       return toast.error("Dirección TON inválida");
