@@ -1,5 +1,32 @@
 export const s = {
-  // Contenedor principal
+  // --- [ ESTADOS DE CARGA Y ERRORES ] ---
+  center: {
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#050505',
+    color: '#fff',
+    textAlign: 'center'
+  },
+  loader: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #222',
+    borderTop: '4px solid #0088cc',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite', // Requiere el CSS de abajo
+    marginBottom: '15px'
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: '14px',
+    marginTop: '10px',
+    lineHeight: '1.4'
+  },
+
+  // --- [ CONTENEDORES GENERALES ] ---
   container: { 
     backgroundColor: '#050505', 
     color: '#ffffff', 
@@ -8,7 +35,7 @@ export const s = {
     display: 'flex', 
     flexDirection: 'column'
   },
-  
+
   main: { 
     padding: '16px', 
     maxWidth: '500px', 
@@ -18,7 +45,34 @@ export const s = {
     paddingBottom: '120px' 
   }, 
 
-  // Tarjetas Modernas
+  // --- [ PERFIL DE USUARIO ] ---
+  profileHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '10px 0',
+    marginBottom: '20px'
+  },
+  profileAvatar: {
+    width: '55px',
+    height: '55px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+    border: '2px solid #0088cc',
+    marginRight: '15px'
+  },
+  profileName: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#ffffff',
+    margin: 0
+  },
+  profileId: {
+    fontSize: '12px',
+    color: '#888',
+    margin: 0
+  },
+
+  // --- [ TARJETAS Y PANELES ] ---
   card: { 
     backgroundColor: '#121212', 
     padding: '20px', 
@@ -27,15 +81,45 @@ export const s = {
     marginBottom: '16px',
     boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
   },
+  cardBalance: { 
+    background: 'linear-gradient(145deg, #0088cc 0%, #005588 100%)', 
+    padding: '35px 20px', 
+    borderRadius: '28px', 
+    textAlign: 'center', 
+    marginBottom: '24px',
+    boxShadow: '0 12px 24px rgba(0,136,204,0.3)'
+  },
 
-  // Diseño de la Red (Grid de 3 columnas)
+  // --- [ ACCIONES RÁPIDAS ] ---
+  actionGrid: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '15px',
+    marginTop: '20px'
+  },
+  actionCard: {
+    flex: 1, 
+    backgroundColor: '#1a1a1a', 
+    borderRadius: '18px',
+    padding: '15px 10px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    border: '1px solid #333',
+    color: '#fff',
+    fontSize: '13px',
+    fontWeight: '600'
+  },
+
+  // --- [ DISEÑO DE RED (AFILIADOS) ] ---
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '10px',
     marginBottom: '20px'
   },
-
   statCol: {
     backgroundColor: '#1a1a1a',
     padding: '12px 5px',
@@ -43,14 +127,11 @@ export const s = {
     textAlign: 'center',
     border: '1px solid #252525'
   },
-
   statLabel: { fontSize: '10px', color: '#888', fontWeight: 'bold', margin: '0 0 5px 0', textTransform: 'uppercase' },
   statValue: { fontSize: '18px', fontWeight: '800', margin: '0', color: '#fff' },
   statCom: { fontSize: '10px', margin: '5px 0 0 0', color: '#0088cc', fontWeight: '600' },
 
-  // Fila de Comisión
   row: { display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '20px' },
-  
   box: { 
     flex: 1, 
     padding: '10px', 
@@ -61,8 +142,6 @@ export const s = {
     color: '#666',
     border: '1px dashed #333'
   },
-
-  // Resaltado de Total
   totalCard: {
     background: 'linear-gradient(90deg, #121212 0%, #1a1a1a 100%)',
     padding: '15px 20px',
@@ -73,7 +152,7 @@ export const s = {
     border: '1px solid #28a74544'
   },
 
-  // Botones
+  // --- [ BOTONES ] ---
   btnGreen: { 
     width: '100%', 
     padding: '18px', 
@@ -84,10 +163,8 @@ export const s = {
     fontWeight: '800', 
     fontSize: '16px',
     boxShadow: '0 8px 20px rgba(40,167,69,0.2)',
-    cursor: 'pointer',
-    transition: 'transform 0.2s'
+    cursor: 'pointer'
   },
-
   btnWhite: { 
     width: '100%', 
     padding: '16px', 
@@ -95,9 +172,9 @@ export const s = {
     color: '#000', 
     borderRadius: '16px', 
     fontWeight: '700',
-    border: 'none'
+    border: 'none',
+    cursor: 'pointer'
   },
-
   btnOutline: { 
     width: '100%', 
     padding: '14px', 
@@ -107,19 +184,11 @@ export const s = {
     borderRadius: '16px', 
     fontWeight: '600',
     fontSize: '14px',
-    marginTop: '10px'
+    marginTop: '10px',
+    cursor: 'pointer'
   },
 
-  cardBalance: { 
-    background: 'linear-gradient(145deg, #0088cc 0%, #005588 100%)', 
-    padding: '35px 20px', 
-    borderRadius: '28px', 
-    textAlign: 'center', 
-    marginBottom: '24px',
-    boxShadow: '0 12px 24px rgba(0,136,204,0.3)'
-  },
-
-  // Navegación
+  // --- [ NAVEGACIÓN ] ---
   bottomNav: { 
     position: 'fixed', 
     bottom: 0, 
@@ -133,25 +202,10 @@ export const s = {
     borderTop: '1px solid #1f1f1f', 
     zIndex: 100 
   },
+  navItem: { color: '#555', display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '11px', width: '33%', gap: '5px', cursor: 'pointer' },
+  navItemActive: { color: '#0088cc', display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '11px', width: '33%', gap: '5px', cursor: 'pointer' },
 
-  navItem: { color: '#555', display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '11px', width: '33%', gap: '5px' },
-  navItemActive: { color: '#0088cc', display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '11px', width: '33%', gap: '5px' },
-
-  // Estilos de Retiro
-  withdrawContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-    padding: '10px 5px'
-  },
-
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    textAlign: 'left'
-  },
-
+  // --- [ RETIRO E INPUTS ] ---
   input: {
     width: '100%',
     padding: '16px',
@@ -162,24 +216,16 @@ export const s = {
     fontSize: '15px',
     outline: 'none',
     boxSizing: 'border-box',
-    transition: 'border-color 0.2s',
+    marginBottom: '15px'
   },
-
   helpText: {
     fontSize: '11px',
-    color: '#fff', // Texto en blanco para que resalte
-    background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.2) 0%, rgba(40, 167, 69, 0.1) 100%)', // Gradiente azul a verde muy suave
+    color: '#fff', 
+    background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.2) 0%, rgba(40, 167, 69, 0.1) 100%)', 
     padding: '12px',
     borderRadius: '16px',
-    border: '1px solid rgba(0, 136, 204, 0.3)', // Borde sutil azul
+    border: '1px solid rgba(0, 136, 204, 0.3)', 
     marginBottom: '15px',
     lineHeight: '1.5'
-  },
-
-  label: {
-    fontSize: '12px',
-    color: '#888',
-    fontWeight: '600',
-    textTransform: 'uppercase'
   }
 };
