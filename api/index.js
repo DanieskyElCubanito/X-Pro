@@ -15,20 +15,39 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   try {
-    const { user, start_param } = req.body;
+    // Recibimos la 'action' para saber qué operación ejecutar
+    const { action, user, start_param, userId, address, amount } = req.body;
 
+    // --- ACCIÓN 1: COBRAR ANUNCIO ---
+    if (action === 'ad-reward') {
+      const { data: u, error: uErr } = await supabase.from('users').select('*').eq('id', userId).single();
+      if (uErr) throw new Error('Usuario no encontrado');
+
+      const newBalance = (u.balance || 0) + 0.0001; // Premio del anuncio
+      const newAdsCount = (u.ads_watched || 0) + 1;
+
+      await supabase.from('users').update({ balance: newBalance, ads_watched: newAdsCount }).eq('id', userId);
+      return res.status(200).json({ success: true, newBalance, newAdsCount });
+    }
+
+    // --- ACCIÓN 2: RETIRAR ---
+    if (action === 'withdraw') {
+      const { data: u, error: uErr } = await supabase.from('users').select('balance').eq('id', userId).single();
+      if (uErr) throw new Error('Usuario no encontrado');
+      if ((u.balance || 0) < amount) return res.status(400).json({ error: 'Saldo insuficiente' });
+
+      await supabase.from('users').update({ balance: u.balance - amount }).eq('id', userId);
+      return res.status(200).json({ success: true });
+    }
+
+    // --- ACCIÓN 3: VERIFICAR O CREAR USUARIO (Por defecto) ---
     if (!user || !user.id) {
       return res.status(400).json({ error: 'Datos de usuario incompletos' });
     }
 
-    // 1. Intentar buscar o crear el usuario
-    let { data: dbUser, error: dbError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    let { data: dbUser, error: dbError } = await supabase.from('users').select('*').eq('id', user.id).single();
 
-    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 es "no encontrado"
+    if (dbError && dbError.code !== 'PGRST116') { 
       return res.status(500).json({ error: 'Error de Supabase al buscar', detalle: dbError.message });
     }
 
@@ -45,17 +64,11 @@ export default async function handler(req, res) {
         }])
         .select().single();
 
-      if (insError) {
-        return res.status(500).json({ error: 'Error al crear usuario', detalle: insError.message });
-      }
+      if (insError) return res.status(500).json({ error: 'Error al crear usuario', detalle: insError.message });
       dbUser = newUser;
     }
 
-    // 2. Obtener estadísticas simples
-    const { data: refs } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('referred_by', user.id);
+    const { data: refs } = await supabase.from('users').select('balance').eq('referred_by', user.id);
 
     return res.status(200).json({
       success: true,
@@ -67,9 +80,6 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    return res.status(500).json({ 
-      error: 'Crash total del servidor', 
-      mensaje: error.message 
-    });
+    return res.status(500).json({ error: 'Crash total del servidor', mensaje: error.message });
   }
 }
