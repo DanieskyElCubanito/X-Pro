@@ -3,20 +3,15 @@ import WebApp from '@twa-dev/sdk';
 import { s } from './styles/appStyles';
 import { botApi } from './api/botApi'; 
 import toast, { Toaster } from 'react-hot-toast'; 
-
 import ShareTab from './components/ShareTab';
 
 function App() {
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
-  const [errorInfo, setErrorInfo] = useState('');
   const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
   
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [withdrawAddress, setWithdrawAddress] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState(0.1);
-  const [isSending, setIsSending] = useState(false);
+  const [view, setView] = useState('main'); // 'main', 'withdraw', 'history'
 
   const verifyUser = async (user, startParam) => {
     try {
@@ -25,93 +20,105 @@ function App() {
         setUserData(data.user);
         setStats(data.stats);
         setStatus('member');
-      } else {
-        setStatus('error');
-        setErrorInfo(data.error || 'Error de acceso');
       }
     } catch (err) {
       setStatus('error');
-      setErrorInfo(err.response?.data?.error || err.message);
     }
   };
 
   useEffect(() => {
-    WebApp.ready();
-    WebApp.expand();
+    WebApp.ready(); WebApp.expand();
     const user = WebApp.initDataUnsafe?.user;
-    if (!user) {
-      setStatus('error');
-      setErrorInfo('Abre la app desde Telegram');
-      return;
-    }
+    if (!user) { setStatus('error'); return; }
     verifyUser(user, WebApp.initDataUnsafe?.start_param);
   }, []);
 
-  const processWithdraw = async () => {
-    if (!withdrawAddress.startsWith('U') && !withdrawAddress.startsWith('E')) {
-      return toast.error("Wallet TON inválida");
-    }
-    setIsSending(true);
+  const handleBonus = async () => {
+    const tid = toast.loading("Reclamando bono...");
     try {
-      const data = await botApi.withdraw(userData.id, withdrawAddress, withdrawAmount);
-      if (data.success) {
-        setUserData(prev => ({ ...prev, balance: prev.balance - withdrawAmount }));
-        setIsWithdrawing(false);
-        toast.success("Retiro solicitado");
+      const res = await botApi.claimBonus(userData.id);
+      if (res.success) {
+        setUserData(prev => ({ ...prev, balance: res.newBalance }));
+        toast.success("¡Bono recibido! +0.005 TON", { id: tid });
       }
     } catch (e) {
-      toast.error("Error en el proceso");
-    } finally {
-      setIsSending(false);
+      toast.error(e.response?.data?.error || "Error al cobrar", { id: tid });
     }
-  };
-
-  const handleShare = () => {
-    const link = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=¡Únete y gana TON!`);
   };
 
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
-  if (status === 'error') return <div style={s.center}><p style={s.errorText}>{errorInfo}</p></div>;
 
   return (
     <div style={s.container}>
       <Toaster position="top-center" />
+      
       <div style={s.main}>
-        {isWithdrawing ? (
-          <div style={{padding:'20px'}}>
-            <h3 style={{color:'#fff', textAlign:'center'}}>Retirar Balance</h3>
-            <input style={s.input} placeholder="Wallet TON (UQ...)" value={withdrawAddress} onChange={e=>setWithdrawAddress(e.target.value)} />
-            <input style={s.input} type="number" value={withdrawAmount} onChange={e=>setWithdrawAmount(e.target.value)} />
-            <button style={s.btnGreen} onClick={processWithdraw} disabled={isSending}>
-              {isSending ? 'PROCESANDO...' : 'CONFIRMAR RETIRO'}
-            </button>
-            <button style={s.btnOutline} onClick={()=>setIsWithdrawing(false)}>VOLVER</button>
+        {/* CABECERA DE PERFIL GAMIFICADA */}
+        <div style={s.profileHeader}>
+          <img 
+            src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} 
+            style={s.profileAvatar} 
+            alt="avatar"
+          />
+          <div>
+            <p style={s.profileName}>{userData?.username || 'Gamer'}</p>
+            <p style={s.profileId}>ID: {userData?.id}</p>
           </div>
-        ) : (
-          <>
-            {activeTab === 'home' && (
-              <div style={s.cardBalance}>
-                <p style={{fontSize:'12px', opacity:0.8}}>SALDO ACTUAL</p>
-                <h1 style={{fontSize:'40px', margin:'10px 0'}}>
-                  {Number(userData?.balance || 0).toFixed(4)} <span style={{fontSize:'16px'}}>TON</span>
-                </h1>
-                <button style={s.btnWhite} onClick={()=>setIsWithdrawing(true)}>SOLICITAR RETIRO</button>
+        </div>
+
+        {activeTab === 'home' && (
+          <div className="fade-in">
+            {/* TARJETA DE BALANCE */}
+            <div style={s.cardBalance}>
+              <p style={{fontSize:'12px', fontWeight:'bold', letterSpacing:'1px', opacity:0.9}}>TOTAL TON</p>
+              <h1 style={{fontSize:'42px', margin:'10px 0', textShadow: '0 4px 10px rgba(0,0,0,0.2)'}}>
+                {Number(userData?.balance || 0).toFixed(4)}
+              </h1>
+              <div style={{fontSize:'14px', opacity:0.8}}>Nivel: Usuario Elite</div>
+            </div>
+
+            {/* BOTONES GAMIFICADOS (Action Grid) */}
+            <div style={s.actionGrid}>
+              <div style={s.actionCard} onClick={() => setView('withdraw')}>
+                <span style={{fontSize:'24px', marginBottom:'8px'}}>💸</span>
+                RETIRO
               </div>
-            )}
-            {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
-          </>
+              <div style={s.actionCard} onClick={handleBonus}>
+                <span style={{fontSize:'24px', marginBottom:'8px'}}>🎁</span>
+                BONO
+              </div>
+              <div style={s.actionCard} onClick={() => toast("Próximamente")}>
+                <span style={{fontSize:'24px', marginBottom:'8px'}}>📜</span>
+                HISTORIA
+              </div>
+            </div>
+            
+            <div style={{...s.card, marginTop:'20px', textAlign:'center'}}>
+                <p style={{color:'#888', fontSize:'12px'}}>¡Invita amigos para subir de nivel!</p>
+            </div>
+          </div>
         )}
+
+        {activeTab === 'share' && <ShareTab stats={stats} handleShare={() => {}} />}
       </div>
 
-      {!isWithdrawing && (
-        <div style={s.bottomNav}>
-          <div onClick={()=>setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
-             <span>🏠</span><span>Inicio</span>
-          </div>
-          <div onClick={()=>setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
-             <span>👥</span><span>Amigos</span>
-          </div>
+      {/* NAVEGACIÓN INFERIOR */}
+      <div style={s.bottomNav}>
+        <div onClick={()=>setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
+           <span>🏠</span><span>HOME</span>
+        </div>
+        <div onClick={()=>setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
+           <span>👥</span><span>RED</span>
+        </div>
+      </div>
+
+      {/* MODAL DE RETIRO (Simple) */}
+      {view === 'withdraw' && (
+        <div style={{...s.center, position:'fixed', zIndex:200, padding:'20px', background:'#000'}}>
+             <h2>Retirar TON</h2>
+             <input style={s.input} placeholder="Dirección TON" />
+             <button style={s.btnGreen} onClick={() => setView('main')}>CONFIRMAR</button>
+             <button style={s.btnOutline} onClick={() => setView('main')}>CANCELAR</button>
         </div>
       )}
     </div>
