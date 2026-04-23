@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { s } from './styles/appStyles';
-import { botApi } from './api'; 
+import { botApi } from './api/botApi'; // Importación corregida para ser más segura
 import toast, { Toaster } from 'react-hot-toast'; 
 
 // Componentes modulares
@@ -49,7 +49,6 @@ function App() {
     } catch (err) {
       console.error("Error detallado:", err);
       
-      // Forzamos a que el error se convierta en texto real
       const serverError = err.response?.data;
       const errorMsg = typeof serverError === 'object' 
         ? JSON.stringify(serverError) 
@@ -58,6 +57,8 @@ function App() {
       setStatus('error');
       setErrorInfo(`[Error ${err.response?.status || 'Red'}] ${errorMsg}`);
     }
+  }; // <--- AQUÍ ESTABA EL ERROR: Faltaba cerrar esta función
+
   useEffect(() => {
     WebApp.ready();
     WebApp.expand();
@@ -66,7 +67,6 @@ function App() {
     const user = WebApp.initDataUnsafe?.user;
     
     if (!user) {
-      // Si entras por navegador normal, esto fallará.
       setStatus('error');
       setErrorInfo('Por favor, abre la app desde Telegram (User no detectado).');
       return;
