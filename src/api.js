@@ -3,23 +3,25 @@ import axios from 'axios';
 
 /**
  * Configuración de Axios para conectar con las Serverless Functions de Vercel.
- * baseURL: '/api' le dice a la app que busque los archivos en la carpeta raíz /api/
  */
 const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 20000, // 20 segundos para soportar conexiones lentas
+  timeout: 20000, 
 });
 
 export const botApi = {
   /**
-   * Verifica al usuario al abrir la App (llama a api/verify.js)
+   * Verifica al usuario al abrir la App
    */
   verifyUser: async (user, startParam) => {
     try {
-      const { data } = await api.post('/verify', { user, startParam });
+      const { data } = await api.post('/verify', { 
+        user, 
+        start_param: startParam // Unificado con guion bajo para el backend
+      });
       return data;
     } catch (error) {
       console.error("Error en verifyUser:", error.response?.data || error.message);
@@ -28,40 +30,51 @@ export const botApi = {
   },
 
   /**
-   * Reclama recompensas de misiones (llama a api/claim.js si existe)
+   * RECLAMA EL BONO DIARIO (Esta es la que faltaba)
    */
-  claimMission: async (userId, missionId) => {
+  claimBonus: async (userId) => {
     try {
-      const { data } = await api.post('/claim', { userId, missionId });
+      const { data } = await api.post('/verify', { 
+        action: 'claim-bonus', 
+        userId 
+      });
       return data;
     } catch (error) {
-      console.error("Error en claimMission:", error.response?.data || error.message);
+      console.error("Error en claimBonus:", error.response?.data || error.message);
       throw error;
     }
   },
 
   /**
-   * Procesa la recompensa por ver anuncios (llama a api/ad-reward.js)
-   */
-  adReward: async (userId) => {
-    try {
-      const { data } = await api.post('/ad-reward', { userId });
-      return data;
-    } catch (error) {
-      console.error("Error en adReward:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  /**
-   * Procesa solicitudes de retiro de saldo (llama a api/withdraw.js)
+   * Procesa solicitudes de retiro de saldo
    */
   withdraw: async (userId, address, amount) => {
     try {
-      const { data } = await api.post('/withdraw', { userId, address, amount });
+      const { data } = await api.post('/verify', { 
+        action: 'withdraw', 
+        userId, 
+        address, 
+        amount 
+      });
       return data;
     } catch (error) {
       console.error("Error en withdraw:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Procesa recompensas de anuncios (si decides volver a usarlos)
+   */
+  adReward: async (userId) => {
+    try {
+      const { data } = await api.post('/verify', { 
+        action: 'ad-reward', 
+        userId 
+      });
+      return data;
+    } catch (error) {
+      console.error("Error en adReward:", error.response?.data || error.message);
       throw error;
     }
   }
