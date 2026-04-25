@@ -53,7 +53,7 @@ function App() {
       const res = await botApi.claimBonus(userData.id);
       if (res.success) {
         setUserData(prev => ({ ...prev, balance: res.newBalance }));
-        toast.success("¡Bono recibido! +0.005 TON", { id: tid });
+        toast.success("¡Bono recibido! +0.001 TON", { id: tid });
       }
     } catch (e) {
       const msg = e.response?.data?.error || e.message || "Error de conexión";
