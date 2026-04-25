@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Vuelve en ${faltan} horas` });
       }
 
-      const reward = 0.005;
+      const reward = 0.001;
       const newB = (Number(u.balance) || 0) + reward;
       await supabase.from('users').update({ balance: newB, last_bonus: new Date().toISOString() }).eq('id', userId);
       return res.status(200).json({ success: true, newBalance: newB });
