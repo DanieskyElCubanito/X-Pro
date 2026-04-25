@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { s } from './styles/appStyles';
-import { botApi } from './api/botApi'; // Asegúrate que el archivo se llame botApi.js
+import { botApi } from './api/botApi';
 import toast, { Toaster } from 'react-hot-toast'; 
 import ShareTab from './components/ShareTab';
 
@@ -10,15 +10,23 @@ function App() {
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
   const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
-  const [view, setView] = useState('main'); // 'main', 'withdraw', 'history'
+  const [view, setView] = useState('main');
+  
+  // Estados para la validación de canales
+  const [mustJoin, setMustJoin] = useState(false);
+  const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
 
-  // Función para verificar usuario
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
+        
+        // Seteamos el estado de los canales que viene del backend
+        setChannelStatus(data.channels);
+        setMustJoin(data.mustJoin); 
+        
         setStatus('member');
       }
     } catch (err) {
@@ -27,27 +35,39 @@ function App() {
     }
   };
 
+  // Función para re-verificar canales manualmente
+  const handleCheckChannels = async () => {
+    const tid = toast.loading("Verificando canales...");
+    try {
+      const res = await botApi.checkChannels(userData.id);
+      if (res.allJoined) {
+        setMustJoin(false);
+        toast.success("¡Perfecto! Ya puedes entrar", { id: tid });
+      } else {
+        setChannelStatus({ c1: res.channel1, c2: res.channel2 });
+        toast.error("Aún no te has unido a todos los canales", { id: tid });
+      }
+    } catch (e) {
+      toast.error("Error al verificar. Intenta de nuevo.", { id: tid });
+    }
+  };
+
   useEffect(() => {
     WebApp.ready(); 
     WebApp.expand();
     const user = WebApp.initDataUnsafe?.user;
-    
-    // AQUÍ ES LA CLAVE: Capturamos el ID de quien lo invitó
     const inviterId = WebApp.initDataUnsafe?.start_param;
 
     if (!user) {
       setStatus('error');
       return;
     }
-    
-    // Pasamos el usuario Y el ID del invitador al backend
+
     verifyUser(user, inviterId);
   }, []);
 
-  // Lógica del Bono con detector de errores real
   const handleBonus = async () => {
     if (!userData?.id) return toast.error("Usuario no cargado");
-
     const tid = toast.loading("Reclamando bono...");
     try {
       const res = await botApi.claimBonus(userData.id);
@@ -61,7 +81,6 @@ function App() {
     }
   };
 
-  // Función para compartir link de referidos
   const handleShare = () => {
     const inviteLink = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = "¡Gana TON gratis con esta App! 💎";
@@ -72,12 +91,52 @@ function App() {
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
   if (status === 'error') return <div style={s.center}><h2>⚠️ Error de acceso</h2><p>Abre la app desde Telegram</p></div>;
 
+  // VISTA DE BLOQUEO (FORCE JOIN)
+  if (mustJoin) {
+    return (
+      <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
+        <Toaster position="top-center" />
+        <h2 style={{color: '#0088cc', marginBottom: '10px'}}>¡Casi listo! 🚀</h2>
+        <p style={{fontSize: '14px', color: '#888', marginBottom: '30px'}}>
+          Para activar tu cuenta y empezar a ganar, únete a nuestros canales oficiales:
+        </p>
+
+        <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+          {!channelStatus.c1 && (
+            <div style={{...s.card, border: '1px solid #0088cc'}}>
+              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Crypto ₿itcoin</p>
+              <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>
+                UNIRME CANAL 1
+              </button>
+            </div>
+          )}
+
+          {!channelStatus.c2 && (
+            <div style={{...s.card, border: '1px solid #0088cc'}}>
+              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Crypto Finanzas</p>
+              <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/FinanzasConDanny')}>
+                UNIRME CANAL 2
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button 
+          style={{...s.btnOutline, marginTop: '40px', width: '100%', color: '#28a745', borderColor: '#28a745'}} 
+          onClick={handleCheckChannels}
+        >
+          🔄 YA ME UNÍ, VERIFICAR
+        </button>
+      </div>
+    );
+  }
+
+  // VISTA PRINCIPAL (CONTENIDO NORMAL)
   return (
     <div style={s.container}>
       <Toaster position="top-center" reverseOrder={false} />
 
       <div style={s.main}>
-        {/* CABECERA */}
         <div style={s.profileHeader}>
           <img 
             src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} 
@@ -126,7 +185,6 @@ function App() {
                 </div>
               </>
             ) : view === 'withdraw' ? (
-              /* VISTA DE RETIRO */
               <div className="fade-in">
                  <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
                  <p style={s.helpText}>Mínimo de retiro: 0.1 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
@@ -136,7 +194,6 @@ function App() {
                  <button style={s.btnOutline} onClick={() => setView('main')}>VOLVER AL INICIO</button>
               </div>
             ) : (
-              /* VISTA DE HISTORIAL */
               <div className="fade-in">
                  <h2 style={{textAlign:'center', marginBottom:'20px'}}>Historial</h2>
                  <div style={{...s.card, textAlign:'center', color:'#555'}}>
@@ -151,7 +208,6 @@ function App() {
         {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
       </div>
 
-      {/* BARRA DE NAVEGACIÓN */}
       <div style={s.bottomNav}>
         <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
            <span style={{fontSize:'20px'}}>🏠</span><span>HOME</span>
