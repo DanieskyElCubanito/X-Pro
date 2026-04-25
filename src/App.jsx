@@ -9,7 +9,7 @@ function App() {
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
-  const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
+  const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
   const [view, setView] = useState('main'); // 'main', 'withdraw', 'history'
 
   // Función para verificar usuario
@@ -31,17 +31,23 @@ function App() {
     WebApp.ready(); 
     WebApp.expand();
     const user = WebApp.initDataUnsafe?.user;
+    
+    // AQUÍ ES LA CLAVE: Capturamos el ID de quien lo invitó
+    const inviterId = WebApp.initDataUnsafe?.start_param;
+
     if (!user) {
       setStatus('error');
       return;
     }
-    verifyUser(user, WebApp.initDataUnsafe?.start_param);
+    
+    // Pasamos el usuario Y el ID del invitador al backend
+    verifyUser(user, inviterId);
   }, []);
 
   // Lógica del Bono con detector de errores real
   const handleBonus = async () => {
     if (!userData?.id) return toast.error("Usuario no cargado");
-    
+
     const tid = toast.loading("Reclamando bono...");
     try {
       const res = await botApi.claimBonus(userData.id);
@@ -50,7 +56,6 @@ function App() {
         toast.success("¡Bono recibido! +0.005 TON", { id: tid });
       }
     } catch (e) {
-      // ESTO TE DIRÁ POR QUÉ FALLA REALMENTE
       const msg = e.response?.data?.error || e.message || "Error de conexión";
       toast.error(`Fallo: ${msg}`, { id: tid });
     }
