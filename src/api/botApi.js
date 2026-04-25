@@ -11,7 +11,7 @@ const api = axios.create({
 });
 
 export const botApi = {
-  // 1. Verificar Usuario
+  // 1. Verificar Usuario e Inicio
   verifyUser: async (user, startParam) => {
     try {
       const res = await api.post('/', { 
@@ -25,7 +25,21 @@ export const botApi = {
     }
   },
 
-  // 2. RECLAMAR BONO (¡Aquí estaba el fallo!)
+  // 2. Re-verificar unión a canales (NUEVO)
+  checkChannels: async (userId) => {
+    try {
+      const res = await api.post('/', { 
+        action: 'check-channels', 
+        userId 
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en checkChannels:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // 3. Reclamar Bono Diario
   claimBonus: async (userId) => {
     try {
       const res = await api.post('/', { 
@@ -39,7 +53,7 @@ export const botApi = {
     }
   },
 
-  // 3. Retirar Saldo
+  // 4. Retirar Saldo
   withdraw: async (userId, address, amount) => {
     try {
       const res = await api.post('/', { 
