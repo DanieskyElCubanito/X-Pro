@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, amount } = req.body;
+    const { user, action, userId, amount, start_param } = req.body; // <-- Recibimos start_param
 
     // --- ACCIÓN: COBRAR BONO DIARIO ---
     if (action === 'claim-bonus') {
@@ -45,16 +45,47 @@ export default async function handler(req, res) {
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).single();
 
     if (!dbUser) {
-      const { data: newUser } = await supabase.from('users').insert([{ 
-        id: user.id, username: user.username, balance: 0 
-      }]).select().single();
+      // EL USUARIO NO EXISTE -> LO CREAMOS Y ASIGNAMOS REFERIDO
+      
+      const newUserObj = { 
+        id: user.id, 
+        username: user.username || 'Gamer', 
+        balance: 0 
+      };
+
+      // Si existe un código de invitación y no es él mismo invitándose
+      if (start_param && start_param !== String(user.id)) {
+        newUserObj.referred_by = start_param;
+      }
+
+      const { data: newUser, error: insError } = await supabase
+        .from('users')
+        .insert([newUserObj])
+        .select()
+        .single();
+        
+      if (insError) throw insError;
       dbUser = newUser;
+
+      // --- PAGO DE COMISIÓN AUTOMÁTICA AL INVITADOR (Nivel 1: 0.003 TON) ---
+      if (newUserObj.referred_by) {
+        // Buscamos al invitador
+        const { data: inviter } = await supabase.from('users').select('balance').eq('id', newUserObj.referred_by).single();
+        if (inviter) {
+          // Le sumamos 0.003
+          const newInviterBalance = (Number(inviter.balance) || 0) + 0.003;
+          await supabase.from('users').update({ balance: newInviterBalance }).eq('id', newUserObj.referred_by);
+        }
+      }
     }
 
+    // --- CÁLCULO DE LA RED DE TRABAJO (Los 3 Niveles) ---
+    
     // NIVEL 1 (Directos)
     const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
     const n1 = lv1?.length || 0;
-    const c1 = lv1?.reduce((a, b) => a + (Number(b.balance) || 0), 0) || 0;
+    // La ganancia la calculamos basada en la recompensa (0.003 por cada uno)
+    const c1 = n1 * 0.003; 
     const ids1 = lv1?.map(u => u.id) || [];
 
     // NIVEL 2 (Invitados de tus directos)
@@ -62,7 +93,7 @@ export default async function handler(req, res) {
     if (ids1.length > 0) {
       const { data: lv2 } = await supabase.from('users').select('id, balance').in('referred_by', ids1);
       n2 = lv2?.length || 0;
-      c2 = lv2?.reduce((a, b) => a + (Number(b.balance) || 0), 0) || 0;
+      c2 = n2 * 0.002; // Asumiendo 0.002 por Nivel 2
       ids2 = lv2?.map(u => u.id) || [];
     }
 
@@ -71,7 +102,7 @@ export default async function handler(req, res) {
     if (ids2.length > 0) {
       const { data: lv3 } = await supabase.from('users').select('id, balance').in('referred_by', ids2);
       n3 = lv3?.length || 0;
-      c3 = lv3?.reduce((a, b) => a + (Number(b.balance) || 0), 0) || 0;
+      c3 = n3 * 0.001; // Asumiendo 0.001 por Nivel 3
     }
 
     return res.status(200).json({
