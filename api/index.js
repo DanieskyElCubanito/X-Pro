@@ -5,6 +5,29 @@ const supabase = createClient(
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx"
 );
 
+// TOKEN DE TU BOT DE TELEGRAM
+const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
+
+/**
+ * Función para verificar si un usuario está en un canal específico
+ */
+async function checkMembership(userId, chatId) {
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${userId}`;
+    const response = await fetch(url);
+    const resData = await response.json();
+    
+    if (!resData.ok) return false;
+    
+    const status = resData.result.status;
+    // Consideramos válidos estos estados
+    return ['member', 'administrator', 'creator'].includes(status);
+  } catch (error) {
+    console.error(`Error verificando canal ${chatId}:`, error);
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -12,7 +35,20 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, amount, start_param } = req.body; // <-- Recibimos start_param
+    const { user, action, userId, amount, start_param } = req.body; 
+
+    // --- ACCIÓN: VERIFICAR CANALES (Botón de la App) ---
+    if (action === 'check-channels') {
+      const isMember1 = await checkMembership(userId, "-1002228067712"); // Crypto ₿itcoin
+      const isMember2 = await checkMembership(userId, "-1003747302094"); // Crypto Finanzas
+      
+      return res.status(200).json({
+        success: true,
+        channel1: isMember1,
+        channel2: isMember2,
+        allJoined: isMember1 && isMember2
+      });
+    }
 
     // --- ACCIÓN: COBRAR BONO DIARIO ---
     if (action === 'claim-bonus') {
@@ -40,13 +76,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // --- ACCIÓN: VERIFICAR / INICIO (Lógica de Referidos Pro) ---
+    // --- ACCIÓN: VERIFICAR / INICIO (Lógica de Referidos Pro + Canales) ---
     if (!user?.id) return res.status(400).json({ error: 'No user id' });
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).single();
 
     if (!dbUser) {
       // EL USUARIO NO EXISTE -> LO CREAMOS Y ASIGNAMOS REFERIDO
-      
       const newUserObj = { 
         id: user.id, 
         username: user.username || 'Gamer', 
@@ -63,28 +98,29 @@ export default async function handler(req, res) {
         .insert([newUserObj])
         .select()
         .single();
-        
+
       if (insError) throw insError;
       dbUser = newUser;
 
       // --- PAGO DE COMISIÓN AUTOMÁTICA AL INVITADOR (Nivel 1: 0.003 TON) ---
       if (newUserObj.referred_by) {
-        // Buscamos al invitador
         const { data: inviter } = await supabase.from('users').select('balance').eq('id', newUserObj.referred_by).single();
         if (inviter) {
-          // Le sumamos 0.003
           const newInviterBalance = (Number(inviter.balance) || 0) + 0.003;
           await supabase.from('users').update({ balance: newInviterBalance }).eq('id', newUserObj.referred_by);
         }
       }
     }
 
+    // --- VERIFICACIÓN DE CANALES AL INICIAR ---
+    const isMember1 = await checkMembership(user.id, "-1002228067712");
+    const isMember2 = await checkMembership(user.id, "-1003747302094");
+
     // --- CÁLCULO DE LA RED DE TRABAJO (Los 3 Niveles) ---
-    
+
     // NIVEL 1 (Directos)
     const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
     const n1 = lv1?.length || 0;
-    // La ganancia la calculamos basada en la recompensa (0.003 por cada uno)
     const c1 = n1 * 0.003; 
     const ids1 = lv1?.map(u => u.id) || [];
 
@@ -93,7 +129,7 @@ export default async function handler(req, res) {
     if (ids1.length > 0) {
       const { data: lv2 } = await supabase.from('users').select('id, balance').in('referred_by', ids1);
       n2 = lv2?.length || 0;
-      c2 = n2 * 0.002; // Asumiendo 0.002 por Nivel 2
+      c2 = n2 * 0.002; 
       ids2 = lv2?.map(u => u.id) || [];
     }
 
@@ -102,9 +138,10 @@ export default async function handler(req, res) {
     if (ids2.length > 0) {
       const { data: lv3 } = await supabase.from('users').select('id, balance').in('referred_by', ids2);
       n3 = lv3?.length || 0;
-      c3 = n3 * 0.001; // Asumiendo 0.001 por Nivel 3
+      c3 = n3 * 0.001; 
     }
 
+    // RETORNAMOS TODO JUNTO: Datos, Red y Estado de los Canales
     return res.status(200).json({
       success: true,
       user: dbUser,
@@ -112,10 +149,13 @@ export default async function handler(req, res) {
         n1, c1: c1.toFixed(4), 
         n2, c2: c2.toFixed(4), 
         n3, c3: c3.toFixed(4) 
-      }
+      },
+      mustJoin: !(isMember1 && isMember2), // Si le falta alguno, esto será TRUE
+      channels: { c1: isMember1, c2: isMember2 } // Detalle de qué canal le falta
     });
 
   } catch (error) {
+    console.error("Error en el handler:", error);
     return res.status(500).json({ error: error.message });
   }
 }
