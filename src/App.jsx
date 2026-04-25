@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import { s } from './styles/appStyles';
-import { botApi } from './api/botApi'; 
+import { botApi } from './api/botApi'; // Asegúrate que el archivo se llame botApi.js
 import toast, { Toaster } from 'react-hot-toast'; 
 import ShareTab from './components/ShareTab';
 
@@ -10,9 +10,9 @@ function App() {
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
   const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
-  
   const [view, setView] = useState('main'); // 'main', 'withdraw', 'history'
 
+  // Función para verificar usuario
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
@@ -22,18 +22,26 @@ function App() {
         setStatus('member');
       }
     } catch (err) {
+      console.error("Error verificando:", err);
       setStatus('error');
     }
   };
 
   useEffect(() => {
-    WebApp.ready(); WebApp.expand();
+    WebApp.ready(); 
+    WebApp.expand();
     const user = WebApp.initDataUnsafe?.user;
-    if (!user) { setStatus('error'); return; }
+    if (!user) {
+      setStatus('error');
+      return;
+    }
     verifyUser(user, WebApp.initDataUnsafe?.start_param);
   }, []);
 
+  // Lógica del Bono con detector de errores real
   const handleBonus = async () => {
+    if (!userData?.id) return toast.error("Usuario no cargado");
+    
     const tid = toast.loading("Reclamando bono...");
     try {
       const res = await botApi.claimBonus(userData.id);
@@ -42,18 +50,29 @@ function App() {
         toast.success("¡Bono recibido! +0.005 TON", { id: tid });
       }
     } catch (e) {
-      toast.error(e.response?.data?.error || "Error al cobrar", { id: tid });
+      // ESTO TE DIRÁ POR QUÉ FALLA REALMENTE
+      const msg = e.response?.data?.error || e.message || "Error de conexión";
+      toast.error(`Fallo: ${msg}`, { id: tid });
     }
   };
 
+  // Función para compartir link de referidos
+  const handleShare = () => {
+    const inviteLink = `https://t.me/TuBotNombre_bot/app?startapp=${userData?.id}`;
+    const text = "¡Gana TON gratis con esta App! 💎";
+    const fullUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`;
+    WebApp.openTelegramLink(fullUrl);
+  };
+
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
+  if (status === 'error') return <div style={s.center}><h2>⚠️ Error de acceso</h2><p>Abre la app desde Telegram</p></div>;
 
   return (
     <div style={s.container}>
-      <Toaster position="top-center" />
-      
+      <Toaster position="top-center" reverseOrder={false} />
+
       <div style={s.main}>
-        {/* CABECERA DE PERFIL GAMIFICADA */}
+        {/* CABECERA */}
         <div style={s.profileHeader}>
           <img 
             src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} 
@@ -61,66 +80,81 @@ function App() {
             alt="avatar"
           />
           <div>
-            <p style={s.profileName}>{userData?.username || 'Gamer'}</p>
+            <p style={s.profileName}>{userData?.username || 'Usuario'}</p>
             <p style={s.profileId}>ID: {userData?.id}</p>
           </div>
         </div>
 
         {activeTab === 'home' && (
           <div className="fade-in">
-            {/* TARJETA DE BALANCE */}
-            <div style={s.cardBalance}>
-              <p style={{fontSize:'12px', fontWeight:'bold', letterSpacing:'1px', opacity:0.9}}>TOTAL TON</p>
-              <h1 style={{fontSize:'42px', margin:'10px 0', textShadow: '0 4px 10px rgba(0,0,0,0.2)'}}>
-                {Number(userData?.balance || 0).toFixed(4)}
-              </h1>
-              <div style={{fontSize:'14px', opacity:0.8}}>Nivel: Usuario Elite</div>
-            </div>
+            {view === 'main' ? (
+              <>
+                <div style={s.cardBalance}>
+                  <p style={{fontSize:'12px', fontWeight:'bold', letterSpacing:'1px', opacity:0.8}}>SALDO DISPONIBLE</p>
+                  <h1 style={{fontSize:'42px', margin:'10px 0', fontWeight:'900'}}>
+                    {Number(userData?.balance || 0).toFixed(4)} <span style={{fontSize:'18px'}}>TON</span>
+                  </h1>
+                  <div style={{fontSize:'12px', background:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'10px', display:'inline-block'}}>
+                    Nivel: Usuario Elite ⚡
+                  </div>
+                </div>
 
-            {/* BOTONES GAMIFICADOS (Action Grid) */}
-            <div style={s.actionGrid}>
-              <div style={s.actionCard} onClick={() => setView('withdraw')}>
-                <span style={{fontSize:'24px', marginBottom:'8px'}}>💸</span>
-                RETIRO
+                <div style={s.actionGrid}>
+                  <div style={s.actionCard} onClick={() => setView('withdraw')}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>💸</span>
+                    RETIRO
+                  </div>
+                  <div style={s.actionCard} onClick={handleBonus}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>🎁</span>
+                    BONO
+                  </div>
+                  <div style={s.actionCard} onClick={() => setView('history')}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>📜</span>
+                    HISTORIAL
+                  </div>
+                </div>
+
+                <div style={{...s.card, marginTop:'20px', borderStyle:'dashed', borderColor:'#333'}}>
+                    <p style={{color:'#888', fontSize:'13px', textAlign:'center'}}>
+                      Próximas misiones disponibles pronto...
+                    </p>
+                </div>
+              </>
+            ) : view === 'withdraw' ? (
+              /* VISTA DE RETIRO */
+              <div className="fade-in">
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
+                 <p style={s.helpText}>Mínimo de retiro: 0.1 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
+                 <input style={s.input} placeholder="Dirección de Wallet TON" />
+                 <input style={s.input} type="number" placeholder="Monto" defaultValue="0.1" />
+                 <button style={s.btnGreen} onClick={() => toast.error("Saldo insuficiente")}>ENVIAR SOLICITUD</button>
+                 <button style={s.btnOutline} onClick={() => setView('main')}>VOLVER AL INICIO</button>
               </div>
-              <div style={s.actionCard} onClick={handleBonus}>
-                <span style={{fontSize:'24px', marginBottom:'8px'}}>🎁</span>
-                BONO
+            ) : (
+              /* VISTA DE HISTORIAL */
+              <div className="fade-in">
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Historial</h2>
+                 <div style={{...s.card, textAlign:'center', color:'#555'}}>
+                    <p>No hay transacciones recientes.</p>
+                 </div>
+                 <button style={s.btnOutline} onClick={() => setView('main')}>VOLVER</button>
               </div>
-              <div style={s.actionCard} onClick={() => toast("Próximamente")}>
-                <span style={{fontSize:'24px', marginBottom:'8px'}}>📜</span>
-                HISTORIA
-              </div>
-            </div>
-            
-            <div style={{...s.card, marginTop:'20px', textAlign:'center'}}>
-                <p style={{color:'#888', fontSize:'12px'}}>¡Invita amigos para subir de nivel!</p>
-            </div>
+            )}
           </div>
         )}
 
-        {activeTab === 'share' && <ShareTab stats={stats} handleShare={() => {}} />}
+        {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
       </div>
 
-      {/* NAVEGACIÓN INFERIOR */}
+      {/* BARRA DE NAVEGACIÓN */}
       <div style={s.bottomNav}>
-        <div onClick={()=>setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
-           <span>🏠</span><span>HOME</span>
+        <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
+           <span style={{fontSize:'20px'}}>🏠</span><span>HOME</span>
         </div>
-        <div onClick={()=>setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
-           <span>👥</span><span>RED</span>
+        <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
+           <span style={{fontSize:'20px'}}>👥</span><span>AMIGOS</span>
         </div>
       </div>
-
-      {/* MODAL DE RETIRO (Simple) */}
-      {view === 'withdraw' && (
-        <div style={{...s.center, position:'fixed', zIndex:200, padding:'20px', background:'#000'}}>
-             <h2>Retirar TON</h2>
-             <input style={s.input} placeholder="Dirección TON" />
-             <button style={s.btnGreen} onClick={() => setView('main')}>CONFIRMAR</button>
-             <button style={s.btnOutline} onClick={() => setView('main')}>CANCELAR</button>
-        </div>
-      )}
     </div>
   );
 }
