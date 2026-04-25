@@ -1,27 +1,59 @@
 import axios from 'axios';
 
+/**
+ * Configuración unificada para Vercel.
+ * Si tu archivo de backend es api/index.js, la ruta base es /api
+ */
 const api = axios.create({
-  baseURL: '', 
-  timeout: 10000,
+  baseURL: '/api', 
+  timeout: 15000,
   headers: { 'Content-Type': 'application/json' }
 });
 
 export const botApi = {
+  // 1. Verificar Usuario
   verifyUser: async (user, startParam) => {
-    // Enviamos action: 'verify'
-    const res = await api.post('/api', { action: 'verify', user, start_param: startParam });
-    return res.data;
+    try {
+      const res = await api.post('/', { 
+        user, 
+        start_param: startParam 
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en verifyUser:", error.response?.data || error.message);
+      throw error;
+    }
   },
 
+  // 2. RECLAMAR BONO (¡Aquí estaba el fallo!)
+  claimBonus: async (userId) => {
+    try {
+      const res = await api.post('/', { 
+        action: 'claim-bonus', 
+        userId 
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en claimBonus:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // 3. Retirar Saldo
   withdraw: async (userId, address, amount) => {
-    // Enviamos action: 'withdraw'
-    const res = await api.post('/api', { action: 'withdraw', userId, address, amount });
-    return res.data;
-  },
-
-  adReward: async (userId) => {
-    // Enviamos action: 'ad-reward'
-    const res = await api.post('/api', { action: 'ad-reward', userId });
-    return res.data;
+    try {
+      const res = await api.post('/', { 
+        action: 'withdraw', 
+        userId, 
+        address, 
+        amount 
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en withdraw:", error.response?.data || error.message);
+      throw error;
+    }
   }
 };
+
+export default botApi;
