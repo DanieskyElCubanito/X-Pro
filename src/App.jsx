@@ -63,7 +63,7 @@ function App() {
 
   // Función para compartir link de referidos
   const handleShare = () => {
-    const inviteLink = `https://t.me/TuBotNombre_bot/app?startapp=${userData?.id}`;
+    const inviteLink = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = "¡Gana TON gratis con esta App! 💎";
     const fullUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`;
     WebApp.openTelegramLink(fullUrl);
