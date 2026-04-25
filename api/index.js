@@ -8,15 +8,11 @@ const supabase = createClient(
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx"
 );
 
-// CONFIGURACIÓN GLOBAL
 const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
-const TON_RPC = "https://toncenter.com/api/v2/jsonRPC"; 
-const TON_API_KEY = "TU_TONCENTER_API_KEY"; // Consíguela gratis en @tonapibot
-const PAYMENTS_CHANNEL = "-1002228067712"; // ID del canal donde se publican los pagos
-const MIN_WITHDRAW = 0.1;
-const MAX_DAILY_WITHDRAW = 5.0;
+const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
+const TON_API_KEY = "TU_API_KEY_AQUI"; // Consíguela en @tonapibot si usas mainnet
+const PAYMENTS_CHANNEL = "-1002416954209"; // Reemplaza con tu ID de canal de pagos
 
-// Función para verificar membresía en canales
 async function checkMembership(userId, chatId) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${userId}`;
@@ -37,123 +33,127 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, amount, address, start_param } = req.body;
+    const { user, action, userId, amount, address, start_param } = req.body; 
 
-    // --- ACCIÓN: CHECK CHANNELS ---
+    // --- ACCIÓN: VERIFICAR CANALES ---
     if (action === 'check-channels') {
       const isMember1 = await checkMembership(userId, "-1002228067712");
       const isMember2 = await checkMembership(userId, "-1003747302094");
       return res.status(200).json({
         success: true,
-        channel1: isMember1, channel2: isMember2,
+        channel1: isMember1,
+        channel2: isMember2,
         allJoined: isMember1 && isMember2
       });
     }
 
-    // --- ACCIÓN: CLAIM BONUS ---
+    // --- ACCIÓN: COBRAR BONO DIARIO ---
     if (action === 'claim-bonus') {
       const { data: u } = await supabase.from('users').select('*').eq('id', userId).single();
       const now = Date.now();
       const lastBonus = u.last_bonus ? new Date(u.last_bonus).getTime() : 0;
-      if (now - lastBonus < 86400000) return res.status(400).json({ error: 'Faltan horas para tu próximo bono' });
+      if (now - lastBonus < 24 * 60 * 60 * 1000) return res.status(400).json({ error: `Espera 24h` });
 
-      const newB = (Number(u.balance) || 0) + 0.001;
+      const reward = 0.001;
+      const newB = (Number(u.balance) || 0) + reward;
       await supabase.from('users').update({ balance: newB, last_bonus: new Date().toISOString() }).eq('id', userId);
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
-    // --- ACCIÓN: RETIRO REAL (BLOCKCHAIN) ---
+    // --- [NUEVA] ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
-      const MNEMONIC = process.env.ADMIN_MNEMONIC; // Guardar en Vercel Env Variables
       const withdrawAmount = parseFloat(amount);
-      const cleanAddress = address?.trim();
+      const { data: u } = await supabase.from('users').select('*').eq('id', userId).single();
+      
+      if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente' });
+      if (withdrawAmount < 0.1) return res.status(400).json({ error: 'Mínimo 0.1 TON' });
 
-      if (!userId || !cleanAddress || isNaN(withdrawAmount)) return res.status(400).json({ error: "Datos incompletos" });
-      if (withdrawAmount < MIN_WITHDRAW) return res.status(400).json({ error: `Mínimo ${MIN_WITHDRAW} TON` });
-
-      // Verificar usuario y saldo en DB
-      const { data: dbUser } = await supabase.from('users').select('*').eq('id', userId).single();
-      if (!dbUser || dbUser.balance < withdrawAmount) return res.status(400).json({ error: "Saldo insuficiente" });
-
-      // Lógica de pago en TON
       let txHash = null;
       try {
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
-        const keyPair = await mnemonicToPrivateKey(MNEMONIC.split(/\s+/));
+        const keyPair = await mnemonicToPrivateKey(process.env.ADMIN_MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
         
-        const balanceAdmin = await wallet.getBalance();
-        const withdrawInNano = toNano(withdrawAmount.toFixed(4));
-
-        if (balanceAdmin < (withdrawInNano + toNano("0.05"))) {
-          return res.status(500).json({ error: "Sin liquidez en la bóveda principal" });
-        }
-
         const seqno = await wallet.getSeqno();
         await wallet.sendTransfer({
           seqno,
           secretKey: keyPair.secretKey,
-          messages: [internal({ to: cleanAddress, value: withdrawInNano, bounce: false, body: "IA Profit Payment" })]
+          messages: [internal({
+            to: address,
+            value: toNano(withdrawAmount.toFixed(4)),
+            bounce: false,
+            body: "IA Profit Payment ✅",
+          })]
         });
 
-        // Esperar confirmación
-        let confirmed = false;
-        for (let i = 0; i < 15; i++) {
+        // Esperar confirmación básica
+        let success = false;
+        for (let i = 0; i < 10; i++) {
           await new Promise(r => setTimeout(r, 3000));
-          const currentSeqno = await wallet.getSeqno();
-          if (currentSeqno > seqno) { confirmed = true; break; }
+          if ((await wallet.getSeqno()) > seqno) { success = true; break; }
         }
-        if (!confirmed) throw new Error("La red TON tarda demasiado, verifica tu wallet");
+        if (!success) throw new Error("La red TON tarda demasiado.");
 
-        const txs = await client.getTransactions(wallet.address, { limit: 1 });
-        txHash = txs[0]?.hash().toString('hex');
+        const transactions = await client.getTransactions(wallet.address, { limit: 1 });
+        txHash = transactions[0]?.hash().toString('hex');
       } catch (e) {
         return res.status(500).json({ error: "Error Blockchain: " + e.message });
       }
 
       if (txHash) {
-        // Ejecutar decremento y guardar log
-        await supabase.rpc('decrement_balance', { user_id_input: String(userId), amount_input: withdrawAmount });
-        await supabase.from('withdrawals').insert([{ user_id: userId, amount: withdrawAmount, tx_hash: txHash, address: cleanAddress, status: 'SUCCESS' }]);
+        // Descontamos usando RPC para seguridad
+        await supabase.rpc('decrement_balance', { user_id_input: userId, amount_input: withdrawAmount });
+        await supabase.from('withdrawals').insert([{ 
+          user_id: userId, amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address 
+        }]);
 
-        // Notificar al canal
-        const msg = `💎 <b>PAGO REALIZADO</b>\n\n👤 <b>Usuario:</b> ${dbUser.username}\n💸 <b>Monto:</b> ${withdrawAmount} TON\n🔗 <a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`;
+        // Notificación al canal
+        const msg = `💎 <b>PAGO ENVIADO</b>\n\n👤 <b>Usuario:</b> ${u.username}\n💰 <b>Monto:</b> ${withdrawAmount} TON\n🔗 <a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`;
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: PAYMENTS_CHANNEL, text: msg, parse_mode: 'HTML' });
 
         return res.status(200).json({ success: true, txHash });
       }
     }
 
-    // --- ACCIÓN: VERIFY / INICIO ---
+    // --- ACCIÓN: VERIFICAR / INICIO (Lógica de Referidos) ---
     if (!user?.id) return res.status(400).json({ error: 'No user id' });
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).single();
 
     if (!dbUser) {
       const newUserObj = { id: user.id, username: user.username || 'Gamer', balance: 0 };
       if (start_param && start_param !== String(user.id)) newUserObj.referred_by = start_param;
-      
       const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
       dbUser = newUser;
 
       if (newUserObj.referred_by) {
         const { data: inviter } = await supabase.from('users').select('balance').eq('id', newUserObj.referred_by).single();
-        if (inviter) {
-          await supabase.from('users').update({ balance: (inviter.balance || 0) + 0.003 }).eq('id', newUserObj.referred_by);
-        }
+        if (inviter) await supabase.from('users').update({ balance: (inviter.balance || 0) + 0.003 }).eq('id', newUserObj.referred_by);
       }
     }
 
     const isMember1 = await checkMembership(user.id, "-1002228067712");
     const isMember2 = await checkMembership(user.id, "-1003747302094");
 
-    // Lógica simplificada de red (puedes mantener la de 3 niveles anterior aquí)
+    // Cálculo de Red (Niveles 1, 2, 3)
     const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
     const n1 = lv1?.length || 0;
+    const ids1 = lv1?.map(u => u.id) || [];
+    let n2 = 0, ids2 = [];
+    if (ids1.length > 0) {
+      const { data: lv2 } = await supabase.from('users').select('id').in('referred_by', ids1);
+      n2 = lv2?.length || 0;
+      ids2 = lv2?.map(u => u.id) || [];
+    }
+    let n3 = 0;
+    if (ids2.length > 0) {
+      const { data: lv3 } = await supabase.from('users').select('id').in('referred_by', ids2);
+      n3 = lv3?.length || 0;
+    }
 
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, c1: (n1 * 0.003).toFixed(4) },
+      stats: { n1, c1: (n1 * 0.003).toFixed(4), n2, c2: (n2 * 0.002).toFixed(4), n3, c3: (n3 * 0.001).toFixed(4) },
       mustJoin: !(isMember1 && isMember2),
       channels: { c1: isMember1, c2: isMember2 }
     });
