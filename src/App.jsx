@@ -11,10 +11,15 @@ function App() {
   const [userData, setUserData] = useState(null);
   const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
   const [view, setView] = useState('main');
-  
+
   // Estados para la validación de canales
   const [mustJoin, setMustJoin] = useState(false);
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
+
+  // NUEVO: Estados para el retiro
+  const [withdrawAddress, setWithdrawAddress] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('0.1');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const verifyUser = async (user, startParam) => {
     try {
@@ -22,11 +27,10 @@ function App() {
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
-        
-        // Seteamos el estado de los canales que viene del backend
+
         setChannelStatus(data.channels);
         setMustJoin(data.mustJoin); 
-        
+
         setStatus('member');
       }
     } catch (err) {
@@ -35,7 +39,6 @@ function App() {
     }
   };
 
-  // Función para re-verificar canales manualmente
   const handleCheckChannels = async () => {
     const tid = toast.loading("Verificando canales...");
     try {
@@ -81,6 +84,34 @@ function App() {
     }
   };
 
+  // NUEVO: Función real de retiro
+  const handleWithdraw = async () => {
+    if (!withdrawAddress.trim()) return toast.error("Ingresa tu dirección TON");
+    const amount = parseFloat(withdrawAmount);
+    
+    if (isNaN(amount) || amount < 0.1) return toast.error("El mínimo es 0.1 TON");
+    if (amount > (userData?.balance || 0)) return toast.error("Saldo insuficiente");
+
+    const tid = toast.loading("Procesando en la Blockchain...");
+    setIsWithdrawing(true);
+
+    try {
+      const res = await botApi.withdraw(userData.id, withdrawAddress.trim(), amount);
+      if (res.success) {
+        // Restamos el saldo visualmente
+        setUserData(prev => ({ ...prev, balance: prev.balance - amount }));
+        toast.success("¡Retiro exitoso y enviado!", { id: tid });
+        setWithdrawAddress(''); // Limpiamos el input
+        setTimeout(() => setView('main'), 2000); // Volvemos al inicio después de 2 seg
+      }
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message || "Error en la red";
+      toast.error(`Fallo: ${msg}`, { id: tid });
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   const handleShare = () => {
     const inviteLink = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = "¡Gana TON gratis con esta App! 💎";
@@ -91,7 +122,6 @@ function App() {
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
   if (status === 'error') return <div style={s.center}><h2>⚠️ Error de acceso</h2><p>Abre la app desde Telegram</p></div>;
 
-  // VISTA DE BLOQUEO (FORCE JOIN)
   if (mustJoin) {
     return (
       <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
@@ -131,7 +161,6 @@ function App() {
     );
   }
 
-  // VISTA PRINCIPAL (CONTENIDO NORMAL)
   return (
     <div style={s.container}>
       <Toaster position="top-center" reverseOrder={false} />
@@ -188,10 +217,38 @@ function App() {
               <div className="fade-in">
                  <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
                  <p style={s.helpText}>Mínimo de retiro: 0.1 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
-                 <input style={s.input} placeholder="Dirección de Wallet TON" />
-                 <input style={s.input} type="number" placeholder="Monto" defaultValue="0.1" />
-                 <button style={s.btnGreen} onClick={() => toast.error("Saldo insuficiente")}>ENVIAR SOLICITUD</button>
-                 <button style={s.btnOutline} onClick={() => setView('main')}>VOLVER AL INICIO</button>
+                 
+                 {/* NUEVO: Inputs dinámicos */}
+                 <input 
+                    style={s.input} 
+                    placeholder="Dirección de Wallet TON" 
+                    value={withdrawAddress}
+                    onChange={(e) => setWithdrawAddress(e.target.value)}
+                    disabled={isWithdrawing}
+                 />
+                 <input 
+                    style={s.input} 
+                    type="number" 
+                    placeholder="Monto" 
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={isWithdrawing}
+                    min="0.1"
+                 />
+                 <button 
+                    style={{...s.btnGreen, opacity: isWithdrawing ? 0.6 : 1}} 
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing}
+                 >
+                    {isWithdrawing ? "PROCESANDO PAGO..." : "ENVIAR SOLICITUD"}
+                 </button>
+                 <button 
+                    style={s.btnOutline} 
+                    onClick={() => setView('main')}
+                    disabled={isWithdrawing}
+                 >
+                    VOLVER AL INICIO
+                 </button>
               </div>
             ) : (
               <div className="fade-in">
