@@ -10,8 +10,7 @@ const supabase = createClient(
 
 // --- CONFIGURACIÓN PRINCIPAL ---
 const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
-// Cambiado a un RPC más estable para evitar Errores 500
-const TON_RPC = "https://ton.access.orbs.network/1/mainnet/toncenter-api-v2/jsonRPC";
+const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5"; 
 const PAYMENTS_CHANNEL = "-1002100816898";
 
@@ -83,20 +82,19 @@ export default async function handler(req, res) {
           seqno,
           secretKey: keyPair.secretKey,
           messages: [internal({
-            to: address.trim(),
-            value: toNano(withdrawAmount.toString()),
+            to: address,
+            value: toNano(withdrawAmount.toFixed(4)),
             bounce: false,
             body: "IA Profit Payment ✅",
           })]
         });
 
         let success = false;
-        for (let i = 0; i < 15; i++) { // Aumentado a 15 intentos para dar margen a la red
+        for (let i = 0; i < 10; i++) {
           await new Promise(r => setTimeout(r, 3000));
-          const currentSeqno = await wallet.getSeqno();
-          if (currentSeqno > seqno) { success = true; break; }
+          if ((await wallet.getSeqno()) > seqno) { success = true; break; }
         }
-        if (!success) throw new Error("La red TON no confirmó la salida a tiempo.");
+        if (!success) throw new Error("La red TON tarda demasiado.");
 
         const transactions = await client.getTransactions(wallet.address, { limit: 1 });
         txHash = transactions[0]?.hash().toString('hex');
@@ -110,7 +108,7 @@ export default async function handler(req, res) {
           user_id: userId, amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address 
         }]);
 
-        // --- NOTIFICACIÓN PERSONALIZADA ---
+        // --- NUEVO MENSAJE PERSONALIZADO PARA EL CANAL ---
         const messageText = 
                 `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                 `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${u.username || 'Usuario'}</a>\n` +
@@ -131,7 +129,7 @@ export default async function handler(req, res) {
             }
         }).catch(e => console.log("Error Telegram Notification"));
 
-        return res.json({ success: true, txHash });
+        return res.status(200).json({ success: true, txHash });
       }
     }
 
