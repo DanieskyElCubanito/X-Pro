@@ -8,10 +8,14 @@ const supabase = createClient(
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx"
 );
 
+// --- CONFIGURACIÓN PRINCIPAL ---
 const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "TU_API_KEY_AQUI"; // Consíguela en @tonapibot si usas mainnet
-const PAYMENTS_CHANNEL = "-1002100816898"; // Reemplaza con tu ID de canal de pagos
+const PAYMENTS_CHANNEL = "-1002100816898";
+
+// 👇 PEGA AQUÍ TUS 24 PALABRAS SEPARADAS POR ESPACIOS 👇
+const ADMIN_MNEMONIC = "palabra1 palabra2 palabra3 palabra4 palabra5 palabra6 palabra7 palabra8 palabra9 palabra10 palabra11 palabra12 palabra13 palabra14 palabra15 palabra16 palabra17 palabra18 palabra19 palabra20 palabra21 palabra22 palabra23 palabra24";
 
 async function checkMembership(userId, chatId) {
   try {
@@ -64,16 +68,18 @@ export default async function handler(req, res) {
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
       const { data: u } = await supabase.from('users').select('*').eq('id', userId).single();
-      
+
       if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente' });
       if (withdrawAmount < 0.1) return res.status(400).json({ error: 'Mínimo 0.1 TON' });
 
       let txHash = null;
       try {
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
-        const keyPair = await mnemonicToPrivateKey(process.env.ADMIN_MNEMONIC.trim().split(/\s+/));
-        const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
         
+        // Usamos la variable que definimos arriba
+        const keyPair = await mnemonicToPrivateKey(ADMIN_MNEMONIC.trim().split(/\s+/));
+        const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
+
         const seqno = await wallet.getSeqno();
         await wallet.sendTransfer({
           seqno,
