@@ -10,11 +10,11 @@ const supabase = createClient(
 
 // --- CONFIGURACIÓN PRINCIPAL ---
 const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
-const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
-const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5"; // Consíguela en @tonapibot si usas mainnet
+// Cambiado a un RPC más estable para evitar Errores 500
+const TON_RPC = "https://ton.access.orbs.network/1/mainnet/toncenter-api-v2/jsonRPC";
+const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5"; 
 const PAYMENTS_CHANNEL = "-1002100816898";
 
-// 👇 PEGA AQUÍ TUS 24 PALABRAS SEPARADAS POR ESPACIOS 👇
 const ADMIN_MNEMONIC = "victory end nothing roast ice begin paddle orient dish three poem salute bright term mixed under nature bacon make amazing add round dynamic market";
 
 async function checkMembership(userId, chatId) {
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
-    // --- [NUEVA] ACCIÓN: RETIRO REAL BLOCKCHAIN ---
+    // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
       const { data: u } = await supabase.from('users').select('*').eq('id', userId).single();
@@ -75,8 +75,6 @@ export default async function handler(req, res) {
       let txHash = null;
       try {
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
-        
-        // Usamos la variable que definimos arriba
         const keyPair = await mnemonicToPrivateKey(ADMIN_MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
 
@@ -85,20 +83,20 @@ export default async function handler(req, res) {
           seqno,
           secretKey: keyPair.secretKey,
           messages: [internal({
-            to: address,
-            value: toNano(withdrawAmount.toFixed(4)),
+            to: address.trim(),
+            value: toNano(withdrawAmount.toString()),
             bounce: false,
             body: "IA Profit Payment ✅",
           })]
         });
 
-        // Esperar confirmación básica
         let success = false;
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 15; i++) { // Aumentado a 15 intentos para dar margen a la red
           await new Promise(r => setTimeout(r, 3000));
-          if ((await wallet.getSeqno()) > seqno) { success = true; break; }
+          const currentSeqno = await wallet.getSeqno();
+          if (currentSeqno > seqno) { success = true; break; }
         }
-        if (!success) throw new Error("La red TON tarda demasiado.");
+        if (!success) throw new Error("La red TON no confirmó la salida a tiempo.");
 
         const transactions = await client.getTransactions(wallet.address, { limit: 1 });
         txHash = transactions[0]?.hash().toString('hex');
@@ -107,21 +105,37 @@ export default async function handler(req, res) {
       }
 
       if (txHash) {
-        // Descontamos usando RPC para seguridad
         await supabase.rpc('decrement_balance', { user_id_input: userId, amount_input: withdrawAmount });
         await supabase.from('withdrawals').insert([{ 
           user_id: userId, amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address 
         }]);
 
-        // Notificación al canal
-        const msg = `💎 <b>PAGO ENVIADO</b>\n\n👤 <b>Usuario:</b> ${u.username}\n💰 <b>Monto:</b> ${withdrawAmount} TON\n🔗 <a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`;
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: PAYMENTS_CHANNEL, text: msg, parse_mode: 'HTML' });
+        // --- NOTIFICACIÓN PERSONALIZADA ---
+        const messageText = 
+                `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+                `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${u.username || 'Usuario'}</a>\n` +
+                `💸 <b>Monto Total:</b> ${withdrawAmount} TON\n` +
+                `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+                `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+                `🔹 <b>TXID:</b>\n` +
+                `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
+                `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
+          
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            chat_id: PAYMENTS_CHANNEL,
+            text: messageText,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            reply_markup: {
+                inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: `https://t.me/IAProfitTonBot` }]]
+            }
+        }).catch(e => console.log("Error Telegram Notification"));
 
-        return res.status(200).json({ success: true, txHash });
+        return res.json({ success: true, txHash });
       }
     }
 
-    // --- ACCIÓN: VERIFICAR / INICIO (Lógica de Referidos) ---
+    // --- ACCIÓN: VERIFICAR / INICIO ---
     if (!user?.id) return res.status(400).json({ error: 'No user id' });
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).single();
 
@@ -140,7 +154,6 @@ export default async function handler(req, res) {
     const isMember1 = await checkMembership(user.id, "-1002228067712");
     const isMember2 = await checkMembership(user.id, "-1002049802477");
 
-    // Cálculo de Red (Niveles 1, 2, 3)
     const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
