@@ -11,7 +11,7 @@ const supabase = createClient(
 const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "TU_API_KEY_AQUI"; // Consíguela en @tonapibot si usas mainnet
-const PAYMENTS_CHANNEL = "-1002416954209"; // Reemplaza con tu ID de canal de pagos
+const PAYMENTS_CHANNEL = "-1002100816898"; // Reemplaza con tu ID de canal de pagos
 
 async function checkMembership(userId, chatId) {
   try {
