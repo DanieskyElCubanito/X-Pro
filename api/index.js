@@ -15,7 +15,7 @@ const TON_API_KEY = "TU_API_KEY_AQUI"; // Consíguela en @tonapibot si usas main
 const PAYMENTS_CHANNEL = "-1002100816898";
 
 // 👇 PEGA AQUÍ TUS 24 PALABRAS SEPARADAS POR ESPACIOS 👇
-const ADMIN_MNEMONIC = "palabra1 palabra2 palabra3 palabra4 palabra5 palabra6 palabra7 palabra8 palabra9 palabra10 palabra11 palabra12 palabra13 palabra14 palabra15 palabra16 palabra17 palabra18 palabra19 palabra20 palabra21 palabra22 palabra23 palabra24";
+const ADMIN_MNEMONIC = "gap chest saddle logic gesture better vapor chicken major math way clinic quick hero host rule bulb image there gallery sniff ecology will film";
 
 async function checkMembership(userId, chatId) {
   try {
