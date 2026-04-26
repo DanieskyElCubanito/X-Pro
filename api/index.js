@@ -15,7 +15,7 @@ const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b8
 const PAYMENTS_CHANNEL = "-1002100816898";
 
 // 👇 PEGA AQUÍ TUS 24 PALABRAS SEPARADAS POR ESPACIOS 👇
-const ADMIN_MNEMONIC = "gap chest saddle logic gesture better vapor chicken major math way clinic quick hero host rule bulb image there gallery sniff ecology will film";
+const ADMIN_MNEMONIC = "victory end nothing roast ice begin paddle orient dish three poem salute bright term mixed under nature bacon make amazing add round dynamic market";
 
 async function checkMembership(userId, chatId) {
   try {
