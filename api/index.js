@@ -132,7 +132,7 @@ export default async function handler(req, res) {
     }
 
     const isMember1 = await checkMembership(user.id, "-1002228067712");
-    const isMember2 = await checkMembership(user.id, "-1003747302094");
+    const isMember2 = await checkMembership(user.id, "-1002049802477");
 
     // Cálculo de Red (Niveles 1, 2, 3)
     const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
