@@ -11,7 +11,7 @@ const supabase = createClient(
 // --- CONFIGURACIÓN PRINCIPAL ---
 const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
-const TON_API_KEY = "TU_API_KEY_AQUI"; // Consíguela en @tonapibot si usas mainnet
+const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5"; // Consíguela en @tonapibot si usas mainnet
 const PAYMENTS_CHANNEL = "-1002100816898";
 
 // 👇 PEGA AQUÍ TUS 24 PALABRAS SEPARADAS POR ESPACIOS 👇
