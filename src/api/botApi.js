@@ -25,7 +25,7 @@ export const botApi = {
     }
   },
 
-  // 2. Re-verificar unión a canales (NUEVO)
+  // 2. Re-verificar unión a canales
   checkChannels: async (userId) => {
     try {
       const res = await api.post('/', { 
@@ -65,6 +65,34 @@ export const botApi = {
       return res.data;
     } catch (error) {
       console.error("Error en withdraw:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // 5. Obtener Historial (NUEVO)
+  getHistory: async (userId) => {
+    try {
+      const res = await api.post('/', { 
+        action: 'get-history', 
+        userId 
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en getHistory:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // 6. Verificar Humano / Puzzle Anti-Bots (NUEVO)
+  verifyHuman: async (userId) => {
+    try {
+      const res = await api.post('/', {
+        action: 'verify-human',
+        userId
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en verifyHuman:", error.response?.data || error.message);
       throw error;
     }
   }
