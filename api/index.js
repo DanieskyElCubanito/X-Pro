@@ -38,6 +38,29 @@ export default async function handler(req, res) {
   try {
     const { user, action, userId, amount, address, start_param } = req.body; 
 
+    // --- NUEVA ACCIÓN: OBTENER HISTORIAL ---
+    if (action === 'get-history') {
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', String(userId))
+        .order('created_at', { ascending: false });
+      
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ success: true, history: data });
+    }
+
+    // --- NUEVA ACCIÓN: VERIFICAR HUMANO (CAPTCHA ANTI-BOTS) ---
+    if (action === 'verify-human') {
+      const { error } = await supabase
+        .from('users')
+        .update({ is_human: true })
+        .eq('id', String(userId));
+        
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ success: true });
+    }
+
     // --- ACCIÓN: VERIFICAR CANALES ---
     if (action === 'check-channels') {
       const isMember1 = await checkMembership(userId, "-1002228067712");
@@ -52,21 +75,21 @@ export default async function handler(req, res) {
 
     // --- ACCIÓN: COBRAR BONO DIARIO ---
     if (action === 'claim-bonus') {
-      const { data: u } = await supabase.from('users').select('*').eq('id', userId).single();
+      const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
       const now = Date.now();
       const lastBonus = u.last_bonus ? new Date(u.last_bonus).getTime() : 0;
       if (now - lastBonus < 24 * 60 * 60 * 1000) return res.status(400).json({ error: `Espera 24h` });
 
       const reward = 0.001;
       const newB = (Number(u.balance) || 0) + reward;
-      await supabase.from('users').update({ balance: newB, last_bonus: new Date().toISOString() }).eq('id', userId);
+      await supabase.from('users').update({ balance: newB, last_bonus: new Date().toISOString() }).eq('id', String(userId));
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
     // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
-      const { data: u } = await supabase.from('users').select('*').eq('id', userId).single();
+      const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
 
       if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente' });
       if (withdrawAmount < 0.1) return res.status(400).json({ error: 'Mínimo 0.1 TON' });
@@ -78,12 +101,14 @@ export default async function handler(req, res) {
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
 
         const seqno = await wallet.getSeqno();
+        
+        // CORRECCIÓN: toString() evita la pérdida de precisión en JS
         await wallet.sendTransfer({
           seqno,
           secretKey: keyPair.secretKey,
           messages: [internal({
-            to: address,
-            value: toNano(withdrawAmount.toFixed(4)),
+            to: address.trim(),
+            value: toNano(withdrawAmount.toString()), 
             bounce: false,
             body: "IA Profit Payment ✅",
           })]
@@ -103,12 +128,12 @@ export default async function handler(req, res) {
       }
 
       if (txHash) {
-        await supabase.rpc('decrement_balance', { user_id_input: userId, amount_input: withdrawAmount });
+        await supabase.rpc('decrement_balance', { user_id_input: String(userId), amount_input: withdrawAmount });
         await supabase.from('withdrawals').insert([{ 
-          user_id: userId, amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address 
+          user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
         }]);
 
-        // --- NUEVO MENSAJE PERSONALIZADO PARA EL CANAL ---
+        // --- MENSAJE PERSONALIZADO PARA EL CANAL ---
         const messageText = 
                 `💎 <b>PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                 `👤 <b>Beneficiario:</b> <a href="tg://user?id=${userId}">${u.username || 'Usuario'}</a>\n` +
@@ -118,7 +143,7 @@ export default async function handler(req, res) {
                 `🔹 <b>TXID:</b>\n` +
                 `<a href="https://tonscan.org/tx/${txHash}"><b>${txHash}</b></a>\n\n` +
                 `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
-          
+
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
             text: messageText,
@@ -133,13 +158,18 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- ACCIÓN: VERIFICAR / INICIO ---
+    // --- ACCIÓN: VERIFICAR / INICIO (Ruta principal) ---
     if (!user?.id) return res.status(400).json({ error: 'No user id' });
-    let { data: dbUser } = await supabase.from('users').select('*').eq('id', user.id).single();
+    let { data: dbUser } = await supabase.from('users').select('*').eq('id', String(user.id)).single();
 
     if (!dbUser) {
-      const newUserObj = { id: user.id, username: user.username || 'Gamer', balance: 0 };
-      if (start_param && start_param !== String(user.id)) newUserObj.referred_by = start_param;
+      const newUserObj = { 
+        id: String(user.id), 
+        username: user.username || 'Gamer', 
+        balance: 0,
+        is_human: false // Inicializamos en falso por defecto
+      };
+      if (start_param && start_param !== String(user.id)) newUserObj.referred_by = String(start_param);
       const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
       dbUser = newUser;
 
@@ -152,7 +182,7 @@ export default async function handler(req, res) {
     const isMember1 = await checkMembership(user.id, "-1002228067712");
     const isMember2 = await checkMembership(user.id, "-1002049802477");
 
-    const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', user.id);
+    const { data: lv1 } = await supabase.from('users').select('id, balance').eq('referred_by', String(user.id));
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
     let n2 = 0, ids2 = [];
