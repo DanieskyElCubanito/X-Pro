@@ -45,7 +45,7 @@ export default async function handler(req, res) {
         .select('*')
         .eq('user_id', String(userId))
         .order('created_at', { ascending: false });
-      
+
       if (error) return res.status(500).json({ error: error.message });
       return res.status(200).json({ success: true, history: data });
     }
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         .from('users')
         .update({ is_human: true })
         .eq('id', String(userId));
-        
+
       if (error) return res.status(500).json({ error: error.message });
       return res.status(200).json({ success: true });
     }
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
 
         const seqno = await wallet.getSeqno();
-        
+
         // CORRECCIÓN: toString() evita la pérdida de precisión en JS
         await wallet.sendTransfer({
           seqno,
@@ -128,7 +128,19 @@ export default async function handler(req, res) {
       }
 
       if (txHash) {
-        await supabase.rpc('decrement_balance', { user_id_input: String(userId), amount_input: withdrawAmount });
+        // CORRECCIÓN AQUÍ: Sustituido el .rpc por un .update directo y seguro
+        const newBalance = Number(u.balance) - withdrawAmount;
+        
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ balance: newBalance })
+          .eq('id', String(userId));
+
+        if (updateError) {
+          console.error("Error descontando el saldo en Supabase:", updateError);
+          // Opcional: Podrías retornar un error aquí, pero el dinero ya se envió a la blockchain.
+        }
+
         await supabase.from('withdrawals').insert([{ 
           user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
         }]);
