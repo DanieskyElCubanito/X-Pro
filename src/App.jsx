@@ -16,10 +16,23 @@ function App() {
   const [mustJoin, setMustJoin] = useState(false);
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
 
-  // NUEVO: Estados para el retiro
+  // Estados para el retiro
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // NUEVO: Estados para Historial
+  const [history, setHistory] = useState([]); 
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // NUEVO: Estados para Captcha Anti-Bots
+  const [isHuman, setIsHuman] = useState(false);
+  const [captchaStep, setCaptchaStep] = useState([]);
+
+  const generateCaptcha = () => {
+    const nums = [1, 2, 3].sort(() => Math.random() - 0.5);
+    setCaptchaStep(nums);
+  };
 
   const verifyUser = async (user, startParam) => {
     try {
@@ -27,11 +40,16 @@ function App() {
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
-
         setChannelStatus(data.channels);
         setMustJoin(data.mustJoin); 
-
         setStatus('member');
+
+        // Validamos si ya resolvió el captcha antes en la base de datos
+        if (data.user.is_human) {
+           setIsHuman(true);
+        } else {
+           generateCaptcha();
+        }
       }
     } catch (err) {
       console.error("Error verificando:", err);
@@ -69,6 +87,24 @@ function App() {
     verifyUser(user, inviterId);
   }, []);
 
+  // NUEVO: Función para cargar historial cuando se entra a la vista
+  const fetchHistory = async () => {
+    if (!userData?.id) return;
+    setLoadingHistory(true);
+    try {
+      const res = await botApi.getHistory(userData.id);
+      if (res.success) setHistory(res.history);
+    } catch (e) {
+      console.error("Error cargando historial");
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'history') fetchHistory();
+  }, [view]);
+
   const handleBonus = async () => {
     if (!userData?.id) return toast.error("Usuario no cargado");
     const tid = toast.loading("Reclamando bono...");
@@ -84,11 +120,10 @@ function App() {
     }
   };
 
-  // NUEVO: Función real de retiro
   const handleWithdraw = async () => {
     if (!withdrawAddress.trim()) return toast.error("Ingresa tu dirección TON");
     const amount = parseFloat(withdrawAmount);
-    
+
     if (isNaN(amount) || amount < 0.1) return toast.error("El mínimo es 0.1 TON");
     if (amount > (userData?.balance || 0)) return toast.error("Saldo insuficiente");
 
@@ -98,11 +133,10 @@ function App() {
     try {
       const res = await botApi.withdraw(userData.id, withdrawAddress.trim(), amount);
       if (res.success) {
-        // Restamos el saldo visualmente
         setUserData(prev => ({ ...prev, balance: prev.balance - amount }));
         toast.success("¡Retiro exitoso y enviado!", { id: tid });
-        setWithdrawAddress(''); // Limpiamos el input
-        setTimeout(() => setView('main'), 2000); // Volvemos al inicio después de 2 seg
+        setWithdrawAddress(''); 
+        setTimeout(() => setView('main'), 2000); 
       }
     } catch (e) {
       const msg = e.response?.data?.error || e.message || "Error en la red";
@@ -122,6 +156,7 @@ function App() {
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
   if (status === 'error') return <div style={s.center}><h2>⚠️ Error de acceso</h2><p>Abre la app desde Telegram</p></div>;
 
+  // Pantalla de Canales
   if (mustJoin) {
     return (
       <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
@@ -161,6 +196,63 @@ function App() {
     );
   }
 
+  // NUEVO: Pantalla de Captcha Anti-Bots
+  if (!isHuman && status === 'member') {
+    return (
+      <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
+        <Toaster position="top-center" />
+        <h2 style={{color: '#0088cc'}}>¡Seguridad Anti-Bots! 🤖</h2>
+        <p style={{color: '#888', fontSize: '14px', marginBottom: '30px'}}>
+          Demuestra que eres humano tocando los números en orden (<b>1, 2, 3</b>):
+        </p>
+        
+        <div style={{display: 'flex', gap: '15px', justifyContent: 'center', marginBottom: '30px'}}>
+          {captchaStep.map((num, idx) => (
+            <div 
+              key={idx} 
+              onClick={async () => {
+                const currentExpected = captchaStep.filter(n => n === null).length + 1;
+                if (num === currentExpected) {
+                   const newStep = [...captchaStep];
+                   newStep[idx] = null; 
+                   setCaptchaStep(newStep);
+                   
+                   // Si resolvió todo el puzzle
+                   if (newStep.every(n => n === null)) {
+                      const tid = toast.loading("Verificando...");
+                      try {
+                        // Avisar al backend que es humano
+                        await botApi.verifyHuman(userData.id);
+                        setIsHuman(true);
+                        toast.success("¡Verificado exitosamente!", { id: tid });
+                      } catch (e) {
+                        toast.error("Error conectando con el servidor", { id: tid });
+                        generateCaptcha();
+                      }
+                   }
+                } else {
+                  toast.error("Orden incorrecto, intenta de nuevo");
+                  generateCaptcha();
+                }
+              }}
+              style={{
+                width: '60px', height: '60px', background: '#0088cc', color: 'white',
+                borderRadius: '12px', display: 'flex', alignItems: 'center', 
+                justifyContent: 'center', fontSize: '24px', fontWeight: 'bold', cursor: 'pointer',
+                visibility: num === null ? 'hidden' : 'visible',
+                boxShadow: '0 4px 10px rgba(0, 136, 204, 0.3)'
+              }}
+            >
+              {num}
+            </div>
+          ))}
+        </div>
+        <p style={{fontSize: '12px', color: '#555', marginTop: '40px'}}>Esta verificación solo aparecerá la primera vez que inicies sesión.</p>
+      </div>
+    );
+  }
+
+  // Interfaz Principal
   return (
     <div style={s.container}>
       <Toaster position="top-center" reverseOrder={false} />
@@ -217,8 +309,7 @@ function App() {
               <div className="fade-in">
                  <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
                  <p style={s.helpText}>Mínimo de retiro: 0.1 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
-                 
-                 {/* NUEVO: Inputs dinámicos */}
+
                  <input 
                     style={s.input} 
                     placeholder="Dirección de Wallet TON" 
@@ -252,11 +343,35 @@ function App() {
               </div>
             ) : (
               <div className="fade-in">
-                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Historial</h2>
-                 <div style={{...s.card, textAlign:'center', color:'#555'}}>
-                    <p>No hay transacciones recientes.</p>
-                 </div>
-                 <button style={s.btnOutline} onClick={() => setView('main')}>VOLVER</button>
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Historial de Retiros</h2>
+                 {loadingHistory ? (
+                   <p style={{textAlign:'center'}}>Cargando transacciones...</p>
+                 ) : history.length > 0 ? (
+                   <div style={{maxHeight: '300px', overflowY: 'auto'}}>
+                     {history.map((tx, index) => (
+                       <div key={index} style={{...s.card, marginBottom: '10px', fontSize: '12px'}}>
+                          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
+                            <span style={{color:'#28a745', fontWeight:'bold'}}>+ {tx.amount} TON</span>
+                            <span style={{color:'#888'}}>{new Date(tx.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p style={{margin:0, color:'#555', wordBreak:'break-all'}}>Wallet: {tx.address}</p>
+                          <a 
+                            href={`https://tonscan.org/tx/${tx.tx_hash}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{color:'#0088cc', textDecoration:'none', display:'block', marginTop:'5px'}}
+                          >
+                            Ver en Explorer 🔗
+                          </a>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div style={{...s.card, textAlign:'center', color:'#555'}}>
+                      <p>No tienes retiros registrados aún.</p>
+                   </div>
+                 )}
+                 <button style={{...s.btnOutline, marginTop: '20px'}} onClick={() => setView('main')}>VOLVER</button>
               </div>
             )}
           </div>
