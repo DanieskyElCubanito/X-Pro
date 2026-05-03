@@ -237,14 +237,14 @@ export default async function handler(req, res) {
       if (newUserObj.referred_by) {
         const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', newUserObj.referred_by).single();
         if (l1) {
-          await supabase.from('users').update({ balance: (l1.balance || 0) + 0.003 }).eq('id', l1.id);
+          await supabase.from('users').update({ balance: (l1.balance || 0) + 0.005 }).eq('id', l1.id);
           if (l1.referred_by) {
             const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
             if (l2) {
-              await supabase.from('users').update({ balance: (l2.balance || 0) + 0.002 }).eq('id', l2.id);
+              await supabase.from('users').update({ balance: (l2.balance || 0) + 0.003 }).eq('id', l2.id);
               if (l2.referred_by) {
                 const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
-                if (l3) await supabase.from('users').update({ balance: (l3.balance || 0) + 0.001 }).eq('id', l3.id);
+                if (l3) await supabase.from('users').update({ balance: (l3.balance || 0) + 0.002 }).eq('id', l3.id);
               }
             }
           }
@@ -270,7 +270,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, c1: (n1 * 0.003).toFixed(4), n2, c2: (n2 * 0.002).toFixed(4), n3, c3: (n3 * 0.001).toFixed(4) }
+      stats: { n1, c1: (n1 * 0.005).toFixed(4), n2, c2: (n2 * 0.003).toFixed(4), n3, c3: (n3 * 0.002).toFixed(4) }
     });
 
   } catch (error) {
