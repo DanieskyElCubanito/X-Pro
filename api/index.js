@@ -171,13 +171,14 @@ export default async function handler(req, res) {
                             `💸 <b>Monto Total:</b> ${withdrawAmount} TON\n` +
                             `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
                             `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
-                            `🔹 <b>TXID:</b>\n<code>${txHash}</code>`;
+                            `🔹 <b>TXID:</b>\n<a href="https://tonscan.org/tx/${txHash}">${txHash}</a>\n\n` +
+                            `🔥 <i>¡Retiros procesados con total transparencia!</i>`;
 
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
             text: messageText,
             parse_mode: 'HTML',
-            disable_web_page_preview: true,
+            disable_web_page_preview: true, // Esto evita que Telegram genere un cuadro gigante de vista previa del link
             reply_markup: {
               inline_keyboard: [[
                 { text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }
@@ -188,7 +189,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, txHash });
       }
     }
-
    // --- ACCIÓN: REGISTRO / LOGIN (VERIFY) ---
     const targetUser = user || { id: userId };
     if (!targetUser?.id) return res.status(400).json({ error: 'No user id' });
