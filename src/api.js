@@ -30,7 +30,40 @@ export const botApi = {
   },
 
   /**
-   * RECLAMA EL BONO DIARIO (Esta es la que faltaba)
+   * Verifica mediante Cloudflare Turnstile que el usuario es humano
+   */
+  verifyHuman: async (userId, captchaToken) => {
+    try {
+      const { data } = await api.post('/verify', {
+        action: 'verify-human',
+        userId,
+        captchaToken
+      });
+      return data;
+    } catch (error) {
+      console.error("Error en verifyHuman:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Verifica si el usuario ya se unió a los canales de Telegram requeridos
+   */
+  checkChannels: async (userId) => {
+    try {
+      const { data } = await api.post('/verify', {
+        action: 'check-channels',
+        userId
+      });
+      return data;
+    } catch (error) {
+      console.error("Error en checkChannels:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * RECLAMA EL BONO DIARIO
    */
   claimBonus: async (userId) => {
     try {
@@ -64,7 +97,23 @@ export const botApi = {
   },
 
   /**
-   * Procesa recompensas de anuncios (si decides volver a usarlos)
+   * Obtiene el historial de retiros del usuario
+   */
+  getHistory: async (userId) => {
+    try {
+      const { data } = await api.post('/verify', {
+        action: 'get-history',
+        userId
+      });
+      return data;
+    } catch (error) {
+      console.error("Error en getHistory:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Procesa recompensas de anuncios
    */
   adReward: async (userId) => {
     try {
