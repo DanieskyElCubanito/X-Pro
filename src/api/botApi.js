@@ -2,11 +2,11 @@ import axios from 'axios';
 
 /**
  * Configuración unificada para Vercel.
- * Si tu archivo de backend es api/index.js, la ruta base es /api
+ * Se aumenta el timeout a 20s para evitar cortes por "Cold Start" en Vercel.
  */
 const api = axios.create({
   baseURL: '/api', 
-  timeout: 15000,
+  timeout: 20000, 
   headers: { 'Content-Type': 'application/json' }
 });
 
@@ -14,12 +14,15 @@ export const botApi = {
   // 1. Verificar Usuario e Inicio
   verifyUser: async (user, startParam) => {
     try {
-      const res = await api.post('/', { 
+      // Se añade 'action: verify' para que el backend sepa qué hacer inmediatamente
+      const res = await api.post('', { 
+        action: 'verify',
         user, 
         start_param: startParam 
       });
       return res.data;
     } catch (error) {
+      // Log detallado en consola para debuggear desde el navegador de Telegram
       console.error("Error en verifyUser:", error.response?.data || error.message);
       throw error;
     }
@@ -28,7 +31,7 @@ export const botApi = {
   // 2. Re-verificar unión a canales
   checkChannels: async (userId) => {
     try {
-      const res = await api.post('/', { 
+      const res = await api.post('', { 
         action: 'check-channels', 
         userId 
       });
@@ -42,7 +45,7 @@ export const botApi = {
   // 3. Reclamar Bono Diario
   claimBonus: async (userId) => {
     try {
-      const res = await api.post('/', { 
+      const res = await api.post('', { 
         action: 'claim-bonus', 
         userId 
       });
@@ -56,7 +59,7 @@ export const botApi = {
   // 4. Retirar Saldo
   withdraw: async (userId, address, amount) => {
     try {
-      const res = await api.post('/', { 
+      const res = await api.post('', { 
         action: 'withdraw', 
         userId, 
         address, 
@@ -72,7 +75,7 @@ export const botApi = {
   // 5. Obtener Historial
   getHistory: async (userId) => {
     try {
-      const res = await api.post('/', { 
+      const res = await api.post('', { 
         action: 'get-history', 
         userId 
       });
@@ -83,16 +86,13 @@ export const botApi = {
     }
   },
 
-  /**
-   * 6. Verificar Humano con Cloudflare Turnstile
-   * Se envía el captchaToken recibido del componente frontend para validación en servidor.
-   */
+  // 6. Verificar Humano con Cloudflare Turnstile
   verifyHuman: async (userId, captchaToken) => {
     try {
-      const res = await api.post('/', {
+      const res = await api.post('', {
         action: 'verify-human',
         userId,
-        captchaToken // Token generado por Cloudflare
+        captchaToken 
       });
       return res.data;
     } catch (error) {
