@@ -13,7 +13,7 @@ const BOT_TOKEN = "8272127366:AAHwAbfVqQDklyLYI0PVo5gvveLaTGtUS6Y";
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5"; 
 const PAYMENTS_CHANNEL = "-1002100816898";
-const ADMIN_MNEMONIC = "victory end nothing roast ice begin paddle orient dish three poem salute bright term mixed under nature bacon make amazing add round dynamic market";
+const ADMIN_MNEMONIC = "gap chest saddle logic gesture better vapor chicken major math way clinic quick hero host rule bulb image there gallery sniff ecology will film";
 
 // --- CLAVES DE CLOUDFLARE TURNSTILE ---
 const CF_SECRET_KEY = "0x4AAAAAACqyiO0Gk6OnxaaGFcIZIYIxRnk";
