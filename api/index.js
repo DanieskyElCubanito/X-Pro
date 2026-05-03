@@ -101,12 +101,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
-    // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
+   // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
+      // Obtenemos los datos del usuario para el balance y el nombre
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
 
-      if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente' });
+      if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente en tu cuenta' });
       if (withdrawAmount < 0.1) return res.status(400).json({ error: 'Mínimo 0.1 TON' });
 
       let txHash = null;
@@ -114,6 +115,19 @@ export default async function handler(req, res) {
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
         const keyPair = await mnemonicToPrivateKey(ADMIN_MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
+
+        // --- NUEVA VALIDACIÓN: Saldo de la Wallet Administrativa ---
+        const walletContract = client.open(wallet);
+        const walletBalance = await walletContract.getBalance();
+        const amountInNano = toNano(withdrawAmount.toString());
+        const feeReserve = toNano('0.05'); // Reserva para el costo de gas
+
+        if (walletBalance < (amountInNano + feeReserve)) {
+          return res.status(500).json({ 
+            error: "El sistema está en mantenimiento de liquidez. Intenta más tarde." 
+          });
+        }
+
         const seqno = await wallet.getSeqno();
 
         await wallet.sendTransfer({
@@ -121,7 +135,7 @@ export default async function handler(req, res) {
           secretKey: keyPair.secretKey,
           messages: [internal({
             to: address.trim(),
-            value: toNano(withdrawAmount.toString()), 
+            value: amountInNano, 
             bounce: false,
             body: "IA Profit Payment ✅",
           })]
@@ -141,19 +155,35 @@ export default async function handler(req, res) {
       }
 
       if (txHash) {
+        // Actualizamos balance del usuario
         const newBalance = Number(u.balance) - withdrawAmount;
         await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+        
+        // Registramos el retiro
         await supabase.from('withdrawals').insert([{ 
           user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
         }]);
 
-        const messageText = `💎 <b>PAGO VERIFICADO</b>\n\n👤 <b>Usuario:</b> ${userId}\n💸 <b>Monto:</b> ${withdrawAmount} TON\n🔹 <b>TX:</b> <a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`;
+        // --- MENSAJE CON EL NUEVO FORMATO ---
+        const displayName = u.username ? `@${u.username}` : userId;
+        const messageText = `<b>💎 PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
+                            `👤 <b>Beneficiario:</b> ${displayName}\n` +
+                            `💸 <b>Monto Total:</b> ${withdrawAmount} TON\n` +
+                            `🛡️ <b>Red:</b> Toncoin (Ton)\n` +
+                            `⚡ <b>Estado:</b> Finalizado / 100%\n\n` +
+                            `🔹 <b>TXID:</b>\n<code>${txHash}</code>`;
+
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
             text: messageText,
             parse_mode: 'HTML',
-            disable_web_page_preview: true
-        }).catch(e => console.log("Error Telegram"));
+            disable_web_page_preview: true,
+            reply_markup: {
+              inline_keyboard: [[
+                { text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }
+              ]]
+            }
+        }).catch(e => console.log("Error enviando a canal de pagos"));
 
         return res.status(200).json({ success: true, txHash });
       }
