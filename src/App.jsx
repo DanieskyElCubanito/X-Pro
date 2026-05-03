@@ -30,23 +30,32 @@ function App() {
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
+      
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
-        setChannelStatus(data.channels);
-        setMustJoin(data.mustJoin); 
+        // Estos campos dependen de si tu backend los envía en el login inicial
+        if (data.channels) setChannelStatus(data.channels);
+        if (data.mustJoin !== undefined) setMustJoin(data.mustJoin); 
+        
         setStatus('member');
 
         if (data.user.is_human) {
            setIsHuman(true);
         }
       } else {
-        setErrorMessage("Tu cuenta no pudo ser verificada por el servidor.");
+        // Si el servidor responde 200 pero success es false
+        setErrorMessage(data.message || "Tu cuenta no pudo ser verificada.");
         setStatus('error');
       }
     } catch (err) {
       console.error("Error verificando:", err);
-      setErrorMessage("Error de conexión con el servidor de IA Profit Ton.");
+
+      // --- CAMBIO CLAVE AQUÍ ---
+      // Si el servidor responde con 403 (VPN), 400 o 500, el error vive en err.response.data
+      const serverMessage = err.response?.data?.message || "Error de conexión con el servidor de IA Profit Ton.";
+      
+      setErrorMessage(serverMessage);
       setStatus('error');
     }
   };
