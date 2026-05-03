@@ -69,7 +69,7 @@ export const botApi = {
     }
   },
 
-  // 5. Obtener Historial (NUEVO)
+  // 5. Obtener Historial
   getHistory: async (userId) => {
     try {
       const res = await api.post('/', { 
@@ -83,12 +83,16 @@ export const botApi = {
     }
   },
 
-  // 6. Verificar Humano / Puzzle Anti-Bots (NUEVO)
-  verifyHuman: async (userId) => {
+  /**
+   * 6. Verificar Humano con Cloudflare Turnstile
+   * Se envía el captchaToken recibido del componente frontend para validación en servidor.
+   */
+  verifyHuman: async (userId, captchaToken) => {
     try {
       const res = await api.post('/', {
         action: 'verify-human',
-        userId
+        userId,
+        captchaToken // Token generado por Cloudflare
       });
       return res.data;
     } catch (error) {
