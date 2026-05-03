@@ -4,6 +4,7 @@ import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
 import toast, { Toaster } from 'react-hot-toast'; 
 import ShareTab from './components/ShareTab';
+import { Turnstile } from '@marsidev/react-turnstile'; // <-- LIBRERÍA NUEVA
 
 function App() {
   const [status, setStatus] = useState('loading'); 
@@ -12,27 +13,18 @@ function App() {
   const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
   const [view, setView] = useState('main');
 
-  // Estados para la validación de canales
   const [mustJoin, setMustJoin] = useState(false);
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
 
-  // Estados para el retiro
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  // NUEVO: Estados para Historial
   const [history, setHistory] = useState([]); 
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // NUEVO: Estados para Captcha Anti-Bots
+  // Solo necesitamos saber si es humano, ya no necesitamos 'captchaStep'
   const [isHuman, setIsHuman] = useState(false);
-  const [captchaStep, setCaptchaStep] = useState([]);
-
-  const generateCaptcha = () => {
-    const nums = [1, 2, 3].sort(() => Math.random() - 0.5);
-    setCaptchaStep(nums);
-  };
 
   const verifyUser = async (user, startParam) => {
     try {
@@ -44,11 +36,8 @@ function App() {
         setMustJoin(data.mustJoin); 
         setStatus('member');
 
-        // Validamos si ya resolvió el captcha antes en la base de datos
         if (data.user.is_human) {
            setIsHuman(true);
-        } else {
-           generateCaptcha();
         }
       }
     } catch (err) {
@@ -87,7 +76,6 @@ function App() {
     verifyUser(user, inviterId);
   }, []);
 
-  // NUEVO: Función para cargar historial cuando se entra a la vista
   const fetchHistory = async () => {
     if (!userData?.id) return;
     setLoadingHistory(true);
@@ -156,7 +144,7 @@ function App() {
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
   if (status === 'error') return <div style={s.center}><h2>⚠️ Error de acceso</h2><p>Abre la app desde Telegram</p></div>;
 
-  // Pantalla de Canales
+  // --- PANTALLA DE CANALES ---
   if (mustJoin) {
     return (
       <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
@@ -175,7 +163,6 @@ function App() {
               </button>
             </div>
           )}
-
           {!channelStatus.c2 && (
             <div style={{...s.card, border: '1px solid #0088cc'}}>
               <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>👑𝘾𝙧𝙮𝙥𝙩𝙤 𝙞𝙣𝙫𝙚𝙨𝙩𝙢𝙚𝙣𝙩𝙨👑</p>
@@ -196,63 +183,47 @@ function App() {
     );
   }
 
-  // NUEVO: Pantalla de Captcha Anti-Bots
+  // --- NUEVA PANTALLA DE CAPTCHA (CLOUDFLARE TURNSTILE) ---
   if (!isHuman && status === 'member') {
     return (
       <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
         <Toaster position="top-center" />
         <h2 style={{color: '#0088cc'}}>¡Seguridad Anti-Bots! 🤖</h2>
         <p style={{color: '#888', fontSize: '14px', marginBottom: '30px'}}>
-          Demuestra que eres humano tocando los números en orden (<b>1, 2, 3</b>):
+          Por favor, completa la verificación para demostrar que eres humano:
         </p>
-        
-        <div style={{display: 'flex', gap: '15px', justifyContent: 'center', marginBottom: '30px'}}>
-          {captchaStep.map((num, idx) => (
-            <div 
-              key={idx} 
-              onClick={async () => {
-                const currentExpected = captchaStep.filter(n => n === null).length + 1;
-                if (num === currentExpected) {
-                   const newStep = [...captchaStep];
-                   newStep[idx] = null; 
-                   setCaptchaStep(newStep);
-                   
-                   // Si resolvió todo el puzzle
-                   if (newStep.every(n => n === null)) {
-                      const tid = toast.loading("Verificando...");
-                      try {
-                        // Avisar al backend que es humano
-                        await botApi.verifyHuman(userData.id);
-                        setIsHuman(true);
-                        toast.success("¡Verificado exitosamente!", { id: tid });
-                      } catch (e) {
-                        toast.error("Error conectando con el servidor", { id: tid });
-                        generateCaptcha();
-                      }
-                   }
-                } else {
-                  toast.error("Orden incorrecto, intenta de nuevo");
-                  generateCaptcha();
+
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '30px'}}>
+          {/* COMPONENTE DE CLOUDFLARE */}
+          <Turnstile 
+            siteKey="0x4AAAAAACqyiOXggbsrQdnA"
+            onSuccess={async (token) => {
+              const tid = toast.loading("Validando seguridad...");
+              try {
+                // Pasamos el token generado al backend
+                const res = await botApi.verifyHuman(userData.id, token);
+                if (res.success) {
+                  setIsHuman(true);
+                  toast.success("¡Verificado exitosamente!", { id: tid });
                 }
-              }}
-              style={{
-                width: '60px', height: '60px', background: '#0088cc', color: 'white',
-                borderRadius: '12px', display: 'flex', alignItems: 'center', 
-                justifyContent: 'center', fontSize: '24px', fontWeight: 'bold', cursor: 'pointer',
-                visibility: num === null ? 'hidden' : 'visible',
-                boxShadow: '0 4px 10px rgba(0, 136, 204, 0.3)'
-              }}
-            >
-              {num}
-            </div>
-          ))}
+              } catch (e) {
+                toast.error("Validación fallida, intenta de nuevo.", { id: tid });
+              }
+            }}
+            onError={() => {
+              toast.error("Error al cargar el Captcha");
+            }}
+          />
         </div>
-        <p style={{fontSize: '12px', color: '#555', marginTop: '40px'}}>Esta verificación solo aparecerá la primera vez que inicies sesión.</p>
+        
+        <p style={{fontSize: '12px', color: '#555', marginTop: '40px'}}>
+          Esta verificación solo aparecerá la primera vez que inicies sesión.
+        </p>
       </div>
     );
   }
 
-  // Interfaz Principal
+  // --- INTERFAZ PRINCIPAL ---
   return (
     <div style={s.container}>
       <Toaster position="top-center" reverseOrder={false} />
