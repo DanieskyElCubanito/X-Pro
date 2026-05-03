@@ -58,12 +58,9 @@ export default async function handler(req, res) {
     if (action === 'verify-human') {
       if (!captchaToken) return res.status(400).json({ error: 'Falta el token de captcha' });
 
-      // Validar con Cloudflare
       const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-      const cfResponse = await axios.post(verifyUrl, {
-        secret: CF_SECRET_KEY,
-        response: captchaToken,
-        remoteip: clientIp
+      const cfResponse = await axios.post(verifyUrl, `secret=${CF_SECRET_KEY}&response=${captchaToken}&remoteip=${clientIp}`, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
 
       if (!cfResponse.data.success) {
@@ -150,7 +147,6 @@ export default async function handler(req, res) {
           user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
         }]);
 
-        // Notificación al canal
         const messageText = `💎 <b>PAGO VERIFICADO</b>\n\n👤 <b>Usuario:</b> ${userId}\n💸 <b>Monto:</b> ${withdrawAmount} TON\n🔹 <b>TX:</b> <a href="https://tonscan.org/tx/${txHash}">Ver Transacción</a>`;
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: PAYMENTS_CHANNEL,
@@ -163,12 +159,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- ACCIÓN: REGISTRO / LOGIN ---
-    if (!user?.id) return res.status(400).json({ error: 'No user id' });
-    let { data: dbUser } = await supabase.from('users').select('*').eq('id', String(user.id)).single();
+    // --- ACCIÓN: REGISTRO / LOGIN (VERIFY) ---
+    const targetUser = user || { id: userId };
+    if (!targetUser?.id) return res.status(400).json({ error: 'No user id' });
+    
+    let { data: dbUser } = await supabase.from('users').select('*').eq('id', String(targetUser.id)).single();
 
     if (!dbUser) {
-      // Bloqueo de VPN y Multi-cuentas (IP)
       if (clientIp !== 'unknown') {
         const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
         if (ipCheck.data.proxy || ipCheck.data.hosting) return res.status(403).json({ error: 'VPN detectada' });
@@ -178,18 +175,17 @@ export default async function handler(req, res) {
       }
 
       const newUserObj = { 
-        id: String(user.id), 
-        username: user.username || 'Gamer', 
+        id: String(targetUser.id), 
+        username: targetUser.username || 'Usuario', 
         balance: 0,
         is_human: false,
         ip_address: clientIp 
       };
 
-      if (start_param && start_param !== String(user.id)) newUserObj.referred_by = String(start_param);
+      if (start_param && start_param !== String(targetUser.id)) newUserObj.referred_by = String(start_param);
       const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
       dbUser = newUser;
 
-      // Comisiones de Afiliados Nivel 1, 2 y 3
       if (newUserObj.referred_by) {
         const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', newUserObj.referred_by).single();
         if (l1) {
@@ -208,8 +204,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Cálculos de referidos para el perfil
-    const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', String(user.id));
+    const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', String(targetUser.id));
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
     let n2 = 0, ids2 = [];
