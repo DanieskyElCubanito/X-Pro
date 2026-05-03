@@ -159,19 +159,37 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- ACCIÓN: REGISTRO / LOGIN (VERIFY) ---
+   // --- ACCIÓN: REGISTRO / LOGIN (VERIFY) ---
     const targetUser = user || { id: userId };
     if (!targetUser?.id) return res.status(400).json({ error: 'No user id' });
     
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', String(targetUser.id)).single();
 
     if (!dbUser) {
+      // Bloqueo de VPN y Multi-cuentas
       if (clientIp !== 'unknown') {
-        const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
-        if (ipCheck.data.proxy || ipCheck.data.hosting) return res.status(403).json({ error: 'VPN detectada' });
+        try {
+          const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
+          
+          // Si detecta VPN o Hosting, enviamos un objeto JSON con el mensaje amigable
+          if (ipCheck.data.proxy || ipCheck.data.hosting) {
+            return res.status(403).json({ 
+              success: false, 
+              message: 'Acceso denegado: Por favor, desactiva tu VPN o Proxy para entrar.' 
+            });
+          }
 
-        const { data: existingIp } = await supabase.from('users').select('id').eq('ip_address', clientIp).limit(1);
-        if (existingIp && existingIp.length > 0) return res.status(403).json({ error: 'IP ya registrada' });
+          const { data: existingIp } = await supabase.from('users').select('id').eq('ip_address', clientIp).limit(1);
+          if (existingIp && existingIp.length > 0) {
+            return res.status(403).json({ 
+              success: false, 
+              message: 'Seguridad: Ya existe una cuenta registrada con esta conexión a internet.' 
+            });
+          }
+        } catch (ipError) {
+          console.error("Error validando IP:", ipError.message);
+          // Si el servicio de IP falla, dejamos pasar al usuario para no bloquearlo por error del API externo
+        }
       }
 
       const newUserObj = { 
