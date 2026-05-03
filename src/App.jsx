@@ -4,7 +4,7 @@ import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
 import toast, { Toaster } from 'react-hot-toast'; 
 import ShareTab from './components/ShareTab';
-import { Turnstile } from '@marsidev/react-turnstile'; // <-- LIBRERÍA NUEVA
+import { Turnstile } from '@marsidev/react-turnstile';
 
 function App() {
   const [status, setStatus] = useState('loading'); 
@@ -22,9 +22,10 @@ function App() {
 
   const [history, setHistory] = useState([]); 
   const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // Solo necesitamos saber si es humano, ya no necesitamos 'captchaStep'
   const [isHuman, setIsHuman] = useState(false);
+
+  // Nueva variable para mostrar mensajes de error más específicos
+  const [errorMessage, setErrorMessage] = useState('');
 
   const verifyUser = async (user, startParam) => {
     try {
@@ -39,9 +40,13 @@ function App() {
         if (data.user.is_human) {
            setIsHuman(true);
         }
+      } else {
+        setErrorMessage("Tu cuenta no pudo ser verificada por el servidor.");
+        setStatus('error');
       }
     } catch (err) {
       console.error("Error verificando:", err);
+      setErrorMessage("Error de conexión con el servidor de IA Profit Ton.");
       setStatus('error');
     }
   };
@@ -63,17 +68,30 @@ function App() {
   };
 
   useEffect(() => {
-    WebApp.ready(); 
-    WebApp.expand();
-    const user = WebApp.initDataUnsafe?.user;
-    const inviterId = WebApp.initDataUnsafe?.start_param;
+    // Añadimos un pequeño delay de 150ms para asegurar que el SDK esté listo en móviles
+    const initTimer = setTimeout(() => {
+      try {
+        WebApp.ready(); 
+        WebApp.expand();
+        
+        const user = WebApp.initDataUnsafe?.user;
+        const inviterId = WebApp.initDataUnsafe?.start_param;
 
-    if (!user) {
-      setStatus('error');
-      return;
-    }
+        if (!user) {
+          // Si estamos aquí, es que WebApp.initData está vacío
+          setErrorMessage("Abre la app desde Telegram");
+          setStatus('error');
+          return;
+        }
 
-    verifyUser(user, inviterId);
+        verifyUser(user, inviterId);
+      } catch (e) {
+        setErrorMessage("Error al iniciar el SDK de Telegram");
+        setStatus('error');
+      }
+    }, 150);
+
+    return () => clearTimeout(initTimer);
   }, []);
 
   const fetchHistory = async () => {
@@ -142,7 +160,21 @@ function App() {
   };
 
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
-  if (status === 'error') return <div style={s.center}><h2>⚠️ Error de acceso</h2><p>Abre la app desde Telegram</p></div>;
+  
+  if (status === 'error') {
+    return (
+      <div style={s.center}>
+        <h2 style={{color: '#ffcc00'}}>⚠️ Error de acceso</h2>
+        <p style={{color: '#fff'}}>{errorMessage}</p>
+        <button 
+          style={{...s.btnOutline, marginTop: '20px', fontSize: '12px'}} 
+          onClick={() => window.location.reload()}
+        >
+          🔄 REINTENTAR
+        </button>
+      </div>
+    );
+  }
 
   // --- PANTALLA DE CANALES ---
   if (mustJoin) {
@@ -183,7 +215,7 @@ function App() {
     );
   }
 
-  // --- NUEVA PANTALLA DE CAPTCHA (CLOUDFLARE TURNSTILE) ---
+  // --- PANTALLA DE CAPTCHA ---
   if (!isHuman && status === 'member') {
     return (
       <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
@@ -194,13 +226,11 @@ function App() {
         </p>
 
         <div style={{display: 'flex', justifyContent: 'center', marginBottom: '30px'}}>
-          {/* COMPONENTE DE CLOUDFLARE */}
           <Turnstile 
             siteKey="0x4AAAAAACqyiOXggbsrQdnA"
             onSuccess={async (token) => {
               const tid = toast.loading("Validando seguridad...");
               try {
-                // Pasamos el token generado al backend
                 const res = await botApi.verifyHuman(userData.id, token);
                 if (res.success) {
                   setIsHuman(true);
@@ -215,7 +245,7 @@ function App() {
             }}
           />
         </div>
-        
+
         <p style={{fontSize: '12px', color: '#555', marginTop: '40px'}}>
           Esta verificación solo aparecerá la primera vez que inicies sesión.
         </p>
