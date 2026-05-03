@@ -12,6 +12,7 @@
     "node": "20.x"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^0.7.0",
     "@supabase/supabase-js": "^2.45.4",
     "@ton/crypto": "^3.3.0",
     "@ton/ton": "^15.1.0",
