@@ -4,36 +4,76 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>IA Profit Ton</title>
+
+    <!-- 1. Telegram Web App SDK (Carga prioritaria) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- 2. Cloudflare Turnstile -->
+    <!-- Nota: Si usas '@marsidev/react-turnstile', este script es opcional pero ayuda a la carga temprana -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    <script src="https://ad.gigapub.tech/script?id=6215"></script>
-  <style>
-  /* Animación para el círculo de carga */
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
 
-  /* Animación de entrada suave para las pantallas */
-  .fade-in {
-    animation: fadeIn 0.4s ease-out;
-  }
+    <!-- 3. Scripts de Terceros -->
+    <script src="https://ad.gigapub.tech/script?id=6215" async></script>
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+    <style>
+      /* Reset y Fondo inmediato para evitar parpadeos blancos */
+      body, html {
+        margin: 0;
+        padding: 0;
+        background-color: #050505;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        overflow: hidden; /* Evita scrolls innecesarios en la Mini App */
+      }
 
-  /* Reset básico para evitar márgenes extraños */
-  body {
-    margin: 0;
-    padding: 0;
-    background-color: #050505; /* Fondo negro desde el segundo 0 */
-  }
-</style>
-</head>
+      /* Pantalla de carga inicial antes de que React despierte */
+      #fallback-loader {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 9999;
+        background-color: #050505;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-left-color: #0088cc;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .fade-in {
+        animation: fadeIn 0.4s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Este contenido desaparece automáticamente cuando React carga -->
+      <div id="fallback-loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-size: 14px; color: #888;">Cargando IA Profit Ton...</p>
+      </div>
+    </div>
+    
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
