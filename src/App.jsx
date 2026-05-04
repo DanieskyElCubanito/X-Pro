@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react'; // <-- Importamos useRef
 import WebApp from '@twa-dev/sdk';
 import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
@@ -23,38 +23,33 @@ function App() {
   const [history, setHistory] = useState([]); 
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isHuman, setIsHuman] = useState(false);
-
-  // Nueva variable para mostrar mensajes de error más específicos
   const [errorMessage, setErrorMessage] = useState('');
+
+  // 1. Instanciamos la referencia para bloquear la doble ejecución
+  const initialized = useRef(false);
 
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
-      
+
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
-        // Estos campos dependen de si tu backend los envía en el login inicial
         if (data.channels) setChannelStatus(data.channels);
         if (data.mustJoin !== undefined) setMustJoin(data.mustJoin); 
-        
+
         setStatus('member');
 
         if (data.user.is_human) {
            setIsHuman(true);
         }
       } else {
-        // Si el servidor responde 200 pero success es false
         setErrorMessage(data.message || "Tu cuenta no pudo ser verificada.");
         setStatus('error');
       }
     } catch (err) {
       console.error("Error verificando:", err);
-
-      // --- CAMBIO CLAVE AQUÍ ---
-      // Si el servidor responde con 403 (VPN), 400 o 500, el error vive en err.response.data
       const serverMessage = err.response?.data?.message || "Error de conexión con el servidor de IA Profit Ton.";
-      
       setErrorMessage(serverMessage);
       setStatus('error');
     }
@@ -77,22 +72,25 @@ function App() {
   };
 
   useEffect(() => {
-    // Añadimos un pequeño delay de 150ms para asegurar que el SDK esté listo en móviles
+    // 2. Si ya pasó por aquí, detenemos la ejecución inmediatamente
+    if (initialized.current) return;
+
     const initTimer = setTimeout(() => {
       try {
         WebApp.ready(); 
         WebApp.expand();
-        
+
         const user = WebApp.initDataUnsafe?.user;
         const inviterId = WebApp.initDataUnsafe?.start_param;
 
         if (!user) {
-          // Si estamos aquí, es que WebApp.initData está vacío
           setErrorMessage("Abre la app desde Telegram");
           setStatus('error');
           return;
         }
 
+        // 3. Marcamos como inicializado justo antes de disparar la petición a la API
+        initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) {
         setErrorMessage("Error al iniciar el SDK de Telegram");
@@ -169,7 +167,7 @@ function App() {
   };
 
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
-  
+
   if (status === 'error') {
     return (
       <div style={s.center}>
