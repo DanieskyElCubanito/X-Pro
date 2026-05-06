@@ -13,9 +13,8 @@ function App() {
   const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
   const [view, setView] = useState('main');
 
-  // --- ESTADOS DE CANALES ---
   const [mustJoin, setMustJoin] = useState(false);
-  const [channelStatus, setChannelStatus] = useState({ c1: false, c2: false });
+  const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
 
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
@@ -26,52 +25,58 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // 1. Instanciamos la referencia para bloquear la doble ejecución
   const initialized = useRef(false);
 
-  // --- LÓGICA DE VERIFICACIÓN TOTAL ---
   const verifyUser = async (user, startParam) => {
     try {
-      // 1. Verificar registro/login
       const data = await botApi.verifyUser(user, startParam);
 
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
-        if (data.user.is_human) setIsHuman(true);
-
-        // 2. Verificar canales inmediatamente después del login
-        const resChannels = await botApi.checkChannels(data.user.id);
         
-        if (resChannels.success) {
-          setChannelStatus({ c1: resChannels.channel1, c2: resChannels.channel2 });
-          // Si NO se ha unido a todos, activamos el bloqueo
-          if (!resChannels.allJoined) {
-            setMustJoin(true);
+        // CORRECCIÓN: Verificación forzada de canales
+        let needsToJoin = false;
+        
+        if (data.channels) {
+          setChannelStatus(data.channels);
+          // Si alguno de los canales es false, obligamos a que se una
+          if (data.channels.c1 === false || data.channels.c2 === false) {
+            needsToJoin = true;
           }
-        }
+        } 
+        
+        // Asignamos mustJoin basado en la verificación local o lo que mande la API directamente
+        setMustJoin(needsToJoin || data.mustJoin === true); 
 
         setStatus('member');
+
+        if (data.user.is_human) {
+           setIsHuman(true);
+        }
       } else {
         setErrorMessage(data.message || "Tu cuenta no pudo ser verificada.");
         setStatus('error');
       }
     } catch (err) {
       console.error("Error verificando:", err);
-      setErrorMessage("Error de conexión con el servidor.");
+      const serverMessage = err.response?.data?.message || "Error de conexión con el servidor de IA Profit Ton.";
+      setErrorMessage(serverMessage);
       setStatus('error');
     }
   };
 
   const handleCheckChannels = async () => {
-    const tid = toast.loading("Verificando suscripciones...");
+    const tid = toast.loading("Verificando canales...");
     try {
       const res = await botApi.checkChannels(userData.id);
       if (res.allJoined) {
         setMustJoin(false);
-        toast.success("¡Suscripción verificada!", { id: tid });
+        toast.success("¡Perfecto! Ya puedes entrar", { id: tid });
       } else {
         setChannelStatus({ c1: res.channel1, c2: res.channel2 });
-        toast.error("Aún faltan canales por seguir", { id: tid });
+        toast.error("Aún no te has unido a todos los canales", { id: tid });
       }
     } catch (e) {
       toast.error("Error al verificar. Intenta de nuevo.", { id: tid });
@@ -79,11 +84,14 @@ function App() {
   };
 
   useEffect(() => {
+    // 2. Si ya pasó por aquí, detenemos la ejecución inmediatamente
     if (initialized.current) return;
+
     const initTimer = setTimeout(() => {
       try {
         WebApp.ready(); 
         WebApp.expand();
+
         const user = WebApp.initDataUnsafe?.user;
         const inviterId = WebApp.initDataUnsafe?.start_param;
 
@@ -93,17 +101,34 @@ function App() {
           return;
         }
 
+        // 3. Marcamos como inicializado justo antes de disparar la petición a la API
         initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) {
-        setErrorMessage("Error de inicio");
+        setErrorMessage("Error al iniciar el SDK de Telegram");
         setStatus('error');
       }
     }, 150);
+
     return () => clearTimeout(initTimer);
   }, []);
 
-  // ... (Resto de funciones handleBonus, handleWithdraw, handleShare iguales)
+  const fetchHistory = async () => {
+    if (!userData?.id) return;
+    setLoadingHistory(true);
+    try {
+      const res = await botApi.getHistory(userData.id);
+      if (res.success) setHistory(res.history);
+    } catch (e) {
+      console.error("Error cargando historial");
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'history') fetchHistory();
+  }, [view]);
 
   const handleBonus = async () => {
     if (!userData?.id) return toast.error("Usuario no cargado");
@@ -115,28 +140,32 @@ function App() {
         toast.success("¡Bono recibido! +0.001 TON", { id: tid });
       }
     } catch (e) {
-      toast.error("Error al reclamar el bono", { id: tid });
+      const msg = e.response?.data?.error || e.message || "Error de conexión";
+      toast.error(`Fallo: ${msg}`, { id: tid });
     }
   };
 
   const handleWithdraw = async () => {
     if (!withdrawAddress.trim()) return toast.error("Ingresa tu dirección TON");
     const amount = parseFloat(withdrawAmount);
+
     if (isNaN(amount) || amount < 0.1) return toast.error("El mínimo es 0.1 TON");
     if (amount > (userData?.balance || 0)) return toast.error("Saldo insuficiente");
 
     const tid = toast.loading("Procesando en la Blockchain...");
     setIsWithdrawing(true);
+
     try {
       const res = await botApi.withdraw(userData.id, withdrawAddress.trim(), amount);
       if (res.success) {
         setUserData(prev => ({ ...prev, balance: prev.balance - amount }));
-        toast.success("¡Retiro exitoso!", { id: tid });
+        toast.success("¡Retiro exitoso y enviado!", { id: tid });
         setWithdrawAddress(''); 
         setTimeout(() => setView('main'), 2000); 
       }
     } catch (e) {
-      toast.error("Error en el retiro", { id: tid });
+      const msg = e.response?.data?.error || e.message || "Error en la red";
+      toast.error(`Fallo: ${msg}`, { id: tid });
     } finally {
       setIsWithdrawing(false);
     }
@@ -145,47 +174,51 @@ function App() {
   const handleShare = () => {
     const inviteLink = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
     const text = "¡Gana TON gratis con esta App! 💎";
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
+    const fullUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`;
+    WebApp.openTelegramLink(fullUrl);
   };
-
-  /* --- RENDERIZADO --- */
 
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
   if (status === 'error') {
     return (
       <div style={s.center}>
-        <h2 style={{color: '#ffcc00'}}>⚠️ Error</h2>
-        <p>{errorMessage}</p>
-        <button style={s.btnOutline} onClick={() => window.location.reload()}>🔄 REINTENTAR</button>
+        <h2 style={{color: '#ffcc00'}}>⚠️ Error de acceso</h2>
+        <p style={{color: '#fff'}}>{errorMessage}</p>
+        <button 
+          style={{...s.btnOutline, marginTop: '20px', fontSize: '12px'}} 
+          onClick={() => window.location.reload()}
+        >
+          🔄 REINTENTAR
+        </button>
       </div>
     );
   }
 
-  // 1. PANTALLA DE BLOQUEO DE CANALES (Prioridad máxima después del login)
+  // --- PANTALLA DE CANALES ---
   if (mustJoin) {
     return (
       <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
         <Toaster position="top-center" />
-        <h2 style={{color: '#0088cc', marginBottom: '10px'}}>¡Acceso Restringido! 🔒</h2>
+        <h2 style={{color: '#0088cc', marginBottom: '10px'}}>¡Casi listo! 🚀</h2>
         <p style={{fontSize: '14px', color: '#888', marginBottom: '30px'}}>
-          Para activar tu minería y recibir pagos, únete a nuestros canales:
+          Para activar tu cuenta y empezar a ganar, únete a nuestros canales oficiales:
         </p>
 
         <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
           {!channelStatus.c1 && (
-            <div style={{...s.card, border: '1px solid #0088cc', padding: '15px'}}>
-              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>📢 Canal de Noticias</p>
+            <div style={{...s.card, border: '1px solid #0088cc'}}>
+              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Crypto ₿itcoin</p>
               <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>
-                UNIRME AHORA
+                UNIRME CANAL 1
               </button>
             </div>
           )}
           {!channelStatus.c2 && (
-            <div style={{...s.card, border: '1px solid #0088cc', padding: '15px'}}>
-              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>💰 Canal de Pagos</p>
+            <div style={{...s.card, border: '1px solid #0088cc'}}>
+              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>👑𝘾𝙧𝙮𝙥𝙩𝙤 𝙞𝙣𝙫𝙚𝙨𝙩𝙢𝙚𝙣𝙩𝙨👑</p>
               <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/CryptoInvestmentsWebs')}>
-                UNIRME AHORA
+                UNIRME CANAL 2
               </button>
             </div>
           )}
@@ -195,40 +228,62 @@ function App() {
           style={{...s.btnOutline, marginTop: '40px', width: '100%', color: '#28a745', borderColor: '#28a745'}} 
           onClick={handleCheckChannels}
         >
-          ✅ YA ME UNÍ, VERIFICAR
+          🔄 YA ME UNÍ, VERIFICAR
         </button>
       </div>
     );
   }
 
-  // 2. PANTALLA DE CAPTCHA (Solo aparece si ya se unió a los canales)
-  if (!isHuman) {
+  // --- PANTALLA DE CAPTCHA ---
+  if (!isHuman && status === 'member') {
     return (
       <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
         <Toaster position="top-center" />
-        <h2 style={{color: '#0088cc'}}>Verificación de Seguridad</h2>
-        <p style={{color: '#888', marginBottom: '30px'}}>Confirma que no eres un robot:</p>
-        <div style={{display: 'flex', justifyContent: 'center'}}>
+        <h2 style={{color: '#0088cc'}}>¡Seguridad Anti-Bots! 🤖</h2>
+        <p style={{color: '#888', fontSize: '14px', marginBottom: '30px'}}>
+          Por favor, completa la verificación para demostrar que eres humano:
+        </p>
+
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: '30px'}}>
           <Turnstile 
             siteKey="0x4AAAAAACqyiOXggbsrQdnA"
             onSuccess={async (token) => {
-              const res = await botApi.verifyHuman(userData.id, token);
-              if (res.success) setIsHuman(true);
+              const tid = toast.loading("Validando seguridad...");
+              try {
+                const res = await botApi.verifyHuman(userData.id, token);
+                if (res.success) {
+                  setIsHuman(true);
+                  toast.success("¡Verificado exitosamente!", { id: tid });
+                }
+              } catch (e) {
+                toast.error("Validación fallida, intenta de nuevo.", { id: tid });
+              }
+            }}
+            onError={() => {
+              toast.error("Error al cargar el Captcha");
             }}
           />
         </div>
+
+        <p style={{fontSize: '12px', color: '#555', marginTop: '40px'}}>
+          Esta verificación solo aparecerá la primera vez que inicies sesión.
+        </p>
       </div>
     );
   }
 
-  // 3. INTERFAZ PRINCIPAL
+  // --- INTERFAZ PRINCIPAL ---
   return (
     <div style={s.container}>
-      <Toaster position="top-center" />
+      <Toaster position="top-center" reverseOrder={false} />
+
       <div style={s.main}>
-        {/* Tu cabecera de perfil */}
         <div style={s.profileHeader}>
-          <img src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} style={s.profileAvatar} />
+          <img 
+            src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} 
+            style={s.profileAvatar} 
+            alt="avatar"
+          />
           <div>
             <p style={s.profileName}>{userData?.username || 'Usuario'}</p>
             <p style={s.profileId}>ID: {userData?.id}</p>
@@ -240,27 +295,103 @@ function App() {
             {view === 'main' ? (
               <>
                 <div style={s.cardBalance}>
-                  <p style={{fontSize:'12px', fontWeight:'bold', opacity:0.8}}>SALDO DISPONIBLE</p>
-                  <h1 style={{fontSize:'42px', margin:'10px 0'}}>
-                    {Number(userData?.balance || 0).toFixed(5)} <span style={{fontSize:'16px'}}>TON</span>
+                  <p style={{fontSize:'12px', fontWeight:'bold', letterSpacing:'1px', opacity:0.8}}>SALDO DISPONIBLE</p>
+                  <h1 style={{fontSize:'42px', margin:'10px 0', fontWeight:'900'}}>
+                    {Number(userData?.balance || 0).toFixed(4)} <span style={{fontSize:'18px'}}>TON</span>
                   </h1>
+                  <div style={{fontSize:'12px', background:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'10px', display:'inline-block'}}>
+                    Nivel: Usuario Elite ⚡
+                  </div>
                 </div>
 
                 <div style={s.actionGrid}>
-                  <div style={s.actionCard} onClick={() => setView('withdraw')}>💸 RETIRO</div>
-                  <div style={s.actionCard} onClick={handleBonus}>🎁 BONO</div>
+                  <div style={s.actionCard} onClick={() => setView('withdraw')}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>💸</span>
+                    RETIRO
+                  </div>
+                  <div style={s.actionCard} onClick={handleBonus}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>🎁</span>
+                    BONO
+                  </div>
+                  <div style={s.actionCard} onClick={() => setView('history')}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>📜</span>
+                    HISTORIAL
+                  </div>
+                </div>
+
+                <div style={{...s.card, marginTop:'20px', borderStyle:'dashed', borderColor:'#333'}}>
+                    <p style={{color:'#888', fontSize:'13px', textAlign:'center'}}>
+                      Próximas misiones disponibles pronto...
+                    </p>
                 </div>
               </>
-            ) : (
-              /* Vista de Retiro */
+            ) : view === 'withdraw' ? (
               <div className="fade-in">
-                <button style={s.btnOutline} onClick={() => setView('main')}>← VOLVER</button>
-                <h2 style={{textAlign:'center', marginTop:'20px'}}>Retirar Fondos</h2>
-                <input style={s.input} placeholder="Dirección TON" value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)} />
-                <input style={s.input} type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
-                <button style={s.btnGreen} onClick={handleWithdraw} disabled={isWithdrawing}>
-                  {isWithdrawing ? "PROCESANDO..." : "CONFIRMAR RETIRO"}
-                </button>
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
+                 <p style={s.helpText}>Mínimo de retiro: 0.1 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
+
+                 <input 
+                    style={s.input} 
+                    placeholder="Dirección de Wallet TON" 
+                    value={withdrawAddress}
+                    onChange={(e) => setWithdrawAddress(e.target.value)}
+                    disabled={isWithdrawing}
+                 />
+                 <input 
+                    style={s.input} 
+                    type="number" 
+                    placeholder="Monto" 
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={isWithdrawing}
+                    min="0.1"
+                 />
+                 <button 
+                    style={{...s.btnGreen, opacity: isWithdrawing ? 0.6 : 1}} 
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing}
+                 >
+                    {isWithdrawing ? "PROCESANDO PAGO..." : "ENVIAR SOLICITUD"}
+                 </button>
+                 <button 
+                    style={s.btnOutline} 
+                    onClick={() => setView('main')}
+                    disabled={isWithdrawing}
+                 >
+                    VOLVER AL INICIO
+                 </button>
+              </div>
+            ) : (
+              <div className="fade-in">
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Historial de Retiros</h2>
+                 {loadingHistory ? (
+                   <p style={{textAlign:'center'}}>Cargando transacciones...</p>
+                 ) : history.length > 0 ? (
+                   <div style={{maxHeight: '300px', overflowY: 'auto'}}>
+                     {history.map((tx, index) => (
+                       <div key={index} style={{...s.card, marginBottom: '10px', fontSize: '12px'}}>
+                          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
+                            <span style={{color:'#28a745', fontWeight:'bold'}}>+ {tx.amount} TON</span>
+                            <span style={{color:'#888'}}>{new Date(tx.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p style={{margin:0, color:'#555', wordBreak:'break-all'}}>Wallet: {tx.address}</p>
+                          <a 
+                            href={`https://tonscan.org/tx/${tx.tx_hash}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{color:'#0088cc', textDecoration:'none', display:'block', marginTop:'5px'}}
+                          >
+                            Ver en Explorer 🔗
+                          </a>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div style={{...s.card, textAlign:'center', color:'#555'}}>
+                      <p>No tienes retiros registrados aún.</p>
+                   </div>
+                 )}
+                 <button style={{...s.btnOutline, marginTop: '20px'}} onClick={() => setView('main')}>VOLVER</button>
               </div>
             )}
           </div>
@@ -269,10 +400,13 @@ function App() {
         {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
       </div>
 
-      {/* Menú Inferior */}
       <div style={s.bottomNav}>
-        <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}>🏠 INICIO</div>
-        <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>👥 AMIGOS</div>
+        <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
+           <span style={{fontSize:'20px'}}>🏠</span><span>HOME</span>
+        </div>
+        <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
+           <span style={{fontSize:'20px'}}>👥</span><span>AMIGOS</span>
+        </div>
       </div>
     </div>
   );
