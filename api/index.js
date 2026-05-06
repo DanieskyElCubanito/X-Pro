@@ -261,16 +261,28 @@ export default async function handler(req, res) {
       n2 = lv2?.length || 0;
       ids2 = lv2?.map(u => u.id) || [];
     }
+    // ... (código anterior de los niveles de referidos) ...
     let n3 = 0;
     if (ids2.length > 0) {
       const { data: lv3 } = await supabase.from('users').select('id').in('referred_by', ids2);
       n3 = lv3?.length || 0;
     }
 
+    // --- CORRECCIÓN: VERIFICAR CANALES AL INICIAR SESIÓN ---
+    // Usamos los mismos IDs de canal que tienes arriba en action === 'check-channels'
+    const isMember1 = await checkMembership(targetUser.id, "-1002228067712");
+    const isMember2 = await checkMembership(targetUser.id, "-1002049802477");
+
+    // Enviamos la respuesta incluyendo el objeto 'channels'
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, c1: (n1 * 0.005).toFixed(4), n2, c2: (n2 * 0.003).toFixed(4), n3, c3: (n3 * 0.002).toFixed(4) }
+      stats: { n1, c1: (n1 * 0.005).toFixed(4), n2, c2: (n2 * 0.003).toFixed(4), n3, c3: (n3 * 0.002).toFixed(4) },
+      // 👇 ESTO ES LO QUE FALTABA 👇
+      channels: {
+        c1: isMember1,
+        c2: isMember2
+      }
     });
 
   } catch (error) {
