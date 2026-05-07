@@ -37,7 +37,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+  // Detección de IP real optimizada para Vercel
+  const forwarded = req.headers["x-forwarded-for"];
+  const clientIp = forwarded ? forwarded.split(/, /)[0] : req.socket?.remoteAddress || 'unknown';
 
   try {
     const { user, action, userId, amount, address, start_param, captchaToken } = req.body; 
@@ -104,7 +106,6 @@ export default async function handler(req, res) {
    // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
-      // Obtenemos los datos del usuario para el balance y el nombre
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
 
       if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente en tu cuenta' });
@@ -116,11 +117,10 @@ export default async function handler(req, res) {
         const keyPair = await mnemonicToPrivateKey(ADMIN_MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
 
-        // --- NUEVA VALIDACIÓN: Saldo de la Wallet Administrativa ---
         const walletContract = client.open(wallet);
         const walletBalance = await walletContract.getBalance();
         const amountInNano = toNano(withdrawAmount.toString());
-        const feeReserve = toNano('0.05'); // Reserva para el costo de gas
+        const feeReserve = toNano('0.05');
 
         if (walletBalance < (amountInNano + feeReserve)) {
           return res.status(500).json({ 
@@ -155,16 +155,13 @@ export default async function handler(req, res) {
       }
 
       if (txHash) {
-        // Actualizamos balance del usuario
         const newBalance = Number(u.balance) - withdrawAmount;
         await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
-        
-        // Registramos el retiro
+
         await supabase.from('withdrawals').insert([{ 
           user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
         }]);
 
-        // --- MENSAJE CON EL NUEVO FORMATO ---
         const displayName = u.username ? `@${u.username}` : userId;
         const messageText = `<b>💎 PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                             `👤 <b>Beneficiario:</b> ${displayName}\n` +
@@ -178,7 +175,7 @@ export default async function handler(req, res) {
             chat_id: PAYMENTS_CHANNEL,
             text: messageText,
             parse_mode: 'HTML',
-            disable_web_page_preview: true, // Esto evita que Telegram genere un cuadro gigante de vista previa del link
+            disable_web_page_preview: true,
             reply_markup: {
               inline_keyboard: [[
                 { text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }
@@ -189,19 +186,18 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, txHash });
       }
     }
+
    // --- ACCIÓN: REGISTRO / LOGIN (VERIFY) ---
     const targetUser = user || { id: userId };
     if (!targetUser?.id) return res.status(400).json({ error: 'No user id' });
-    
+
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', String(targetUser.id)).single();
 
     if (!dbUser) {
-      // Bloqueo de VPN y Multi-cuentas
-      if (clientIp !== 'unknown') {
+      // 1. Bloqueo de VPN y Multi-cuentas (Corregido)
+      if (clientIp && clientIp !== 'unknown') {
         try {
           const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
-          
-          // Si detecta VPN o Hosting, enviamos un objeto JSON con el mensaje amigable
           if (ipCheck.data.proxy || ipCheck.data.hosting) {
             return res.status(403).json({ 
               success: false, 
@@ -218,10 +214,10 @@ export default async function handler(req, res) {
           }
         } catch (ipError) {
           console.error("Error validando IP:", ipError.message);
-          // Si el servicio de IP falla, dejamos pasar al usuario para no bloquearlo por error del API externo
         }
       }
 
+      // 2. Crear el nuevo usuario
       const newUserObj = { 
         id: String(targetUser.id), 
         username: targetUser.username || 'Usuario', 
@@ -230,21 +226,30 @@ export default async function handler(req, res) {
         ip_address: clientIp 
       };
 
-      if (start_param && start_param !== String(targetUser.id)) newUserObj.referred_by = String(start_param);
+      if (start_param && String(start_param) !== String(targetUser.id)) {
+        newUserObj.referred_by = String(start_param);
+      }
+      
       const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
       dbUser = newUser;
 
-      if (newUserObj.referred_by) {
-        const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', newUserObj.referred_by).single();
+      // 3. Distribución de comisiones por referidos (Corregido)
+      if (dbUser.referred_by) {
+        // Nivel 1
+        const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
         if (l1) {
-          await supabase.from('users').update({ balance: (l1.balance || 0) + 0.005 }).eq('id', l1.id);
+          await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.005 }).eq('id', l1.id);
+          // Nivel 2
           if (l1.referred_by) {
             const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
             if (l2) {
-              await supabase.from('users').update({ balance: (l2.balance || 0) + 0.003 }).eq('id', l2.id);
+              await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.003 }).eq('id', l2.id);
+              // Nivel 3
               if (l2.referred_by) {
                 const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
-                if (l3) await supabase.from('users').update({ balance: (l3.balance || 0) + 0.002 }).eq('id', l3.id);
+                if (l3) {
+                  await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.002 }).eq('id', l3.id);
+                }
               }
             }
           }
@@ -252,6 +257,7 @@ export default async function handler(req, res) {
       }
     }
 
+    // 4. Obtener estadísticas de referidos
     const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', String(targetUser.id));
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
@@ -261,24 +267,20 @@ export default async function handler(req, res) {
       n2 = lv2?.length || 0;
       ids2 = lv2?.map(u => u.id) || [];
     }
-    // ... (código anterior de los niveles de referidos) ...
     let n3 = 0;
     if (ids2.length > 0) {
       const { data: lv3 } = await supabase.from('users').select('id').in('referred_by', ids2);
       n3 = lv3?.length || 0;
     }
 
-    // --- CORRECCIÓN: VERIFICAR CANALES AL INICIAR SESIÓN ---
-    // Usamos los mismos IDs de canal que tienes arriba en action === 'check-channels'
+    // 5. Verificar canales al iniciar sesión (Corregido)
     const isMember1 = await checkMembership(targetUser.id, "-1002228067712");
     const isMember2 = await checkMembership(targetUser.id, "-1002049802477");
 
-    // Enviamos la respuesta incluyendo el objeto 'channels'
     return res.status(200).json({
       success: true,
       user: dbUser,
       stats: { n1, c1: (n1 * 0.005).toFixed(4), n2, c2: (n2 * 0.003).toFixed(4), n3, c3: (n3 * 0.002).toFixed(4) },
-      // 👇 ESTO ES LO QUE FALTABA 👇
       channels: {
         c1: isMember1,
         c2: isMember2
