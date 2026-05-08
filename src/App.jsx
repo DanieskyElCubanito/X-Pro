@@ -25,7 +25,7 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 1. Instanciamos la referencia para bloquear la doble ejecución
+  // 1. Candado para evitar el doble disparo de React Strict Mode
   const initialized = useRef(false);
 
   const verifyUser = async (user, startParam) => {
@@ -35,21 +35,16 @@ function App() {
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
-        
-        // CORRECCIÓN: Verificación forzada de canales
+
         let needsToJoin = false;
-        
         if (data.channels) {
           setChannelStatus(data.channels);
-          // Si alguno de los canales es false, obligamos a que se una
           if (data.channels.c1 === false || data.channels.c2 === false) {
             needsToJoin = true;
           }
         } 
-        
-        // Asignamos mustJoin basado en la verificación local o lo que mande la API directamente
-        setMustJoin(needsToJoin || data.mustJoin === true); 
 
+        setMustJoin(needsToJoin || data.mustJoin === true); 
         setStatus('member');
 
         if (data.user.is_human) {
@@ -61,7 +56,8 @@ function App() {
       }
     } catch (err) {
       console.error("Error verificando:", err);
-      const serverMessage = err.response?.data?.message || "Error de conexión con el servidor de IA Profit Ton.";
+      // Capturamos el mensaje de VPN o IP Duplicada del backend
+      const serverMessage = err.response?.data?.message || err.message || "Error de conexión con el servidor.";
       setErrorMessage(serverMessage);
       setStatus('error');
     }
@@ -84,7 +80,6 @@ function App() {
   };
 
   useEffect(() => {
-    // 2. Si ya pasó por aquí, detenemos la ejecución inmediatamente
     if (initialized.current) return;
 
     const initTimer = setTimeout(() => {
@@ -96,16 +91,16 @@ function App() {
         const inviterId = WebApp.initDataUnsafe?.start_param;
 
         if (!user) {
-          setErrorMessage("Abre la app desde Telegram");
+          setErrorMessage("Debes abrir la app desde Telegram.");
           setStatus('error');
           return;
         }
 
-        // 3. Marcamos como inicializado justo antes de disparar la petición a la API
+        // 2. Activamos el candado antes de llamar a la API
         initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) {
-        setErrorMessage("Error al iniciar el SDK de Telegram");
+        setErrorMessage("Error al iniciar el SDK de Telegram.");
         setStatus('error');
       }
     }, 150);
