@@ -323,7 +323,7 @@ function App() {
             ) : view === 'withdraw' ? (
               <div className="fade-in">
                  <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
-                 <p style={s.helpText}>Mínimo de retiro: 0.1 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
+                 <p style={s.helpText}>Mínimo de retiro: 0.01 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
 
                  <input 
                     style={s.input} 
