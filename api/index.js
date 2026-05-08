@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
-   // --- ACCIÓN: RETIRO REAL BLOCKCHAIN (RESTABLECIDO COMPLETO) ---
+   // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
@@ -186,7 +186,7 @@ export default async function handler(req, res) {
       }
     }
 
-   // --- ACCIÓN: REGISTRO / LOGIN (ESTRUCTURA ORIGINAL CON FIX DE PAGO) ---
+   // --- ACCIÓN: REGISTRO / LOGIN (ESTRUCTURA ORIGINAL CON FIX DE PAGO Y ANTI-BUCLE) ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
@@ -194,7 +194,6 @@ export default async function handler(req, res) {
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
     if (!dbUser) {
-      // 1. Bloqueo de VPN y Multi-cuentas (Tal como lo tenías)
       if (clientIp && clientIp !== 'unknown') {
         try {
           const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
@@ -217,7 +216,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // 2. Crear el nuevo usuario
       const newUserObj = { 
         id: targetId, 
         username: targetUser.username || 'Usuario', 
@@ -230,23 +228,30 @@ export default async function handler(req, res) {
         newUserObj.referred_by = String(start_param);
       }
 
-      // FIX: Solo pagamos si el INSERT es exitoso
       const { data: newUser, error: insertError } = await supabase.from('users').insert([newUserObj]).select().single();
-      
+
       if (!insertError && newUser) {
         dbUser = newUser;
-        // 3. Distribución de comisiones (Solo ocurre una vez por usuario real)
+        
+        // 3. Distribución de comisiones con PROTECCIÓN ANTI-BUCLE
         if (dbUser.referred_by) {
           const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
           if (l1) {
+            // PAGO NIVEL 1: 0.005
             await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.005 }).eq('id', l1.id);
-            if (l1.referred_by) {
+            
+            // Verifica que Nivel 2 exista y NO sea la misma persona que el Nivel 1 ni el usuario actual
+            if (l1.referred_by && String(l1.referred_by) !== String(l1.id) && String(l1.referred_by) !== targetId) {
               const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
               if (l2) {
+                // PAGO NIVEL 2: 0.003
                 await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.003 }).eq('id', l2.id);
-                if (l2.referred_by) {
+                
+                // Verifica que Nivel 3 exista y no rompa la cadena
+                if (l2.referred_by && String(l2.referred_by) !== String(l2.id) && String(l2.referred_by) !== String(l1.id) && String(l2.referred_by) !== targetId) {
                   const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
                   if (l3) {
+                    // PAGO NIVEL 3: 0.002
                     await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.002 }).eq('id', l3.id);
                   }
                 }
@@ -255,13 +260,12 @@ export default async function handler(req, res) {
           }
         }
       } else {
-        // Si el insert falló (porque ya existía), simplemente lo buscamos
         const { data: retryUser } = await supabase.from('users').select('*').eq('id', targetId).single();
         dbUser = retryUser;
       }
     }
 
-    // 4. Estadísticas de referidos (Restablecido completo)
+    // 4. Estadísticas de referidos
     const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
@@ -277,7 +281,6 @@ export default async function handler(req, res) {
       n3 = lv3?.length || 0;
     }
 
-    // 5. Verificación de canales para la respuesta final
     const isMember1 = await checkMembership(targetId, "-1002228067712");
     const isMember2 = await checkMembership(targetId, "-1002049802477");
 
