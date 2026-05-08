@@ -37,7 +37,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Detección de IP real optimizada para Vercel
   const forwarded = req.headers["x-forwarded-for"];
   const clientIp = forwarded ? forwarded.split(/, /)[0] : req.socket?.remoteAddress || 'unknown';
 
@@ -56,24 +55,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, history: data });
     }
 
-    // --- ACCIÓN: VERIFICAR HUMANO (CON CLOUDFLARE TURNSTILE) ---
+    // --- ACCIÓN: VERIFICAR HUMANO ---
     if (action === 'verify-human') {
       if (!captchaToken) return res.status(400).json({ error: 'Falta el token de captcha' });
-
       const verifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
       const cfResponse = await axios.post(verifyUrl, `secret=${CF_SECRET_KEY}&response=${captchaToken}&remoteip=${clientIp}`, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
-
-      if (!cfResponse.data.success) {
-        return res.status(403).json({ error: 'Validación de captcha fallida' });
-      }
-
-      const { error } = await supabase
-        .from('users')
-        .update({ is_human: true })
-        .eq('id', String(userId));
-
+      if (!cfResponse.data.success) return res.status(403).json({ error: 'Validación de captcha fallida' });
+      const { error } = await supabase.from('users').update({ is_human: true }).eq('id', String(userId));
       if (error) return res.status(500).json({ error: error.message });
       return res.status(200).json({ success: true });
     }
@@ -83,10 +73,7 @@ export default async function handler(req, res) {
       const isMember1 = await checkMembership(userId, "-1002228067712");
       const isMember2 = await checkMembership(userId, "-1002049802477");
       return res.status(200).json({
-        success: true,
-        channel1: isMember1,
-        channel2: isMember2,
-        allJoined: isMember1 && isMember2
+        success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2
       });
     }
 
@@ -96,19 +83,18 @@ export default async function handler(req, res) {
       const now = Date.now();
       const lastBonus = u.last_bonus ? new Date(u.last_bonus).getTime() : 0;
       if (now - lastBonus < 24 * 60 * 60 * 1000) return res.status(400).json({ error: `Espera 24h` });
-
       const reward = 0.001;
       const newB = (Number(u.balance) || 0) + reward;
       await supabase.from('users').update({ balance: newB, last_bonus: new Date().toISOString() }).eq('id', String(userId));
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
-   // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
+    // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
 
-      if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente en tu cuenta' });
+      if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente' });
       if (withdrawAmount < 0.1) return res.status(400).json({ error: 'Mínimo 0.1 TON' });
 
       let txHash = null;
@@ -116,29 +102,14 @@ export default async function handler(req, res) {
         const client = new TonClient({ endpoint: TON_RPC, apiKey: TON_API_KEY });
         const keyPair = await mnemonicToPrivateKey(ADMIN_MNEMONIC.trim().split(/\s+/));
         const wallet = client.open(WalletContractV5R1.create({ workchain: 0, publicKey: keyPair.publicKey }));
-
-        const walletContract = client.open(wallet);
-        const walletBalance = await walletContract.getBalance();
+        const walletBalance = await wallet.getBalance();
         const amountInNano = toNano(withdrawAmount.toString());
-        const feeReserve = toNano('0.05');
-
-        if (walletBalance < (amountInNano + feeReserve)) {
-          return res.status(500).json({ 
-            error: "El sistema está en mantenimiento de liquidez. Intenta más tarde." 
-          });
-        }
-
+        if (walletBalance < (amountInNano + toNano('0.05'))) return res.status(500).json({ error: "Falta liquidez." });
+        
         const seqno = await wallet.getSeqno();
-
         await wallet.sendTransfer({
-          seqno,
-          secretKey: keyPair.secretKey,
-          messages: [internal({
-            to: address.trim(),
-            value: amountInNano, 
-            bounce: false,
-            body: "IA Profit Payment ✅",
-          })]
+          seqno, secretKey: keyPair.secretKey,
+          messages: [internal({ to: address.trim(), value: amountInNano, bounce: false, body: "IA Profit Payment ✅" })]
         });
 
         let success = false;
@@ -146,22 +117,16 @@ export default async function handler(req, res) {
           await new Promise(r => setTimeout(r, 3000));
           if ((await wallet.getSeqno()) > seqno) { success = true; break; }
         }
-        if (!success) throw new Error("La red TON tarda demasiado.");
-
+        if (!success) throw new Error("La red TON no confirmó a tiempo.");
         const transactions = await client.getTransactions(wallet.address, { limit: 1 });
         txHash = transactions[0]?.hash().toString('hex');
-      } catch (e) {
-        return res.status(500).json({ error: "Error Blockchain: " + e.message });
-      }
+      } catch (e) { return res.status(500).json({ error: "Error Blockchain: " + e.message }); }
 
       if (txHash) {
-        const newBalance = Number(u.balance) - withdrawAmount;
-        await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+        await supabase.from('users').update({ balance: Number(u.balance) - withdrawAmount }).eq('id', String(userId));
+        await supabase.from('withdrawals').insert([{ user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() }]);
 
-        await supabase.from('withdrawals').insert([{ 
-          user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
-        }]);
-
+        // --- MENSAJE DETALLADO RESTAURADO ---
         const displayName = u.username ? `@${u.username}` : userId;
         const messageText = `<b>💎 PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
                             `👤 <b>Beneficiario:</b> ${displayName}\n` +
@@ -181,84 +146,66 @@ export default async function handler(req, res) {
                 { text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }
               ]]
             }
-        }).catch(e => console.log("Error enviando a canal de pagos"));
+        }).catch(e => console.log("Error enviando a canal"));
 
         return res.status(200).json({ success: true, txHash });
       }
     }
 
-   // --- ACCIÓN: REGISTRO / LOGIN (VERIFY) ---
-    const targetUser = user || { id: userId };
-    if (!targetUser?.id) return res.status(400).json({ error: 'No user id' });
+    // --- ACCIÓN: REGISTRO / LOGIN (CON FIX 0.008) ---
+    const targetId = String(user?.id || userId);
+    if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'ID inválido' });
 
-    let { data: dbUser } = await supabase.from('users').select('*').eq('id', String(targetUser.id)).single();
+    let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
     if (!dbUser) {
-      // 1. Bloqueo de VPN y Multi-cuentas (Corregido)
+      // Bloqueo VPN/Proxy
       if (clientIp && clientIp !== 'unknown') {
-        try {
-          const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
-          if (ipCheck.data.proxy || ipCheck.data.hosting) {
-            return res.status(403).json({ 
-              success: false, 
-              message: 'Acceso denegado: Por favor, desactiva tu VPN o Proxy para entrar.' 
-            });
-          }
-
-          const { data: existingIp } = await supabase.from('users').select('id').eq('ip_address', clientIp).limit(1);
-          if (existingIp && existingIp.length > 0) {
-            return res.status(403).json({ 
-              success: false, 
-              message: 'Seguridad: Ya existe una cuenta registrada con esta conexión a internet.' 
-            });
-          }
-        } catch (ipError) {
-          console.error("Error validando IP:", ipError.message);
-        }
+        const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`).catch(() => ({data:{}}));
+        if (ipCheck.data.proxy || ipCheck.data.hosting) return res.status(403).json({ success: false, message: 'VPN no permitida.' });
+        const { data: exIp } = await supabase.from('users').select('id').eq('ip_address', clientIp).limit(1);
+        if (exIp && exIp.length > 0) return res.status(403).json({ success: false, message: 'Cuenta duplicada detectada.' });
       }
 
-      // 2. Crear el nuevo usuario
       const newUserObj = { 
-        id: String(targetUser.id), 
-        username: targetUser.username || 'Usuario', 
+        id: targetId, 
+        username: user?.username || 'Usuario', 
         balance: 0,
         is_human: false,
-        ip_address: clientIp 
+        ip_address: clientIp,
+        referred_by: (start_param && String(start_param) !== targetId) ? String(start_param) : null
       };
 
-      if (start_param && String(start_param) !== String(targetUser.id)) {
-        newUserObj.referred_by = String(start_param);
-      }
-      
-      const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
-      dbUser = newUser;
+      // INSERCIÓN ATÓMICA: Evita el pago doble
+      const { data: newUser, error: insertError } = await supabase.from('users').insert([newUserObj]).select().single();
 
-      // 3. Distribución de comisiones por referidos (Corregido)
-      if (dbUser.referred_by) {
-        // Nivel 1
-        const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
-        if (l1) {
-          await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.005 }).eq('id', l1.id);
-          // Nivel 2
-          if (l1.referred_by) {
-            const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
-            if (l2) {
-              await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.003 }).eq('id', l2.id);
-              // Nivel 3
-              if (l2.referred_by) {
-                const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
-                if (l3) {
-                  await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.002 }).eq('id', l3.id);
+      if (!insertError && newUser) {
+        dbUser = newUser;
+        // Pagar comisiones (Solo una vez)
+        if (dbUser.referred_by) {
+          const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
+          if (l1) {
+            await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.005 }).eq('id', l1.id);
+            if (l1.referred_by) {
+              const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
+              if (l2) {
+                await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.003 }).eq('id', l2.id);
+                if (l2.referred_by) {
+                  const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
+                  if (l3) await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.002 }).eq('id', l3.id);
                 }
               }
             }
           }
         }
+      } else {
+        const { data: retry } = await supabase.from('users').select('*').eq('id', targetId).single();
+        dbUser = retry;
       }
     }
 
-    // 4. Obtener estadísticas de referidos
-    const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', String(targetUser.id));
+    // Estadísticas para UI
+    const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
     let n2 = 0, ids2 = [];
@@ -273,18 +220,14 @@ export default async function handler(req, res) {
       n3 = lv3?.length || 0;
     }
 
-    // 5. Verificar canales al iniciar sesión (Corregido)
-    const isMember1 = await checkMembership(targetUser.id, "-1002228067712");
-    const isMember2 = await checkMembership(targetUser.id, "-1002049802477");
+    const isM1 = await checkMembership(targetId, "-1002228067712");
+    const isM2 = await checkMembership(targetId, "-1002049802477");
 
     return res.status(200).json({
       success: true,
       user: dbUser,
       stats: { n1, c1: (n1 * 0.005).toFixed(4), n2, c2: (n2 * 0.003).toFixed(4), n3, c3: (n3 * 0.002).toFixed(4) },
-      channels: {
-        c1: isMember1,
-        c2: isMember2
-      }
+      channels: { c1: isM1, c2: isM2 }
     });
 
   } catch (error) {
