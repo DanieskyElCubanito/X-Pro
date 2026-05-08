@@ -108,7 +108,7 @@ export default async function handler(req, res) {
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
 
       if (!u || u.balance < withdrawAmount) return res.status(400).json({ error: 'Saldo insuficiente en tu cuenta' });
-      if (withdrawAmount < 0.1) return res.status(400).json({ error: 'Mínimo 0.1 TON' });
+      if (withdrawAmount < 0.01) return res.status(400).json({ error: 'Mínimo 0.01 TON' });
 
       let txHash = null;
       try {
