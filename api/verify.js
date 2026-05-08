@@ -5,7 +5,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configuración de comisiones (Debe coincidir con tu lógica de negocio)
-const REWARDS = { level1: 0.005, level2: 0.003, level3: 0.002 };
+const REWARDS = { level1: 0.000, level2: 0.000, level3: 0.000 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
