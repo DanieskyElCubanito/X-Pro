@@ -144,7 +144,7 @@ function App() {
     if (!withdrawAddress.trim()) return toast.error("Ingresa tu dirección TON");
     const amount = parseFloat(withdrawAmount);
 
-    if (isNaN(amount) || amount < 0.1) return toast.error("El mínimo es 0.1 TON");
+    if (isNaN(amount) || amount < 0.01) return toast.error("El mínimo es 0.01 TON");
     if (amount > (userData?.balance || 0)) return toast.error("Saldo insuficiente");
 
     const tid = toast.loading("Procesando en la Blockchain...");
