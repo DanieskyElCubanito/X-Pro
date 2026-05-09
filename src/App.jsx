@@ -4,33 +4,14 @@ import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
 import toast, { Toaster } from 'react-hot-toast'; 
 import ShareTab from './components/ShareTab';
-import { Turnstile } from '@marsidev/react-turnstile';
 
 function App() {
+  // --- 1. TODOS LOS ESTADOS PRIMERO (Para evitar errores de variables no definidas) ---
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
   const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
   const [view, setView] = useState('main');
-
-const [captchaTarget, setCaptchaTarget] = useState(null);
-  const [captchaOptions, setCaptchaOptions] = useState([]);
-
-  const initCaptcha = () => {
-    const items = [
-      { icon: '🍎', name: 'la Manzana' }, { icon: '🚗', name: 'el Auto' },
-      { icon: '🐶', name: 'el Perro' }, { icon: '🚀', name: 'el Cohete' },
-      { icon: '🍕', name: 'la Pizza' }, { icon: '⚽', name: 'el Balón' }
-    ];
-    const shuffled = items.sort(() => 0.5 - Math.random());
-    const selectedOptions = shuffled.slice(0, 4);
-    setCaptchaOptions(selectedOptions);
-    setCaptchaTarget(selectedOptions[Math.floor(Math.random() * selectedOptions.length)]);
-  };
-
-  useEffect(() => {
-    if (!isHuman && status === 'member' && !captchaTarget) initCaptcha();
-  }, [isHuman, status, captchaTarget]);
 
   const [mustJoin, setMustJoin] = useState(false);
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
@@ -44,9 +25,33 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 1. Candado para evitar el doble disparo de React Strict Mode
+  // Estados del Captcha Nativo
+  const [captchaTarget, setCaptchaTarget] = useState(null);
+  const [captchaOptions, setCaptchaOptions] = useState([]);
+
+  // --- 2. CANDADO PARA REACT STRICT MODE ---
   const initialized = useRef(false);
 
+  // --- 3. LÓGICA DEL CAPTCHA NATIVO ---
+  const initCaptcha = () => {
+    const items = [
+      { icon: '🍎', name: 'la Manzana' }, { icon: '🚗', name: 'el Auto' },
+      { icon: '🐶', name: 'el Perro' }, { icon: '🚀', name: 'el Cohete' },
+      { icon: '🍕', name: 'la Pizza' }, { icon: '⚽', name: 'el Balón' }
+    ];
+    const shuffled = items.sort(() => 0.5 - Math.random());
+    const selectedOptions = shuffled.slice(0, 4);
+    setCaptchaOptions(selectedOptions);
+    setCaptchaTarget(selectedOptions[Math.floor(Math.random() * selectedOptions.length)]);
+  };
+
+  useEffect(() => {
+    if (!isHuman && status === 'member' && !captchaTarget) {
+      initCaptcha();
+    }
+  }, [isHuman, status, captchaTarget]);
+
+  // --- 4. FUNCIONES PRINCIPALES ---
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
@@ -75,7 +80,6 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
       }
     } catch (err) {
       console.error("Error verificando:", err);
-      // Capturamos el mensaje de VPN o IP Duplicada del backend
       const serverMessage = err.response?.data?.message || err.message || "Error de conexión con el servidor.";
       setErrorMessage(serverMessage);
       setStatus('error');
@@ -115,7 +119,6 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
           return;
         }
 
-        // 2. Activamos el candado antes de llamar a la API
         initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) {
@@ -192,6 +195,7 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
     WebApp.openTelegramLink(fullUrl);
   };
 
+  // --- 5. RENDERIZADO DE VISTAS ---
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
   if (status === 'error') {
@@ -248,7 +252,7 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
     );
   }
 
-  // --- PANTALLA DE CAPTCHA ---
+  // --- PANTALLA DE CAPTCHA NATIVO ---
   if (!isHuman && status === 'member') {
     return (
       <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
@@ -277,7 +281,7 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
                   }
                 } else {
                   toast.error("Incorrecto, intenta de nuevo.");
-                  initCaptcha(); // Reinicia el reto con nuevos emojis
+                  initCaptcha(); 
                 }
               }}
               style={{
@@ -370,7 +374,7 @@ const [captchaTarget, setCaptchaTarget] = useState(null);
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     disabled={isWithdrawing}
-                    min="0.1"
+                    min="0.01"
                  />
                  <button 
                     style={{...s.btnGreen, opacity: isWithdrawing ? 0.6 : 1}} 
