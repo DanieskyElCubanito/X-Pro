@@ -13,6 +13,25 @@ function App() {
   const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
   const [view, setView] = useState('main');
 
+const [captchaTarget, setCaptchaTarget] = useState(null);
+  const [captchaOptions, setCaptchaOptions] = useState([]);
+
+  const initCaptcha = () => {
+    const items = [
+      { icon: '🍎', name: 'la Manzana' }, { icon: '🚗', name: 'el Auto' },
+      { icon: '🐶', name: 'el Perro' }, { icon: '🚀', name: 'el Cohete' },
+      { icon: '🍕', name: 'la Pizza' }, { icon: '⚽', name: 'el Balón' }
+    ];
+    const shuffled = items.sort(() => 0.5 - Math.random());
+    const selectedOptions = shuffled.slice(0, 4);
+    setCaptchaOptions(selectedOptions);
+    setCaptchaTarget(selectedOptions[Math.floor(Math.random() * selectedOptions.length)]);
+  };
+
+  useEffect(() => {
+    if (!isHuman && status === 'member' && !captchaTarget) initCaptcha();
+  }, [isHuman, status, captchaTarget]);
+
   const [mustJoin, setMustJoin] = useState(false);
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
 
