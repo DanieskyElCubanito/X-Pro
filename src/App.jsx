@@ -6,7 +6,6 @@ import toast, { Toaster } from 'react-hot-toast';
 import ShareTab from './components/ShareTab';
 
 function App() {
-  // --- 1. TODOS LOS ESTADOS PRIMERO (Para evitar errores de variables no definidas) ---
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
@@ -25,14 +24,15 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Estados del Captcha Nativo
+  // --- ESTADOS DE MISIONES ---
+  // Controla si el usuario ya tocó "Abrir App" en esta sesión
+  const [openedApps, setOpenedApps] = useState({ tickbit: false, gmail: false });
+
   const [captchaTarget, setCaptchaTarget] = useState(null);
   const [captchaOptions, setCaptchaOptions] = useState([]);
 
-  // --- 2. CANDADO PARA REACT STRICT MODE ---
   const initialized = useRef(false);
 
-  // --- 3. LÓGICA DEL CAPTCHA NATIVO ---
   const initCaptcha = () => {
     const items = [
       { icon: '🍎', name: 'la Manzana' }, { icon: '🚗', name: 'el Auto' },
@@ -51,7 +51,6 @@ function App() {
     }
   }, [isHuman, status, captchaTarget]);
 
-  // --- 4. FUNCIONES PRINCIPALES ---
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
@@ -80,7 +79,7 @@ function App() {
       }
     } catch (err) {
       console.error("Error verificando:", err);
-      const serverMessage = err.response?.data?.message || err.message || "Error de conexión con el servidor.";
+      const serverMessage = err.response?.data?.message || err.message || "Error de conexión.";
       setErrorMessage(serverMessage);
       setStatus('error');
     }
@@ -195,7 +194,36 @@ function App() {
     WebApp.openTelegramLink(fullUrl);
   };
 
-  // --- 5. RENDERIZADO DE VISTAS ---
+  // --- LÓGICA DE MISIONES ---
+  const handleOpenApp = (missionId, url) => {
+    WebApp.openTelegramLink(url);
+    // Marcamos que ya abrió el enlace para habilitar el botón de reclamar
+    setOpenedApps(prev => ({ ...prev, [missionId]: true }));
+  };
+
+  const handleClaimMission = async (missionId) => {
+    if (!openedApps[missionId]) {
+      return toast.error("Debes abrir la app primero para poder reclamar.");
+    }
+
+    const tid = toast.loading("Verificando misión...");
+    try {
+      const res = await botApi.claimMission(userData.id, missionId);
+      if (res.success) {
+        setUserData(prev => ({ 
+          ...prev, 
+          balance: res.newBalance,
+          // Agregamos la misión a las completadas localmente
+          missions_completed: [...(prev.missions_completed || []), missionId] 
+        }));
+        toast.success("¡Misión completada! +0.001 TON", { id: tid });
+      }
+    } catch (e) {
+      const msg = e.response?.data?.error || "Error al verificar la misión";
+      toast.error(msg, { id: tid });
+    }
+  };
+
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
   if (status === 'error') {
@@ -213,7 +241,6 @@ function App() {
     );
   }
 
-  // --- PANTALLA DE CANALES ---
   if (mustJoin) {
     return (
       <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
@@ -252,7 +279,6 @@ function App() {
     );
   }
 
-  // --- PANTALLA DE CAPTCHA NATIVO ---
   if (!isHuman && status === 'member') {
     return (
       <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
@@ -270,7 +296,6 @@ function App() {
                 if (item.icon === captchaTarget?.icon) {
                   const tid = toast.loading("Validando seguridad...");
                   try {
-                    // Enviamos un código interno al backend
                     const res = await botApi.verifyHuman(userData.id, 'app-verified-fast');
                     if (res.success) {
                       setIsHuman(true);
@@ -302,7 +327,10 @@ function App() {
     );
   }
 
-  // --- INTERFAZ PRINCIPAL ---
+  // Comprobamos qué misiones ya están guardadas en la base de datos
+  const isTickbitCompleted = userData?.missions_completed?.includes('tickbit');
+  const isGmailCompleted = userData?.missions_completed?.includes('gmail');
+
   return (
     <div style={s.container}>
       <Toaster position="top-center" reverseOrder={false} />
@@ -349,10 +377,80 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{...s.card, marginTop:'20px', borderStyle:'dashed', borderColor:'#333'}}>
-                    <p style={{color:'#888', fontSize:'13px', textAlign:'center'}}>
-                      Próximas misiones disponibles pronto...
-                    </p>
+                {/* --- SECCIÓN DE MISIONES --- */}
+                <div style={{ marginTop: '25px', textAlign: 'left' }}>
+                  <h3 style={{ fontSize: '15px', color: '#fff', marginBottom: '15px' }}>📋 Misiones Disponibles</h3>
+
+                  {/* MISIÓN 1: TickBit */}
+                  <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+                        🤖
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start TickBit Bot</p>
+                        <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {isTickbitCompleted ? (
+                        <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
+                          Completada
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
+                            onClick={() => handleOpenApp('tickbit', 'https://t.me/TickBitEarn_bot?start=ref_7517815832')}
+                          >
+                            Abrir App
+                          </button>
+                          <button 
+                            style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.tickbit ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.tickbit ? 1 : 0.6}}
+                            onClick={() => handleClaimMission('tickbit')}
+                          >
+                            Reclamar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* MISIÓN 2: Gmail Farmer */}
+                  <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+                        ✉️
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start Gmail Farmer</p>
+                        <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {isGmailCompleted ? (
+                        <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
+                          Completada
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
+                            onClick={() => handleOpenApp('gmail', 'https://t.me/GmailFarmerBot?start=7517815832')}
+                          >
+                            Abrir App
+                          </button>
+                          <button 
+                            style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.gmail ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.gmail ? 1 : 0.6}}
+                            onClick={() => handleClaimMission('gmail')}
+                          >
+                            Reclamar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </>
             ) : view === 'withdraw' ? (
