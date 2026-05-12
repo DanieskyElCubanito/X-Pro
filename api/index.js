@@ -85,6 +85,46 @@ export default async function handler(req, res) {
       });
     }
 
+// --- ACCIÓN: RECLAMAR MISIÓN ---
+    if (action === 'claim-mission') {
+      const { missionId } = req.body;
+      if (!missionId) return res.status(400).json({ error: 'Falta ID de la misión' });
+
+      // 1. Verificamos si el usuario ya la reclamó en la base de datos
+      const { data: existingMission } = await supabase
+        .from('user_missions')
+        .select('id')
+        .eq('user_id', String(userId))
+        .eq('mission_id', missionId)
+        .single();
+      
+      if (existingMission) {
+        return res.status(400).json({ error: 'Ya completaste esta misión antes.' });
+      }
+
+      // 2. Le sumamos 0.001 TON a su balance
+      const reward = 0.001;
+      const { data: user, error: userErr } = await supabase.rpc('increment_balance', {
+        x: reward,
+        row_id: String(userId)
+      });
+
+      if (userErr) {
+        // Si no tienes la función RPC increment_balance, usamos el método tradicional:
+        const { data: currentUser } = await supabase.from('users').select('balance').eq('id', String(userId)).single();
+        await supabase.from('users').update({ balance: (currentUser.balance || 0) + reward }).eq('id', String(userId));
+      }
+
+      // 3. Guardamos el registro en Supabase para que no lo haga de nuevo
+      await supabase.from('user_missions').insert([{ 
+        user_id: String(userId), 
+        mission_id: missionId 
+      }]);
+
+      // Devolvemos el nuevo balance al frontend
+      const { data: updatedUser } = await supabase.from('users').select('balance').eq('id', String(userId)).single();
+      return res.status(200).json({ success: true, newBalance: updatedUser.balance });
+    }
     // --- ACCIÓN: COBRAR BONO DIARIO ---
     if (action === 'claim-bonus') {
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
