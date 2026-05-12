@@ -99,15 +99,22 @@ export const botApi = {
       console.error("Error en verifyHuman:", error.response?.data || error.message);
       throw error;
     }
+}, // <--- No olvides esta coma para separar funciones
+
+  // 7. Reclamar Misión
+  claimMission: async (userId, missionId) => {
+    try {
+      const res = await api.post('', {
+        action: 'claim-mission',
+        userId,
+        missionId
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en claimMission:", error.response?.data || error.message);
+      throw error;
+    }
   }
 };
 
-claimMission: async (userId, missionId) => {
-    const res = await axios.post(`${API_URL}/action`, {
-      action: 'claim-mission',
-      userId,
-      missionId
-    });
-    return res.data;
-  }
 export default botApi;
