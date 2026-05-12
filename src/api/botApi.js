@@ -102,4 +102,12 @@ export const botApi = {
   }
 };
 
+claimMission: async (userId, missionId) => {
+    const res = await axios.post(`${API_URL}/action`, {
+      action: 'claim-mission',
+      userId,
+      missionId
+    });
+    return res.data;
+  }
 export default botApi;
