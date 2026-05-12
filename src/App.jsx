@@ -24,12 +24,13 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // --- ESTADOS DE MISIONES Y DAILY ---
+  // --- ESTADOS DE MISIONES ---
+  // Controla si el usuario ya tocó "Abrir App" en esta sesión
   const [openedApps, setOpenedApps] = useState({ tickbit: false, gmail: false });
-  const [hasSharedDaily, setHasSharedDaily] = useState(false);
 
   const [captchaTarget, setCaptchaTarget] = useState(null);
   const [captchaOptions, setCaptchaOptions] = useState([]);
+
   const initialized = useRef(false);
 
   const initCaptcha = () => {
@@ -53,75 +54,136 @@ function App() {
   const verifyUser = async (user, startParam) => {
     try {
       const data = await botApi.verifyUser(user, startParam);
+
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
+
         let needsToJoin = false;
         if (data.channels) {
           setChannelStatus(data.channels);
-          if (data.channels.c1 === false || data.channels.c2 === false) needsToJoin = true;
+          if (data.channels.c1 === false || data.channels.c2 === false) {
+            needsToJoin = true;
+          }
         } 
+
         setMustJoin(needsToJoin || data.mustJoin === true); 
         setStatus('member');
-        if (data.user.is_human) setIsHuman(true);
+
+        if (data.user.is_human) {
+           setIsHuman(true);
+        }
       } else {
-        setErrorMessage(data.message || "Error de verificación.");
+        setErrorMessage(data.message || "Tu cuenta no pudo ser verificada.");
         setStatus('error');
       }
     } catch (err) {
-      setErrorMessage("Error de conexión.");
+      console.error("Error verificando:", err);
+      const serverMessage = err.response?.data?.message || err.message || "Error de conexión.";
+      setErrorMessage(serverMessage);
       setStatus('error');
     }
   };
 
   const handleCheckChannels = async () => {
-    const tid = toast.loading("Verificando...");
+    const tid = toast.loading("Verificando canales...");
     try {
       const res = await botApi.checkChannels(userData.id);
       if (res.allJoined) {
         setMustJoin(false);
-        toast.success("¡Acceso concedido!", { id: tid });
+        toast.success("¡Perfecto! Ya puedes entrar", { id: tid });
       } else {
         setChannelStatus({ c1: res.channel1, c2: res.channel2 });
-        toast.error("Aún faltan canales", { id: tid });
+        toast.error("Aún no te has unido a todos los canales", { id: tid });
       }
     } catch (e) {
-      toast.error("Error al verificar", { id: tid });
+      toast.error("Error al verificar. Intenta de nuevo.", { id: tid });
     }
   };
 
   useEffect(() => {
     if (initialized.current) return;
+
     const initTimer = setTimeout(() => {
       try {
         WebApp.ready(); 
         WebApp.expand();
+
         const user = WebApp.initDataUnsafe?.user;
         const inviterId = WebApp.initDataUnsafe?.start_param;
+
         if (!user) {
-          setErrorMessage("Abre desde Telegram.");
+          setErrorMessage("Debes abrir la app desde Telegram.");
           setStatus('error');
           return;
         }
+
         initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) {
+        setErrorMessage("Error al iniciar el SDK de Telegram.");
         setStatus('error');
       }
     }, 150);
+
     return () => clearTimeout(initTimer);
   }, []);
 
+  const fetchHistory = async () => {
+    if (!userData?.id) return;
+    setLoadingHistory(true);
+    try {
+      const res = await botApi.getHistory(userData.id);
+      if (res.success) setHistory(res.history);
+    } catch (e) {
+      console.error("Error cargando historial");
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'history') fetchHistory();
+  }, [view]);
+
   const handleBonus = async () => {
-    const tid = toast.loading("Reclamando...");
+    if (!userData?.id) return toast.error("Usuario no cargado");
+    const tid = toast.loading("Reclamando bono...");
     try {
       const res = await botApi.claimBonus(userData.id);
       if (res.success) {
         setUserData(prev => ({ ...prev, balance: res.newBalance }));
-        toast.success("¡Bono recibido!", { id: tid });
+        toast.success("¡Bono recibido! +0.001 TON", { id: tid });
       }
     } catch (e) {
-      toast.error("Error al reclamar", { id: tid });
+      const msg = e.response?.data?.error || e.message || "Error de conexión";
+      toast.error(`Fallo: ${msg}`, { id: tid });
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawAddress.trim()) return toast.error("Ingresa tu dirección TON");
+    const amount = parseFloat(withdrawAmount);
+
+    if (isNaN(amount) || amount < 0.01) return toast.error("El mínimo es 0.01 TON");
+    if (amount > (userData?.balance || 0)) return toast.error("Saldo insuficiente");
+
+    const tid = toast.loading("Procesando en la Blockchain...");
+    setIsWithdrawing(true);
+
+    try {
+      const res = await botApi.withdraw(userData.id, withdrawAddress.trim(), amount);
+      if (res.success) {
+        setUserData(prev => ({ ...prev, balance: prev.balance - amount }));
+        toast.success("¡Retiro exitoso y enviado!", { id: tid });
+        setWithdrawAddress(''); 
+        setTimeout(() => setView('main'), 2000); 
+      }
+    } catch (e) {
+      const msg = e.response?.data?.error || e.message || "Error en la red";
+      toast.error(`Fallo: ${msg}`, { id: tid });
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -130,156 +192,348 @@ function App() {
     const text = "¡Gana TON gratis con esta App! 💎";
     const fullUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`;
     WebApp.openTelegramLink(fullUrl);
-    setHasSharedDaily(true); // Habilitamos el botón de reclamar daily
   };
 
-  const handleClaimDaily = async () => {
-    if (!hasSharedDaily) return toast.error("Comparte primero el enlace");
-    const tid = toast.loading("Procesando daily...");
-    try {
-      const res = await botApi.claimMission(userData.id, 'daily_check');
-      if (res.success) {
-        setUserData(prev => ({ ...prev, balance: res.newBalance, daily_claimed: true }));
-        toast.success("¡Daily Check completado! +0.001 TON", { id: tid });
-      }
-    } catch (e) {
-      toast.error(e.response?.data?.error || "Error", { id: tid });
-    }
-  };
-
-  const handleOpenApp = (id, url) => {
+  // --- LÓGICA DE MISIONES ---
+  const handleOpenApp = (missionId, url) => {
     WebApp.openTelegramLink(url);
-    setOpenedApps(prev => ({ ...prev, [id]: true }));
+    // Marcamos que ya abrió el enlace para habilitar el botón de reclamar
+    setOpenedApps(prev => ({ ...prev, [missionId]: true }));
   };
 
-  const handleClaimMission = async (id) => {
-    if (!openedApps[id]) return toast.error("Debes abrir la app primero");
-    const tid = toast.loading("Verificando...");
+  const handleClaimMission = async (missionId) => {
+    if (!openedApps[missionId]) {
+      return toast.error("Debes abrir la app primero para poder reclamar.");
+    }
+
+    const tid = toast.loading("Verificando misión...");
     try {
-      const res = await botApi.claimMission(userData.id, id);
+      const res = await botApi.claimMission(userData.id, missionId);
       if (res.success) {
         setUserData(prev => ({ 
           ...prev, 
           balance: res.newBalance,
-          missions_completed: [...(prev.missions_completed || []), id] 
+          // Agregamos la misión a las completadas localmente
+          missions_completed: [...(prev.missions_completed || []), missionId] 
         }));
         toast.success("¡Misión completada! +0.001 TON", { id: tid });
       }
     } catch (e) {
-      toast.error(e.response?.data?.error || "Error", { id: tid });
+      const msg = e.response?.data?.error || "Error al verificar la misión";
+      toast.error(msg, { id: tid });
     }
   };
 
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
+  if (status === 'error') {
+    return (
+      <div style={s.center}>
+        <h2 style={{color: '#ffcc00'}}>⚠️ Error de acceso</h2>
+        <p style={{color: '#fff'}}>{errorMessage}</p>
+        <button 
+          style={{...s.btnOutline, marginTop: '20px', fontSize: '12px'}} 
+          onClick={() => window.location.reload()}
+        >
+          🔄 REINTENTAR
+        </button>
+      </div>
+    );
+  }
+
+  if (mustJoin) {
+    return (
+      <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
+        <Toaster position="top-center" />
+        <h2 style={{color: '#0088cc', marginBottom: '10px'}}>¡Casi listo! 🚀</h2>
+        <p style={{fontSize: '14px', color: '#888', marginBottom: '30px'}}>
+          Para activar tu cuenta y empezar a ganar, únete a nuestros canales oficiales:
+        </p>
+
+        <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+          {!channelStatus.c1 && (
+            <div style={{...s.card, border: '1px solid #0088cc'}}>
+              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Crypto ₿itcoin</p>
+              <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/CryptosBitcoins')}>
+                UNIRME CANAL 1
+              </button>
+            </div>
+          )}
+          {!channelStatus.c2 && (
+            <div style={{...s.card, border: '1px solid #0088cc'}}>
+              <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>👑𝘾𝙧𝙮𝙥𝙩𝙤 𝙞𝙣𝙫𝙚𝙨𝙩𝙢𝙚𝙣𝙩𝙨👑</p>
+              <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/CryptoInvestmentsWebs')}>
+                UNIRME CANAL 2
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button 
+          style={{...s.btnOutline, marginTop: '40px', width: '100%', color: '#28a745', borderColor: '#28a745'}} 
+          onClick={handleCheckChannels}
+        >
+          🔄 YA ME UNÍ, VERIFICAR
+        </button>
+      </div>
+    );
+  }
+
+  if (!isHuman && status === 'member') {
+    return (
+      <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
+        <Toaster position="top-center" />
+        <h2 style={{color: '#0088cc'}}>¡Verificación Rápida! ⚡</h2>
+        <p style={{color: '#888', fontSize: '15px', marginBottom: '30px'}}>
+          Demuestra que eres humano tocando <b>{captchaTarget?.name}</b>:
+        </p>
+
+        <div style={{display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap', marginBottom: '30px'}}>
+          {captchaOptions.map((item, index) => (
+            <button 
+              key={index}
+              onClick={async () => {
+                if (item.icon === captchaTarget?.icon) {
+                  const tid = toast.loading("Validando seguridad...");
+                  try {
+                    const res = await botApi.verifyHuman(userData.id, 'app-verified-fast');
+                    if (res.success) {
+                      setIsHuman(true);
+                      toast.success("¡Acceso concedido!", { id: tid });
+                    }
+                  } catch (e) {
+                    toast.error("Validación fallida.", { id: tid });
+                  }
+                } else {
+                  toast.error("Incorrecto, intenta de nuevo.");
+                  initCaptcha(); 
+                }
+              }}
+              style={{
+                fontSize: '40px', padding: '15px', borderRadius: '15px', 
+                background: '#1a1a1a', border: '2px solid #333', cursor: 'pointer',
+                transition: 'transform 0.1s'
+              }}
+            >
+              {item.icon}
+            </button>
+          ))}
+        </div>
+
+        <p style={{fontSize: '12px', color: '#555', marginTop: '40px'}}>
+          Esta verificación solo aparece la primera vez que inicies.
+        </p>
+      </div>
+    );
+  }
+
+  // Comprobamos qué misiones ya están guardadas en la base de datos
+  const isTickbitCompleted = userData?.missions_completed?.includes('tickbit');
+  const isGmailCompleted = userData?.missions_completed?.includes('gmail');
+
   return (
     <div style={s.container}>
-      <Toaster position="top-center" />
+      <Toaster position="top-center" reverseOrder={false} />
+
       <div style={s.main}>
-        
-        {/* HEADER */}
         <div style={s.profileHeader}>
-          <img src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} style={s.profileAvatar} alt="avatar" />
+          <img 
+            src={WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'} 
+            style={s.profileAvatar} 
+            alt="avatar"
+          />
           <div>
             <p style={s.profileName}>{userData?.username || 'Usuario'}</p>
             <p style={s.profileId}>ID: {userData?.id}</p>
           </div>
         </div>
 
-        {/* TAB: HOME */}
         {activeTab === 'home' && (
           <div className="fade-in">
-            <div style={s.cardBalance}>
-              <p style={{fontSize:'12px', fontWeight:'bold', opacity:0.8}}>SALDO DISPONIBLE</p>
-              <h1 style={{fontSize:'42px', margin:'10px 0', fontWeight:'900'}}>
-                {Number(userData?.balance || 0).toFixed(4)} <span style={{fontSize:'18px'}}>TON</span>
-              </h1>
-            </div>
-
-            <div style={s.actionGrid}>
-              <div style={s.actionCard} onClick={() => setView('withdraw')}>💸 RETIRO</div>
-              <div style={s.actionCard} onClick={handleBonus}>🎁 BONO</div>
-              <div style={s.actionCard} onClick={() => setView('history')}>📜 LOGS</div>
-            </div>
-
-            {/* CHECK DAILY */}
-            <div style={{...s.card, marginTop:'20px', border:'1px solid #ffcc00', backgroundColor:'rgba(255,204,0,0.05)'}}>
-              <h4 style={{margin:'0 0 10px 0', color:'#ffcc00'}}>🌟 Check Daily</h4>
-              <p style={{fontSize:'12px', color:'#888', marginBottom:'15px'}}>Comparte con un amigo o grupo para reclamar.</p>
-              {userData?.daily_claimed ? (
-                <button style={{...s.btnGreen, opacity:0.5}} disabled>COMPLETADO HOY</button>
-              ) : (
-                <div style={{display:'flex', gap:'10px'}}>
-                  <button style={{...s.btnOutline, flex:1, fontSize:'12px'}} onClick={handleShare}>1. COMPARTIR</button>
-                  <button 
-                    style={{...s.btnGreen, flex:1, fontSize:'12px', opacity: hasSharedDaily ? 1 : 0.5}} 
-                    onClick={handleClaimDaily}
-                  >
-                    2. RECLAMAR
-                  </button>
+            {view === 'main' ? (
+              <>
+                <div style={s.cardBalance}>
+                  <p style={{fontSize:'12px', fontWeight:'bold', letterSpacing:'1px', opacity:0.8}}>SALDO DISPONIBLE</p>
+                  <h1 style={{fontSize:'42px', margin:'10px 0', fontWeight:'900'}}>
+                    {Number(userData?.balance || 0).toFixed(4)} <span style={{fontSize:'18px'}}>TON</span>
+                  </h1>
+                  <div style={{fontSize:'12px', background:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:'10px', display:'inline-block'}}>
+                    Nivel: Usuario Elite ⚡
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div style={s.actionGrid}>
+                  <div style={s.actionCard} onClick={() => setView('withdraw')}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>💸</span>
+                    RETIRO
+                  </div>
+                  <div style={s.actionCard} onClick={handleBonus}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>🎁</span>
+                    BONO
+                  </div>
+                  <div style={s.actionCard} onClick={() => setView('history')}>
+                    <span style={{fontSize:'26px', marginBottom:'5px'}}>📜</span>
+                    HISTORIAL
+                  </div>
+                </div>
+
+                {/* --- SECCIÓN DE MISIONES --- */}
+                <div style={{ marginTop: '25px', textAlign: 'left' }}>
+                  <h3 style={{ fontSize: '15px', color: '#fff', marginBottom: '15px' }}>📋 Misiones Disponibles</h3>
+
+                  {/* MISIÓN 1: TickBit */}
+                  <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+                        🤖
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start TickBit Bot</p>
+                        <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {isTickbitCompleted ? (
+                        <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
+                          Completada
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
+                            onClick={() => handleOpenApp('tickbit', 'https://t.me/TickBitEarn_bot?start=ref_7517815832')}
+                          >
+                            Abrir App
+                          </button>
+                          <button 
+                            style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.tickbit ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.tickbit ? 1 : 0.6}}
+                            onClick={() => handleClaimMission('tickbit')}
+                          >
+                            Reclamar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* MISIÓN 2: Gmail Farmer */}
+                  <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+                        ✉️
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start Gmail Farmer</p>
+                        <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {isGmailCompleted ? (
+                        <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
+                          Completada
+                        </button>
+                      ) : (
+                        <>
+                          <button 
+                            style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
+                            onClick={() => handleOpenApp('gmail', 'https://t.me/GmailFarmerBot?start=7517815832')}
+                          >
+                            Abrir App
+                          </button>
+                          <button 
+                            style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.gmail ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.gmail ? 1 : 0.6}}
+                            onClick={() => handleClaimMission('gmail')}
+                          >
+                            Reclamar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </>
+            ) : view === 'withdraw' ? (
+              <div className="fade-in">
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
+                 <p style={s.helpText}>Mínimo de retiro: 0.01 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
+
+                 <input 
+                    style={s.input} 
+                    placeholder="Dirección de Wallet TON" 
+                    value={withdrawAddress}
+                    onChange={(e) => setWithdrawAddress(e.target.value)}
+                    disabled={isWithdrawing}
+                 />
+                 <input 
+                    style={s.input} 
+                    type="number" 
+                    placeholder="Monto" 
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={isWithdrawing}
+                    min="0.01"
+                 />
+                 <button 
+                    style={{...s.btnGreen, opacity: isWithdrawing ? 0.6 : 1}} 
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing}
+                 >
+                    {isWithdrawing ? "PROCESANDO PAGO..." : "ENVIAR SOLICITUD"}
+                 </button>
+                 <button 
+                    style={s.btnOutline} 
+                    onClick={() => setView('main')}
+                    disabled={isWithdrawing}
+                 >
+                    VOLVER AL INICIO
+                 </button>
+              </div>
+            ) : (
+              <div className="fade-in">
+                 <h2 style={{textAlign:'center', marginBottom:'20px'}}>Historial de Retiros</h2>
+                 {loadingHistory ? (
+                   <p style={{textAlign:'center'}}>Cargando transacciones...</p>
+                 ) : history.length > 0 ? (
+                   <div style={{maxHeight: '300px', overflowY: 'auto'}}>
+                     {history.map((tx, index) => (
+                       <div key={index} style={{...s.card, marginBottom: '10px', fontSize: '12px'}}>
+                          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
+                            <span style={{color:'#28a745', fontWeight:'bold'}}>+ {tx.amount} TON</span>
+                            <span style={{color:'#888'}}>{new Date(tx.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p style={{margin:0, color:'#555', wordBreak:'break-all'}}>Wallet: {tx.address}</p>
+                          <a 
+                            href={`https://tonscan.org/tx/${tx.tx_hash}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{color:'#0088cc', textDecoration:'none', display:'block', marginTop:'5px'}}
+                          >
+                            Ver en Explorer 🔗
+                          </a>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div style={{...s.card, textAlign:'center', color:'#555'}}>
+                      <p>No tienes retiros registrados aún.</p>
+                   </div>
+                 )}
+                 <button style={{...s.btnOutline, marginTop: '20px'}} onClick={() => setView('main')}>VOLVER</button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* TAB: MISIONES */}
-        {activeTab === 'missions' && (
-          <div className="fade-in">
-            <h3 style={{marginBottom:'20px', textAlign:'center'}}>Misiones Disponibles</h3>
-            
-            {/* MISIÓN 1: TICKBIT */}
-            <div style={{...s.card, marginBottom:'15px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <div>
-                <p style={{margin:0, fontWeight:'bold'}}>TickBit App</p>
-                <p style={{margin:0, fontSize:'12px', color:'#00ccff'}}>+0.001 TON</p>
-              </div>
-              <div style={{display:'flex', gap:'5px'}}>
-                {userData?.missions_completed?.includes('tickbit') ? (
-                  <span style={{color:'#28a745'}}>✅</span>
-                ) : (
-                  <>
-                    <button style={{...s.btnOutline, padding:'5px 10px', fontSize:'11px'}} onClick={() => handleOpenApp('tickbit', 'https://t.me/TickBitEarn_bot?start=ref_7517815832')}>ABRIR</button>
-                    <button style={{...s.btnGreen, padding:'5px 10px', fontSize:'11px', opacity: openedApps.tickbit ? 1 : 0.5}} onClick={() => handleClaimMission('tickbit')}>RECLAMAR</button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* MISIÓN 2: GMAIL FARMER */}
-            <div style={{...s.card, marginBottom:'15px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <div>
-                <p style={{margin:0, fontWeight:'bold'}}>Gmail Farmer</p>
-                <p style={{margin:0, fontSize:'12px', color:'#00ccff'}}>+0.001 TON</p>
-              </div>
-              <div style={{display:'flex', gap:'5px'}}>
-                {userData?.missions_completed?.includes('gmail') ? (
-                  <span style={{color:'#28a745'}}>✅</span>
-                ) : (
-                  <>
-                    <button style={{...s.btnOutline, padding:'5px 10px', fontSize:'11px'}} onClick={() => handleOpenApp('gmail', 'https://t.me/GmailFarmerBot?start=7517815832')}>ABRIR</button>
-                    <button style={{...s.btnGreen, padding:'5px 10px', fontSize:'11px', opacity: openedApps.gmail ? 1 : 0.5}} onClick={() => handleClaimMission('gmail')}>RECLAMAR</button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB: AMIGOS */}
         {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
       </div>
 
-      {/* NAVEGACIÓN INFERIOR */}
       <div style={s.bottomNav}>
-        <div onClick={() => setActiveTab('home')} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
-           <span>🏠</span><span style={{fontSize:'10px'}}>HOME</span>
-        </div>
-        <div onClick={() => setActiveTab('missions')} style={activeTab === 'missions' ? s.navItemActive : s.navItem}>
-           <span>🎯</span><span style={{fontSize:'10px'}}>MISIONES</span>
+        <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
+           <span style={{fontSize:'20px'}}>🏠</span><span>HOME</span>
         </div>
         <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
-           <span>👥</span><span style={{fontSize:'10px'}}>AMIGOS</span>
+           <span style={{fontSize:'20px'}}>👥</span><span>AMIGOS</span>
         </div>
       </div>
     </div>
