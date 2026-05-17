@@ -323,7 +323,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, c1: (n1 * 0.01).toFixed(4), n2, c2: (n2 * 0.003).toFixed(4), n3, c3: (n3 * 0.002).toFixed(4) },
+      stats: { n1, c1: (n1 * 0.003).toFixed(4), n2, c2: (n2 * 0.002).toFixed(4), n3, c3: (n3 * 0.001).toFixed(4) },
       channels: {
         c1: isMember1,
         c2: isMember2
