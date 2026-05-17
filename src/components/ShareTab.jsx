@@ -21,9 +21,9 @@ function ShareTab({ stats, handleShare }) {
         </div>
 
         <div style={s.row}>
-          <div style={s.box}>NIVEL 1<br /><b style={{ color: '#fff', fontSize: '12px' }}>0.01</b></div>
-          <div style={s.box}>NIVEL 2<br /><b style={{ color: '#fff', fontSize: '12px' }}>0.003</b></div>
-          <div style={s.box}>NIVEL 3<br /><b style={{ color: '#fff', fontSize: '12px' }}>0.002</b></div>
+          <div style={s.box}>NIVEL 1<br /><b style={{ color: '#fff', fontSize: '12px' }}>0.003</b></div>
+          <div style={s.box}>NIVEL 2<br /><b style={{ color: '#fff', fontSize: '12px' }}>0.002</b></div>
+          <div style={s.box}>NIVEL 3<br /><b style={{ color: '#fff', fontSize: '12px' }}>0.001</b></div>
         </div>
 
         <button style={s.btnGreen} onClick={handleShare}>
