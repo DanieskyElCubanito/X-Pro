@@ -273,22 +273,22 @@ export default async function handler(req, res) {
         if (dbUser.referred_by) {
           const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
           if (l1) {
-            // PAGO NIVEL 1: 0.005
-            await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.01 }).eq('id', l1.id);
+            // PAGO NIVEL 1: 0.003
+            await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.003 }).eq('id', l1.id);
             
             // Verifica que Nivel 2 exista y NO sea la misma persona que el Nivel 1 ni el usuario actual
             if (l1.referred_by && String(l1.referred_by) !== String(l1.id) && String(l1.referred_by) !== targetId) {
               const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
               if (l2) {
-                // PAGO NIVEL 2: 0.003
-                await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.003 }).eq('id', l2.id);
+                // PAGO NIVEL 2: 0.002
+                await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.002 }).eq('id', l2.id);
                 
                 // Verifica que Nivel 3 exista y no rompa la cadena
                 if (l2.referred_by && String(l2.referred_by) !== String(l2.id) && String(l2.referred_by) !== String(l1.id) && String(l2.referred_by) !== targetId) {
                   const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
                   if (l3) {
-                    // PAGO NIVEL 3: 0.002
-                    await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.002 }).eq('id', l3.id);
+                    // PAGO NIVEL 3: 0.001
+                    await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.001 }).eq('id', l3.id);
                   }
                 }
               }
