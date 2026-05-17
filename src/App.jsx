@@ -16,7 +16,7 @@ function App() {
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
 
   const [withdrawAddress, setWithdrawAddress] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('0.01');
+  const [withdrawAmount, setWithdrawAmount] = useState('0.25');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const [history, setHistory] = useState([]); 
