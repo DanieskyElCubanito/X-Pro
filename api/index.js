@@ -211,7 +211,7 @@ export default async function handler(req, res) {
         if (dbUser.referred_by) {
           const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
           if (l1) {
-            await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.003 }).eq('id', l1.id);
+            await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.03 }).eq('id', l1.id);
             if (l1.referred_by && String(l1.referred_by) !== String(l1.id) && String(l1.referred_by) !== targetId) {
               const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
               if (l2) {
