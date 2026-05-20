@@ -29,7 +29,7 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const [openedApps, setOpenedApps] = useState({ tickbit: false, gmail: false });
+  const [openedApps, setOpenedApps] = useState({ nexlegends: false, gmail: false });
   const initialized = useRef(false);
 
   const verifyUser = async (user, startParam) => {
