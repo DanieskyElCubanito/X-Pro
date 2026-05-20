@@ -293,9 +293,14 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} />}
-      
-      {/* CORRECCIÓN: Etiqueta de cierre añadida aquí para cerrar el div s.main */}
+        {activeTab === 'share' && (
+  <ShareTab 
+    stats={stats} 
+    handleShare={handleShare} 
+    userId={userData?.id}
+    totalReferralEarnings={userData?.ganancias_referidos} // <-- AQUÍ PASAS EL HISTORIAL REAL
+  />
+)}
       </div>
 
       <div style={s.bottomNav}>
