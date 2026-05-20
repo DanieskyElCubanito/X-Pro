@@ -7,15 +7,23 @@ import { s } from '../styles/appStyles';
 export default function DailyCheckIn({ userData, setUserData }) {
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState("");
-  const [canClaim, setCanClaim] = useState(true);
+  const [canClaim, setCanClaim] = useState(false); // 🔥 Corrección: Iniciamos en false para evitar parpadeos
 
   useEffect(() => {
-    if (!userData?.last_bonus) {
-      setCanClaim(true);
+    // Si los datos del usuario aún no han cargado desde el backend, protegemos el estado
+    if (!userData || !userData.id) {
+      setCanClaim(false);
       return;
     }
 
-    const interval = setInterval(() => {
+    // Si el usuario nunca ha reclamado un bono, habilitamos de inmediato
+    if (!userData.last_bonus) {
+      setCanClaim(true);
+      setCooldown("");
+      return;
+    }
+
+    const checkCooldown = () => {
       const now = Date.now();
       const lastBonusTime = new Date(userData.last_bonus).getTime();
       const timePassed = now - lastBonusTime;
@@ -24,24 +32,41 @@ export default function DailyCheckIn({ userData, setUserData }) {
       if (timePassed < twentyFourHours) {
         setCanClaim(false);
         const timeLeft = twentyFourHours - timePassed;
-        
+
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
         const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-        
+
         setCooldown(`${hours}h ${minutes}m ${seconds}s`);
+        return false; // No se puede reclamar
       } else {
         setCanClaim(true);
         setCooldown("");
-        clearInterval(interval);
+        return true; // Ya se puede reclamar
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(interval);
-  }, [userData?.last_bonus]);
+    // Ejecutamos la verificación inmediatamente al montar o actualizar datos
+    const available = checkCooldown();
+
+    // Solo activamos el intervalo de cuenta regresiva si el bono NO está disponible
+    let interval;
+    if (!available) {
+      interval = setInterval(() => {
+        const stillLocked = !checkCooldown();
+        if (!stillLocked && interval) {
+          clearInterval(interval);
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [userData]); // Escucha los cambios completos del objeto de usuario
 
   const handleDailyCheck = async () => {
-    if (!canClaim || loading) return;
+    if (!canClaim || loading || !userData?.id) return;
     setLoading(true);
 
     try {
@@ -84,6 +109,9 @@ export default function DailyCheckIn({ userData, setUserData }) {
     }
   };
 
+  // Determinamos si todo el componente está esperando datos globales
+  const isAppLoading = !userData || !userData.id;
+
   return (
     <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -95,19 +123,19 @@ export default function DailyCheckIn({ userData, setUserData }) {
       </div>
       <button 
         onClick={handleDailyCheck} 
-        disabled={!canClaim || loading}
+        disabled={!canClaim || loading || isAppLoading}
         style={{
           ...s.btnGreen,
           padding: '8px 16px',
           fontSize: '13px',
           width: 'auto',
-          backgroundColor: canClaim ? '#0088cc' : '#334455',
-          opacity: canClaim && !loading ? 1 : 0.6,
-          cursor: canClaim && !loading ? 'pointer' : 'not-allowed',
+          backgroundColor: canClaim && !isAppLoading ? '#0088cc' : '#334455',
+          opacity: canClaim && !loading && !isAppLoading ? 1 : 0.6,
+          cursor: canClaim && !loading && !isAppLoading ? 'pointer' : 'not-allowed',
           border: 'none'
         }}
       >
-        {loading ? "Cargando..." : canClaim ? "+0.001 TON" : cooldown}
+        {loading || isAppLoading ? "Cargando..." : canClaim ? "+0.001 TON" : cooldown}
       </button>
     </div>
   );
