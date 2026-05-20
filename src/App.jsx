@@ -5,6 +5,129 @@ import { botApi } from './api/botApi';
 import toast, { Toaster } from 'react-hot-toast'; 
 import ShareTab from './components/ShareTab';
 
+// ==========================================
+// COMPONENTE: CHECK DAILY (Bono con Anuncios)
+// ==========================================
+function DailyCheckIn({ userData, setUserData }) {
+  const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState("");
+  const [canClaim, setCanClaim] = useState(true);
+
+  useEffect(() => {
+    if (!userData?.last_bonus) {
+      setCanClaim(true);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const lastBonusTime = new Date(userData.last_bonus).getTime();
+      const timePassed = now - lastBonusTime;
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+
+      if (timePassed < twentyFourHours) {
+        setCanClaim(false);
+        const timeLeft = twentyFourHours - timePassed;
+        
+        const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        
+        setCooldown(`${hours}h ${minutes}m ${seconds}s`);
+      } else {
+        setCanClaim(true);
+        setCooldown("");
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [userData?.last_bonus]);
+
+  const handleDailyCheck = async () => {
+    if (!canClaim || loading) return;
+    setLoading(true);
+
+    try {
+      // 1. Forzar al usuario a compartir su enlace en Telegram
+      const userId = userData?.id || 'invitado';
+      const shareUrl = `https://t.me/IAProfitTonBot/app?startapp=${userId}`;
+      const shareText = encodeURIComponent("🚀 ¡Mira esta Mini App para ganar Toncoin diario con Inteligencia Artificial! Entra ya: 💎");
+      const telegramShareLink = `https://t.me/share/url?url=${shareUrl}&text=${shareText}`;
+
+      WebApp.openTelegramLink(telegramShareLink);
+
+      // Pequeña pausa para simular el regreso a la app
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // 2. Mostrar el anuncio obligatorio de GigaPub
+      if (typeof window.showGiga === 'function') {
+        const tid = toast.loading("Cargando recompensa...");
+        window.showGiga()
+          .then(async () => {
+            // El anuncio terminó con éxito -> Ejecutamos el reclamo en el Backend
+            const res = await botApi.claimBonus(userData.id);
+
+            if (res.success) {
+              toast.success("¡Bono diario reclamado con éxito! +0.001 TON", { id: tid });
+              setUserData(prev => ({
+                ...prev,
+                balance: res.newBalance,
+                last_bonus: new Date().toISOString()
+              }));
+            } else {
+              toast.error("Error al procesar el bono.", { id: tid });
+            }
+          })
+          .catch((err) => {
+            toast.error("⚠️ Debes ver el anuncio completo para recibir la recompensa.", { id: tid });
+            console.error("Error en GigaPub:", err);
+          })
+          .finally(() => setLoading(false));
+      } else {
+        toast.error("Error al cargar el sistema de anuncios.");
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Ocurrió un error inesperado.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ fontSize: '28px' }}>🎁</div>
+        <div>
+          <h4 style={{ margin: 0, fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>Check Daily</h4>
+          <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#888' }}>Comparte + Mira un Ad</p>
+        </div>
+      </div>
+      <button 
+        onClick={handleDailyCheck} 
+        disabled={!canClaim || loading}
+        style={{
+          ...s.btnGreen,
+          padding: '8px 16px',
+          fontSize: '13px',
+          width: 'auto',
+          backgroundColor: canClaim ? '#0088cc' : '#334455',
+          opacity: canClaim && !loading ? 1 : 0.6,
+          cursor: canClaim && !loading ? 'pointer' : 'not-allowed',
+          border: 'none'
+        }}
+      >
+        {loading ? "Cargando..." : canClaim ? "+0.001 TON" : cooldown}
+      </button>
+    </div>
+  );
+}
+
+
+// ==========================================
+// APLICACIÓN PRINCIPAL
+// ==========================================
 function App() {
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
@@ -144,21 +267,6 @@ function App() {
   useEffect(() => {
     if (view === 'history') fetchHistory();
   }, [view]);
-
-  const handleBonus = async () => {
-    if (!userData?.id) return toast.error("Usuario no cargado");
-    const tid = toast.loading("Reclamando bono...");
-    try {
-      const res = await botApi.claimBonus(userData.id);
-      if (res.success) {
-        setUserData(prev => ({ ...prev, balance: res.newBalance }));
-        toast.success("¡Bono recibido! +0.001 TON", { id: tid });
-      }
-    } catch (e) {
-      const msg = e.response?.data?.error || e.message || "Error de conexión";
-      toast.error(`Fallo: ${msg}`, { id: tid });
-    }
-  };
 
   const handleWithdraw = async () => {
     if (!withdrawAddress.trim()) return toast.error("Ingresa tu dirección TON");
@@ -324,7 +432,6 @@ function App() {
     );
   }
 
-  // Comprobamos qué misiones ya están guardadas en la base de datos
   const isTickbitCompleted = userData?.missions_completed?.includes('tickbit');
   const isGmailCompleted = userData?.missions_completed?.includes('gmail');
 
@@ -362,25 +469,26 @@ function App() {
                   </div>
                 </div>
 
-                <div style={s.actionGrid}>
+                {/* Modificamos el Grid para quitar el bono antiguo y usar dos botones más grandes */}
+                <div style={{...s.actionGrid, gridTemplateColumns: '1fr 1fr'}}>
                   <div style={s.actionCard} onClick={() => setView('withdraw')}>
                     <span style={{fontSize:'26px', marginBottom:'5px'}}>💸</span>
                     RETIRO
-                  </div>
-                  <div style={s.actionCard} onClick={handleBonus}>
-                    <span style={{fontSize:'26px', marginBottom:'5px'}}>🎁</span>
-                    BONO
                   </div>
                   <div style={s.actionCard} onClick={() => setView('history')}>
                     <span style={{fontSize:'26px', marginBottom:'5px'}}>📜</span>
                     HISTORIAL
                   </div>
                 </div>
+
+                {/* Nueva tarjeta del Bono Diario (Check Daily) */}
+                <DailyCheckIn userData={userData} setUserData={setUserData} />
+
               </>
             ) : view === 'withdraw' ? (
               <div className="fade-in">
                  <h2 style={{textAlign:'center', marginBottom:'20px'}}>Retirar Balance</h2>
-                 <p style={s.helpText}>Mínimo de retiro: 0.01 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
+                 <p style={s.helpText}>Mínimo de retiro: 0.25 TON. Asegúrate de usar una red TON (UQ... o EQ...).</p>
 
                  <input 
                     style={s.input} 
@@ -396,7 +504,7 @@ function App() {
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     disabled={isWithdrawing}
-                    min="0.01"
+                    min="0.25"
                  />
                  <button 
                     style={{...s.btnGreen, opacity: isWithdrawing ? 0.6 : 1}} 
