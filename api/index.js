@@ -276,7 +276,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. Estadísticas de referidos
+   // 4. Estadísticas de referidos
     const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
@@ -292,31 +292,20 @@ export default async function handler(req, res) {
       n3 = lv3?.length || 0;
     }
 
+    // Verificación de membresía en los canales
     const isMember1 = await checkMembership(targetId, "-1002228067712");
     const isMember2 = await checkMembership(targetId, "-1002049802477");
 
-const isMember1 = await checkMembership(targetId, "-1002228067712");
-    const isMember2 = await checkMembership(targetId, "-1002049802477");
-
-    // 🔥 NESTED FIX: Buscamos las misiones que este usuario ya completó en Supabase
+    // 🔥 FIX: Buscamos las misiones que este usuario ya completó en Supabase
     const { data: completedMissions } = await supabase
       .from('user_missions')
       .select('mission_id')
       .eq('user_id', targetId);
 
-    // Formateamos el resultado como un array simple de strings: ['tickbit', 'gmail']
-    // y se lo inyectamos a dbUser para que el frontend lo lea correctamente.
+    // Formateamos el resultado como un array de strings planos y se lo inyectamos a dbUser
     dbUser.missions_completed = completedMissions?.map(m => m.mission_id) || [];
 
-    return res.status(200).json({
-      success: true,
-      user: dbUser,
-      stats: { n1, c1: (n1 * 0.003).toFixed(4), n2, c2: (n2 * 0.002).toFixed(4), n3, c3: (n3 * 0.001).toFixed(4) },
-      channels: {
-        c1: isMember1,
-        c2: isMember2
-      }
-    });
+    // Respuesta única al frontend
     return res.status(200).json({
       success: true,
       user: dbUser,
@@ -331,4 +320,3 @@ const isMember1 = await checkMembership(targetId, "-1002228067712");
     return res.status(500).json({ error: error.message });
   }
 }
-
