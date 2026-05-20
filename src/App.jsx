@@ -147,10 +147,9 @@ function App() {
         toast.success("¡Misión completada! +0.001 TON", { id: tid });
       }
     } catch (e) {
-      toast.error(e.response?.data?.error || "Error al verificar la misión", { id: tid });
-    }
-  };
-
+  console.log("Error detallado:", e); // Esto te dirá qué está pasando realmente
+  toast.error(e.message || "Error al verificar", { id: tid });
+}
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
   if (status === 'error') {
