@@ -293,8 +293,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
-      </div>
+        {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} />}
 
       <div style={s.bottomNav}>
         <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}><span style={{fontSize:'20px'}}>🏠</span><span>HOME</span></div>
