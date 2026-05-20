@@ -29,7 +29,7 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const [openedApps, setOpenedApps] = useState({ nexlegends: false, gmail: false });
+  const [openedApps, setOpenedApps] = useState({ 'Nex Legends': false, gmail: false });
   const initialized = useRef(false);
 
   const verifyUser = async (user, startParam) => {
@@ -167,7 +167,7 @@ function App() {
   if (mustJoin) return <ChannelJoin channelStatus={channelStatus} setChannelStatus={setChannelStatus} userData={userData} setMustJoin={setMustJoin} />;
   if (!isHuman && status === 'member') return <CaptchaVerification userData={userData} setIsHuman={setIsHuman} />;
 
-  const isTickbitCompleted = userData?.missions_completed?.includes('tickbit');
+  const isNexLegendsCompleted = userData?.missions_completed?.includes('Nex Legends');
   const isGmailCompleted = userData?.missions_completed?.includes('gmail');
 
   return (
@@ -259,12 +259,12 @@ function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {isTickbitCompleted ? (
+                {isNexLegendsCompleted ? (
                   <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5}} disabled>Completada</button>
                 ) : (
                   <>
                     <button style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff'}} onClick={() => handleOpenApp('Nex Legends', 'https://t.me/nexlegendsbot/hunt?startapp=7517815832')}>Abrir App</button>
-                    <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.tickbit ? '#0088cc' : '#334455', opacity: openedApps.tickbit ? 1 : 0.6}} onClick={() => handleClaimMission('tickbit')}>Reclamar</button>
+                    <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps['Nex Legends'] ? '#0088cc' : '#334455', opacity: openedApps['Nex Legends'] ? 1 : 0.6}} onClick={() => handleClaimMission('Nex Legends')}>Reclamar</button>
                   </>
                 )}
               </div>
@@ -294,13 +294,13 @@ function App() {
         )}
 
         {activeTab === 'share' && (
-  <ShareTab 
-    stats={stats} 
-    handleShare={handleShare} 
-    userId={userData?.id}
-    totalReferralEarnings={userData?.ganancias_referidos} // <-- AQUÍ PASAS EL HISTORIAL REAL
-  />
-)}
+          <ShareTab 
+            stats={stats} 
+            handleShare={handleShare} 
+            userId={userData?.id}
+            totalReferralEarnings={userData?.ganancias_referidos}
+          />
+        )}
       </div>
 
       <div style={s.bottomNav}>
