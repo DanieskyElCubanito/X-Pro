@@ -25,7 +25,6 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('');
 
   // --- ESTADOS DE MISIONES ---
-  // Controla si el usuario ya tocó "Abrir App" en esta sesión
   const [openedApps, setOpenedApps] = useState({ tickbit: false, gmail: false });
 
   const [captchaTarget, setCaptchaTarget] = useState(null);
@@ -197,7 +196,6 @@ function App() {
   // --- LÓGICA DE MISIONES ---
   const handleOpenApp = (missionId, url) => {
     WebApp.openTelegramLink(url);
-    // Marcamos que ya abrió el enlace para habilitar el botón de reclamar
     setOpenedApps(prev => ({ ...prev, [missionId]: true }));
   };
 
@@ -213,7 +211,6 @@ function App() {
         setUserData(prev => ({ 
           ...prev, 
           balance: res.newBalance,
-          // Agregamos la misión a las completadas localmente
           missions_completed: [...(prev.missions_completed || []), missionId] 
         }));
         toast.success("¡Misión completada! +0.001 TON", { id: tid });
@@ -348,6 +345,9 @@ function App() {
           </div>
         </div>
 
+        {/* =====================
+            PESTAÑA: HOME 
+            ===================== */}
         {activeTab === 'home' && (
           <div className="fade-in">
             {view === 'main' ? (
@@ -375,82 +375,6 @@ function App() {
                     <span style={{fontSize:'26px', marginBottom:'5px'}}>📜</span>
                     HISTORIAL
                   </div>
-                </div>
-
-                {/* --- SECCIÓN DE MISIONES --- */}
-                <div style={{ marginTop: '25px', textAlign: 'left' }}>
-                  <h3 style={{ fontSize: '15px', color: '#fff', marginBottom: '15px' }}>📋 Misiones Disponibles</h3>
-
-                  {/* MISIÓN 1: TickBit */}
-                  <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
-                        🤖
-                      </div>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start TickBit Bot</p>
-                        <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {isTickbitCompleted ? (
-                        <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
-                          Completada
-                        </button>
-                      ) : (
-                        <>
-                          <button 
-                            style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
-                            onClick={() => handleOpenApp('tickbit', 'https://t.me/TickBitEarn_bot?start=ref_7517815832')}
-                          >
-                            Abrir App
-                          </button>
-                          <button 
-                            style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.tickbit ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.tickbit ? 1 : 0.6}}
-                            onClick={() => handleClaimMission('tickbit')}
-                          >
-                            Reclamar
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* MISIÓN 2: Gmail Farmer */}
-                  <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
-                        ✉️
-                      </div>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start Gmail Farmer</p>
-                        <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {isGmailCompleted ? (
-                        <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
-                          Completada
-                        </button>
-                      ) : (
-                        <>
-                          <button 
-                            style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
-                            onClick={() => handleOpenApp('gmail', 'https://t.me/GmailFarmerBot?start=7517815832')}
-                          >
-                            Abrir App
-                          </button>
-                          <button 
-                            style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.gmail ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.gmail ? 1 : 0.6}}
-                            onClick={() => handleClaimMission('gmail')}
-                          >
-                            Reclamar
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
                 </div>
               </>
             ) : view === 'withdraw' ? (
@@ -525,12 +449,105 @@ function App() {
           </div>
         )}
 
+        {/* =====================
+            PESTAÑA: MISIONES 
+            ===================== */}
+        {activeTab === 'missions' && (
+          <div className="fade-in" style={{ marginTop: '10px', textAlign: 'left' }}>
+            <div style={{textAlign: 'center', marginBottom: '20px'}}>
+              <h2 style={{ margin: 0, color: '#fff' }}>📋 Panel de Misiones</h2>
+              <p style={{ color: '#888', fontSize: '13px', marginTop: '5px' }}>
+                Completa estas tareas para sumar TON extra a tu balance.
+              </p>
+            </div>
+
+            {/* MISIÓN 1: TickBit */}
+            <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+                  🤖
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start TickBit Bot</p>
+                  <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {isTickbitCompleted ? (
+                  <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
+                    Completada
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
+                      onClick={() => handleOpenApp('tickbit', 'https://t.me/TickBitEarn_bot?start=ref_7517815832')}
+                    >
+                      Abrir App
+                    </button>
+                    <button 
+                      style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.tickbit ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.tickbit ? 1 : 0.6}}
+                      onClick={() => handleClaimMission('tickbit')}
+                    >
+                      Reclamar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* MISIÓN 2: Gmail Farmer */}
+            <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+                  ✉️
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Start Gmail Farmer</p>
+                  <p style={{ margin: 0, color: '#00ccff', fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>⚡ +0.001 TON</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {isGmailCompleted ? (
+                  <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, cursor: 'not-allowed'}} disabled>
+                    Completada
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff', backgroundColor: 'transparent'}}
+                      onClick={() => handleOpenApp('gmail', 'https://t.me/GmailFarmerBot?start=7517815832')}
+                    >
+                      Abrir App
+                    </button>
+                    <button 
+                      style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps.gmail ? '#0088cc' : '#334455', color: '#fff', border: 'none', opacity: openedApps.gmail ? 1 : 0.6}}
+                      onClick={() => handleClaimMission('gmail')}
+                    >
+                      Reclamar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =====================
+            PESTAÑA: AMIGOS (SHARE) 
+            ===================== */}
         {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} />}
       </div>
 
+      {/* =====================
+          NAVEGACIÓN INFERIOR 
+          ===================== */}
       <div style={s.bottomNav}>
         <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}>
            <span style={{fontSize:'20px'}}>🏠</span><span>HOME</span>
+        </div>
+        <div onClick={() => setActiveTab('missions')} style={activeTab === 'missions' ? s.navItemActive : s.navItem}>
+           <span style={{fontSize:'20px'}}>📋</span><span>MISIONES</span>
         </div>
         <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
            <span style={{fontSize:'20px'}}>👥</span><span>AMIGOS</span>
