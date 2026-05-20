@@ -15,9 +15,6 @@ const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b8
 const PAYMENTS_CHANNEL = "-1002352835078";
 const ADMIN_MNEMONIC = "gap chest saddle logic gesture better vapor chicken major math way clinic quick hero host rule bulb image there gallery sniff ecology will film";
 
-// --- CLAVES DE CLOUDFLARE TURNSTILE ---
-const CF_SECRET_KEY = "0x4AAAAAACqyiO0Gk6OnxaaGFcIZIYIxRnk";
-
 async function checkMembership(userId, chatId) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${userId}`;
@@ -55,8 +52,6 @@ export default async function handler(req, res) {
     // --- ACCIÓN: VERIFICAR HUMANO ---
     if (action === 'verify-human') {
       if (!captchaToken) return res.status(400).json({ error: 'Falta el token de seguridad' });
-
-      // Verificamos nuestra clave de seguridad interna nativa
       if (captchaToken !== 'app-verified-fast') {
         return res.status(403).json({ error: 'Validación de captcha fallida' });
       }
@@ -80,6 +75,32 @@ export default async function handler(req, res) {
         channel2: isMember2,
         allJoined: isMember1 && isMember2
       });
+    }
+
+    // --- ACCIÓN: RECLAMAR MISIÓN ---
+    if (action === 'claim-mission') {
+      const { missionId } = req.body;
+      if (!missionId) return res.status(400).json({ error: 'Falta ID de la misión' });
+
+      const { data: existingMission } = await supabase
+        .from('user_missions')
+        .select('id')
+        .eq('user_id', String(userId))
+        .eq('mission_id', missionId)
+        .single();
+
+      if (existingMission) {
+        return res.status(400).json({ error: 'Ya completaste esta misión.' });
+      }
+
+      const reward = 0.001;
+      const { data: currentUser } = await supabase.from('users').select('balance').eq('id', String(userId)).single();
+      const newBalance = (currentUser?.balance || 0) + reward;
+      
+      await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+      await supabase.from('user_missions').insert([{ user_id: String(userId), mission_id: missionId }]);
+
+      return res.status(200).json({ success: true, newBalance });
     }
 
     // --- ACCIÓN: COBRAR BONO DIARIO ---
@@ -115,9 +136,7 @@ export default async function handler(req, res) {
         const feeReserve = toNano('0.05');
 
         if (walletBalance < (amountInNano + feeReserve)) {
-          return res.status(500).json({ 
-            error: "El sistema está en mantenimiento de liquidez. Intenta más tarde." 
-          });
+          return res.status(500).json({ error: "El sistema está en mantenimiento de liquidez. Intenta más tarde." });
         }
 
         const seqno = await wallet.getSeqno();
@@ -149,10 +168,7 @@ export default async function handler(req, res) {
       if (txHash) {
         const newBalance = Number(u.balance) - withdrawAmount;
         await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
-
-        await supabase.from('withdrawals').insert([{ 
-          user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() 
-        }]);
+        await supabase.from('withdrawals').insert([{ user_id: String(userId), amount: withdrawAmount, status: 'SUCCESS', tx_hash: txHash, address: address.trim() }]);
 
         const displayName = u.username ? `@${u.username}` : userId;
         const messageText = `<b>💎 PAGO VERIFICADO EXITOSAMENTE</b>\n\n` +
@@ -168,11 +184,7 @@ export default async function handler(req, res) {
             text: messageText,
             parse_mode: 'HTML',
             disable_web_page_preview: true,
-            reply_markup: {
-              inline_keyboard: [[
-                { text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }
-              ]]
-            }
+            reply_markup: { inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }]] }
         }).catch(e => console.log("Error enviando a canal de pagos"));
 
         return res.status(200).json({ success: true, txHash });
@@ -187,13 +199,7 @@ export default async function handler(req, res) {
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
     if (!dbUser) {
-      const newUserObj = { 
-        id: targetId, 
-        username: targetUser.username || 'Usuario', 
-        balance: 0,
-        is_human: false
-      };
-
+      const newUserObj = { id: targetId, username: targetUser.username || 'Usuario', balance: 0, is_human: false };
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
       }
@@ -202,26 +208,17 @@ export default async function handler(req, res) {
 
       if (!insertError && newUser) {
         dbUser = newUser;
-
-        // 3. Distribución de comisiones con PROTECCIÓN ANTI-BUCLE
         if (dbUser.referred_by) {
           const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
           if (l1) {
-            // PAGO NIVEL 1: 0.003
             await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.003 }).eq('id', l1.id);
-
-            // Verifica que Nivel 2 exista y NO sea la misma persona que el Nivel 1 ni el usuario actual
             if (l1.referred_by && String(l1.referred_by) !== String(l1.id) && String(l1.referred_by) !== targetId) {
               const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
               if (l2) {
-                // PAGO NIVEL 2: 0.002
                 await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.002 }).eq('id', l2.id);
-
-                // Verifica que Nivel 3 exista y no rompa la cadena
                 if (l2.referred_by && String(l2.referred_by) !== String(l2.id) && String(l2.referred_by) !== String(l1.id) && String(l2.referred_by) !== targetId) {
                   const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
                   if (l3) {
-                    // PAGO NIVEL 3: 0.001
                     await supabase.from('users').update({ balance: Number(l3.balance || 0) + 0.001 }).eq('id', l3.id);
                   }
                 }
@@ -235,7 +232,6 @@ export default async function handler(req, res) {
       }
     }
 
-   // 4. Estadísticas de referidos
     const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
     const ids1 = lv1?.map(u => u.id) || [];
@@ -251,19 +247,22 @@ export default async function handler(req, res) {
       n3 = lv3?.length || 0;
     }
 
-    // Verificación de membresía en los canales
     const isMember1 = await checkMembership(targetId, "-1002228067712");
     const isMember2 = await checkMembership(targetId, "-1002049802477");
 
-    // Respuesta única al frontend
+    // 🔥 SOLUCIÓN ERROR 1: Buscamos y adjuntamos las misiones completadas
+    const { data: completedMissions } = await supabase
+      .from('user_missions')
+      .select('mission_id')
+      .eq('user_id', targetId);
+
+    dbUser.missions_completed = completedMissions?.map(m => m.mission_id) || [];
+
     return res.status(200).json({
       success: true,
       user: dbUser,
       stats: { n1, c1: (n1 * 0.003).toFixed(4), n2, c2: (n2 * 0.002).toFixed(4), n3, c3: (n3 * 0.001).toFixed(4) },
-      channels: {
-        c1: isMember1,
-        c2: isMember2
-      }
+      channels: { c1: isMember1, c2: isMember2 }
     });
 
   } catch (error) {
