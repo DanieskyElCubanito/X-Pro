@@ -37,9 +37,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const forwarded = req.headers["x-forwarded-for"];
-  const clientIp = forwarded ? forwarded.split(/, /)[0] : req.socket?.remoteAddress || 'unknown';
-
   try {
     const { user, action, userId, amount, address, start_param, captchaToken } = req.body; 
 
@@ -85,7 +82,7 @@ export default async function handler(req, res) {
       });
     }
 
-// --- ACCIÓN: RECLAMAR MISIÓN ---
+    // --- ACCIÓN: RECLAMAR MISIÓN ---
     if (action === 'claim-mission') {
       const { missionId } = req.body;
       if (!missionId) return res.status(400).json({ error: 'Falta ID de la misión' });
@@ -97,7 +94,7 @@ export default async function handler(req, res) {
         .eq('user_id', String(userId))
         .eq('mission_id', missionId)
         .single();
-      
+
       if (existingMission) {
         return res.status(400).json({ error: 'Ya completaste esta misión antes.' });
       }
@@ -125,6 +122,7 @@ export default async function handler(req, res) {
       const { data: updatedUser } = await supabase.from('users').select('balance').eq('id', String(userId)).single();
       return res.status(200).json({ success: true, newBalance: updatedUser.balance });
     }
+
     // --- ACCIÓN: COBRAR BONO DIARIO ---
     if (action === 'claim-bonus') {
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
@@ -138,7 +136,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, newBalance: newB });
     }
 
-   // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
+    // --- ACCIÓN: RETIRO REAL BLOCKCHAIN ---
     if (action === 'withdraw') {
       const withdrawAmount = parseFloat(amount);
       const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
@@ -222,7 +220,7 @@ export default async function handler(req, res) {
       }
     }
 
-   // --- ACCIÓN: REGISTRO / LOGIN (ESTRUCTURA ORIGINAL CON FIX DE PAGO Y ANTI-BUCLE) ---
+    // --- ACCIÓN: REGISTRO / LOGIN (ESTRUCTURA ORIGINAL CON FIX DE PAGO Y ANTI-BUCLE) ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
@@ -230,34 +228,11 @@ export default async function handler(req, res) {
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
     if (!dbUser) {
-      if (clientIp && clientIp !== 'unknown') {
-        try {
-          const ipCheck = await axios.get(`http://ip-api.com/json/${clientIp}?fields=proxy,hosting`);
-          if (ipCheck.data.proxy || ipCheck.data.hosting) {
-            return res.status(403).json({ 
-              success: false, 
-              message: 'Acceso denegado: Por favor, desactiva tu VPN o Proxy para entrar.' 
-            });
-          }
-
-          const { data: existingIp } = await supabase.from('users').select('id').eq('ip_address', clientIp).limit(1);
-          if (existingIp && existingIp.length > 0) {
-            return res.status(403).json({ 
-              success: false, 
-              message: 'Seguridad: Ya existe una cuenta registrada con esta conexión a internet.' 
-            });
-          }
-        } catch (ipError) {
-          console.error("Error validando IP:", ipError.message);
-        }
-      }
-
       const newUserObj = { 
         id: targetId, 
         username: targetUser.username || 'Usuario', 
         balance: 0,
-        is_human: false,
-        ip_address: clientIp 
+        is_human: false
       };
 
       if (start_param && String(start_param) !== targetId) {
@@ -268,21 +243,21 @@ export default async function handler(req, res) {
 
       if (!insertError && newUser) {
         dbUser = newUser;
-        
+
         // 3. Distribución de comisiones con PROTECCIÓN ANTI-BUCLE
         if (dbUser.referred_by) {
           const { data: l1 } = await supabase.from('users').select('id, balance, referred_by').eq('id', dbUser.referred_by).single();
           if (l1) {
             // PAGO NIVEL 1: 0.003
             await supabase.from('users').update({ balance: Number(l1.balance || 0) + 0.003 }).eq('id', l1.id);
-            
+
             // Verifica que Nivel 2 exista y NO sea la misma persona que el Nivel 1 ni el usuario actual
             if (l1.referred_by && String(l1.referred_by) !== String(l1.id) && String(l1.referred_by) !== targetId) {
               const { data: l2 } = await supabase.from('users').select('id, balance, referred_by').eq('id', l1.referred_by).single();
               if (l2) {
                 // PAGO NIVEL 2: 0.002
                 await supabase.from('users').update({ balance: Number(l2.balance || 0) + 0.002 }).eq('id', l2.id);
-                
+
                 // Verifica que Nivel 3 exista y no rompa la cadena
                 if (l2.referred_by && String(l2.referred_by) !== String(l2.id) && String(l2.referred_by) !== String(l1.id) && String(l2.referred_by) !== targetId) {
                   const { data: l3 } = await supabase.from('users').select('id, balance').eq('id', l2.referred_by).single();
@@ -334,3 +309,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 }
+
