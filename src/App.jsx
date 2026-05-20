@@ -294,6 +294,9 @@ function App() {
         )}
 
         {activeTab === 'share' && <ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} />}
+      
+      {/* CORRECCIÓN: Etiqueta de cierre añadida aquí para cerrar el div s.main */}
+      </div>
 
       <div style={s.bottomNav}>
         <div onClick={() => { setActiveTab('home'); setView('main'); }} style={activeTab === 'home' ? s.navItemActive : s.navItem}><span style={{fontSize:'20px'}}>🏠</span><span>HOME</span></div>
