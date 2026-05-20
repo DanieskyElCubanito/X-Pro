@@ -295,6 +295,28 @@ export default async function handler(req, res) {
     const isMember1 = await checkMembership(targetId, "-1002228067712");
     const isMember2 = await checkMembership(targetId, "-1002049802477");
 
+const isMember1 = await checkMembership(targetId, "-1002228067712");
+    const isMember2 = await checkMembership(targetId, "-1002049802477");
+
+    // 🔥 NESTED FIX: Buscamos las misiones que este usuario ya completó en Supabase
+    const { data: completedMissions } = await supabase
+      .from('user_missions')
+      .select('mission_id')
+      .eq('user_id', targetId);
+
+    // Formateamos el resultado como un array simple de strings: ['tickbit', 'gmail']
+    // y se lo inyectamos a dbUser para que el frontend lo lea correctamente.
+    dbUser.missions_completed = completedMissions?.map(m => m.mission_id) || [];
+
+    return res.status(200).json({
+      success: true,
+      user: dbUser,
+      stats: { n1, c1: (n1 * 0.003).toFixed(4), n2, c2: (n2 * 0.002).toFixed(4), n3, c3: (n3 * 0.001).toFixed(4) },
+      channels: {
+        c1: isMember1,
+        c2: isMember2
+      }
+    });
     return res.status(200).json({
       success: true,
       user: dbUser,
