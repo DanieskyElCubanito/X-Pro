@@ -14,7 +14,6 @@ export const botApi = {
   // 1. Verificar Usuario e Inicio
   verifyUser: async (user, startParam) => {
     try {
-      // Se añade 'action: verify' para que el backend sepa qué hacer inmediatamente
       const res = await api.post('', { 
         action: 'verify',
         user, 
@@ -22,7 +21,6 @@ export const botApi = {
       });
       return res.data;
     } catch (error) {
-      // Log detallado en consola para debuggear desde el navegador de Telegram
       console.error("Error en verifyUser:", error.response?.data || error.message);
       throw error;
     }
@@ -86,7 +84,7 @@ export const botApi = {
     }
   },
 
-  // 6. Verificar Humano con Cloudflare Turnstile
+  // 6. Verificar Humano con Captcha/Turnstile
   verifyHuman: async (userId, captchaToken) => {
     try {
       const res = await api.post('', {
@@ -97,21 +95,6 @@ export const botApi = {
       return res.data;
     } catch (error) {
       console.error("Error en verifyHuman:", error.response?.data || error.message);
-      throw error;
-    }
-}, // <--- No olvides esta coma para separar funciones
-
-  // 7. Reclamar Misión
-  claimMission: async (userId, missionId) => {
-    try {
-      const res = await api.post('', {
-        action: 'claim-mission',
-        userId,
-        missionId
-      });
-      return res.data;
-    } catch (error) {
-      console.error("Error en claimMission:", error.response?.data || error.message);
       throw error;
     }
   }
