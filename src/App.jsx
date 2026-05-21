@@ -147,9 +147,12 @@ function App() {
         toast.success("¡Misión completada! +0.001 TON", { id: tid });
       }
     } catch (e) {
-  console.log("Error detallado:", e); // Esto te dirá qué está pasando realmente
-  toast.error(e.message || "Error al verificar", { id: tid });
-}
+      console.log("Error detallado:", e); 
+      toast.error(e.message || "Error al verificar", { id: tid });
+    }
+  }; // LLAVE DE CIERRE AGREGADA A LA FUNCIÓN handleClaimMission
+
+  // ESTOS BLOQUES ESTÁN AHORA FUERA DE LA FUNCIÓN ANTERIOR
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
 
   if (status === 'error') {
