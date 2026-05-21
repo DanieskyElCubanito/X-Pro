@@ -97,6 +97,21 @@ export const botApi = {
       console.error("Error en verifyHuman:", error.response?.data || error.message);
       throw error;
     }
+  },
+
+  // 7. Reclamar Misión (¡ESTA ES LA QUE FALTABA!)
+  claimMission: async (userId, missionId) => {
+    try {
+      const res = await api.post('', {
+        action: 'claim-mission', // <-- Asegúrate de que tu backend espera este nombre de acción
+        userId,
+        missionId
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en claimMission:", error.response?.data || error.message);
+      throw error;
+    }
   }
 };
 
