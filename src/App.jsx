@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
-import fpPromise from '@fingerprintjs/fingerprintjs'; // <-- Importamos FingerprintJS
+import { FingerprintJS } from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
 import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
