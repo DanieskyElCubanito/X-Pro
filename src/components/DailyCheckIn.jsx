@@ -71,7 +71,7 @@ export default function DailyCheckIn({ userData, setUserData }) {
 
     try {
       const userId = userData?.id || 'invitado';
-      const shareUrl = `https://t.me/IAProfitTonBot/app?startapp=${userId}`;
+      const shareUrl = `https://t.me/Xokpro_Bot/app?startapp=${userId}`;
       const shareText = encodeURIComponent("🚀 ¡Mira esta Mini App para ganar Toncoin diario con Inteligencia Artificial! Entra ya: 💎");
       const telegramShareLink = `https://t.me/share/url?url=${shareUrl}&text=${shareText}`;
 
