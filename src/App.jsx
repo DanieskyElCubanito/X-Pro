@@ -4,7 +4,7 @@ import fpPromise from '@fingerprintjs/fingerprintjs'; // <-- Importamos Fingerpr
 import toast, { Toaster } from 'react-hot-toast'; 
 import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
-
+ 
 // Subcomponentes importados
 import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';
