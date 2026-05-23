@@ -1,8 +1,14 @@
 import { s } from '../styles/appStyles';
 
 export default function MissionsTab({ userData, openedApps, handleOpenApp, handleClaimMission }) {
+  // Estado de misiones existentes
   const isNexLegendsCompleted = userData?.missions_completed?.includes('Nex Legends');
   const isGmailCompleted = userData?.missions_completed?.includes('gmail');
+  
+  // Estado de las nuevas misiones
+  const isCandyCompleted = userData?.missions_completed?.includes('candy');
+  const isEarnStarsCompleted = userData?.missions_completed?.includes('earn_stars');
+  const isGemFluxCompleted = userData?.missions_completed?.includes('gemflux');
 
   const MissionCard = ({ icon, title, isCompleted, missionId, url }) => (
     <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
@@ -31,8 +37,15 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
       <div style={{textAlign: 'center', marginBottom: '20px'}}>
         <h2 style={{ margin: 0, color: '#fff' }}>📋 Panel de Misiones</h2>
       </div>
+      
+      {/* Misiones Existentes */}
       <MissionCard icon="🤖" title="Start Nex Legends" isCompleted={isNexLegendsCompleted} missionId="Nex Legends" url="https://t.me/nexlegendsbot/hunt?startapp=7517815832" />
       <MissionCard icon="✉️" title="Start Gmail Farmer" isCompleted={isGmailCompleted} missionId="gmail" url="https://t.me/GmailFarmerBot?start=7517815832" />
+      
+      {/* Nuevas Misiones */}
+      <MissionCard icon="🍬" title="Dulce (CANDY)" isCompleted={isCandyCompleted} missionId="candy" url="https://t.me/dulcecandybot?start=7517815832" />
+      <MissionCard icon="⭐" title="Earn Stars" isCompleted={isEarnStarsCompleted} missionId="earn_stars" url="https://t.me/EarnStarsAppBot/?startapp=ref_3gbwvtk" />
+      <MissionCard icon="💎" title="GemFlux" isCompleted={isGemFluxCompleted} missionId="gemflux" url="https://t.me/GemFlux_bot/app?startapp=7517815832" />
     </div>
   );
 }
