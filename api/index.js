@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     // --- ACCIÓN: VERIFICAR CANALES ---
     if (action === 'check-channels') {
       const isMember1 = await checkMembership(userId, "-1002228067712");
-      const isMember2 = await checkMembership(userId, "-1002049802477");
+      const isMember2 = await checkMembership(userId, "-1003747302094");
       return res.status(200).json({
         success: true,
         channel1: isMember1,
@@ -148,7 +148,7 @@ export default async function handler(req, res) {
             to: address.trim(),
             value: amountInNano, 
             bounce: false,
-            body: "IA Profit Payment ✅",
+            body: "X Pro 💰",
           })]
         });
 
@@ -184,7 +184,7 @@ export default async function handler(req, res) {
             text: messageText,
             parse_mode: 'HTML',
             disable_web_page_preview: true,
-            reply_markup: { inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/IAProfitTonBot/app" }]] }
+            reply_markup: { inline_keyboard: [[{ text: "💰 ¡QUIERO GANAR TON AHORA!", url: "https://t.me/Xokpro_Bot/app" }]] }
         }).catch(e => console.log("Error enviando a canal de pagos"));
 
         return res.status(200).json({ success: true, txHash });
@@ -248,7 +248,7 @@ export default async function handler(req, res) {
     }
 
     const isMember1 = await checkMembership(targetId, "-1002228067712");
-    const isMember2 = await checkMembership(targetId, "-1002049802477");
+    const isMember2 = await checkMembership(targetId, "-1003747302094");
 
     // 🔥 SOLUCIÓN ERROR 1: Buscamos y adjuntamos las misiones completadas
     const { data: completedMissions } = await supabase
