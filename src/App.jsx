@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
-import { FingerprintJS } from '@fingerprintjs/fingerprintjs';
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
 import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
@@ -51,7 +51,7 @@ function App() {
 
       // 2. Enviamos el user, el referido y la huella digital al backend
       const data = await botApi.verifyUser(user, startParam, deviceId);
-      
+
       if (data.success) {
         setUserData(data.user);
         setStats(data.stats);
