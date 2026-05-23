@@ -143,7 +143,7 @@ function App() {
 
   // --- LÓGICA DE MISIONES Y COMPARTIR ---
   const handleShare = () => {
-    const inviteLink = `https://t.me/IAProfitTonBot/app?startapp=${userData?.id}`;
+    const inviteLink = `https://t.me/Xokpro_Bot/app?startapp=${userData?.id}`;
     const text = "¡Gana TON gratis con esta App! 💎";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
