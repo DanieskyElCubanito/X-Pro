@@ -1,5 +1,5 @@
 {
-  "name": "ia-profit-ton",
+  "name": "X-Pro",
   "version": "1.0.0",
   "private": true,
   "type": "module", 
@@ -12,6 +12,7 @@
     "node": "20.x"
   },
   "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^4.5.1",
     "@marsidev/react-turnstile": "^0.7.0",
     "@supabase/supabase-js": "^2.45.4",
     "@ton/crypto": "^3.3.0",
