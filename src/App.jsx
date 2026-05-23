@@ -45,7 +45,7 @@ function App() {
   const verifyUser = async (user, startParam) => {
     try {
       // 1. Generamos la huella digital local del dispositivo
-      const fp = await fpPromise.load();
+      const fp = await FingerprintJS.load();
       const result = await fp.get();
       const deviceId = result.visitorId;
 
