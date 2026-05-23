@@ -40,8 +40,8 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
         )}
         {!channelStatus.c2 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>👑𝘾𝙧𝙮𝙥𝙩𝙤 𝙞𝙣𝙫𝙚𝙨𝙩𝙢𝙚𝙣𝙩𝙨👑</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/CryptoInvestmentsWebs')}>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Finanzas Con Danny</p>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/FinanzaConDanny')}>
               UNIRME CANAL 2
             </button>
           </div>
