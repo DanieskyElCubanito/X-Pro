@@ -84,13 +84,13 @@ export const botApi = {
     }
   },
 
-  // 6. Verificar Humano con Captcha/Turnstile
-  verifyHuman: async (userId, captchaToken) => {
+  // 6. Verificar Humano con Captcha 3 Pasos
+  verifyHuman: async (userId, method) => {
     try {
       const res = await api.post('', {
         action: 'verify-human',
         userId,
-        captchaToken 
+        method // Enviará 'app-verified-3step'
       });
       return res.data;
     } catch (error) {
@@ -99,11 +99,11 @@ export const botApi = {
     }
   },
 
-  // 7. Reclamar Misión (¡ESTA ES LA QUE FALTABA!)
+  // 7. Reclamar Misión
   claimMission: async (userId, missionId) => {
     try {
       const res = await api.post('', {
-        action: 'claim-mission', // <-- Asegúrate de que tu backend espera este nombre de acción
+        action: 'claim-mission', 
         userId,
         missionId
       });
