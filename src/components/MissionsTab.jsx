@@ -1,4 +1,4 @@
-import { s } from '../styles/appStyles';
+import { s } from '../styles/appStyles.js'; // ✅ Mantenemos el .js para Vercel
 
 export default function MissionsTab({ userData, openedApps, handleOpenApp, handleClaimMission }) {
   // Estado de misiones existentes
@@ -33,7 +33,17 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
   );
 
   return (
-    <div className="fade-in" style={{ marginTop: '10px', textAlign: 'left' }}>
+    <div 
+      className="fade-in" 
+      style={{ 
+        marginTop: '10px', 
+        textAlign: 'left',
+        maxHeight: '70vh',
+        overflowY: 'auto',
+        paddingRight: '5px',
+        paddingBottom: '30px'
+      }}
+    >
       <div style={{textAlign: 'center', marginBottom: '20px'}}>
         <h2 style={{ margin: 0, color: '#fff' }}>📋 Panel de Misiones</h2>
       </div>
