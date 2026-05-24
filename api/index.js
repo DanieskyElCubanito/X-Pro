@@ -35,7 +35,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, amount, address, start_param, captchaToken } = req.body; 
+    // 👇 Cambiamos captchaToken por method
+    const { user, action, userId, amount, address, start_param, method } = req.body; 
 
     // --- ACCIÓN: OBTENER HISTORIAL ---
     if (action === 'get-history') {
@@ -51,9 +52,10 @@ export default async function handler(req, res) {
 
     // --- ACCIÓN: VERIFICAR HUMANO ---
     if (action === 'verify-human') {
-      if (!captchaToken) return res.status(400).json({ error: 'Falta el token de seguridad' });
-      if (captchaToken !== 'app-verified-fast') {
-        return res.status(403).json({ error: 'Validación de captcha fallida' });
+      // 👇 Actualizamos para validar el método correcto de 3 pasos
+      if (!method) return res.status(400).json({ error: 'Falta el método de seguridad' });
+      if (method !== 'app-verified-3step') {
+        return res.status(403).json({ error: 'Validación de seguridad fallida' });
       }
 
       const { error } = await supabase
@@ -96,7 +98,7 @@ export default async function handler(req, res) {
       const reward = 0.001;
       const { data: currentUser } = await supabase.from('users').select('balance').eq('id', String(userId)).single();
       const newBalance = (currentUser?.balance || 0) + reward;
-      
+
       await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
       await supabase.from('user_missions').insert([{ user_id: String(userId), mission_id: missionId }]);
 
