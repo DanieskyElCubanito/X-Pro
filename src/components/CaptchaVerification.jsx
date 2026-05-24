@@ -4,8 +4,10 @@ import { botApi } from '../api/botApi';
 import { s } from '../styles/appStyles.js';
 
 export default function CaptchaVerification({ userData, setIsHuman }) {
-  // Estado para controlar en qué paso del CAPTCHA estamos (1, 2 o 3)
   const [step, setStep] = useState(1);
+
+  // --- ESTADO PARA EL PASO 1 (CHECKBOX) ---
+  const [isChecked, setIsChecked] = useState(false);
 
   // --- ESTADOS PARA EL PASO 2 (PUZZLE) ---
   const [targetPosition, setTargetPosition] = useState(0);
@@ -16,51 +18,48 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
   const [shuffledIcons, setShuffledIcons] = useState([]);
   const [selectedIcons, setSelectedIcons] = useState([]);
 
-  // Inicializar los retos
   useEffect(() => {
-    // Generar posición aleatoria para el hueco del puzzle (entre 40% y 80%)
     setTargetPosition(Math.floor(Math.random() * 40) + 40);
 
-    // Configurar iconos para el paso 3
     const allIcons = ['⭐', '🛒', '📅', '🍎', '🚀', '🍕', '⚽', '🚗'];
     const shuffledAll = [...allIcons].sort(() => 0.5 - Math.random());
     
-    // Elegir 3 iconos como objetivo
     const targets = shuffledAll.slice(0, 3);
     setTargetIcons(targets);
     
-    // Mostrar 6 iconos en total (los 3 objetivos + 3 distractores) desordenados
     const displayIcons = shuffledAll.slice(0, 6).sort(() => 0.5 - Math.random());
     setShuffledIcons(displayIcons);
   }, []);
 
   // --- LÓGICA PASO 1 ---
-  const handleCheckbox = () => {
-    setStep(2);
+  const handleCheckboxClick = () => {
+    // Marcamos la casilla visualmente
+    setIsChecked(true);
+    // Esperamos medio segundo para que el usuario vea el check antes de cambiar de pantalla
+    setTimeout(() => {
+      setStep(2);
+    }, 500);
   };
 
   // --- LÓGICA PASO 2 ---
   const handleSliderRelease = () => {
-    // Validar si la pieza está cerca del hueco (margen de error de 5%)
     if (Math.abs(sliderValue - targetPosition) < 5) {
       toast.success("¡Puzzle completado!");
       setTimeout(() => setStep(3), 500);
     } else {
       toast.error("Posición incorrecta, intenta de nuevo.");
       setSliderValue(0);
-      setTargetPosition(Math.floor(Math.random() * 40) + 40); // Cambiar posición si falla
+      setTargetPosition(Math.floor(Math.random() * 40) + 40);
     }
   };
 
   // --- LÓGICA PASO 3 ---
   const handleIconSelect = async (icon) => {
-    // Evitar seleccionar el mismo más de una vez
     if (selectedIcons.includes(icon)) return;
 
     const newSelection = [...selectedIcons, icon];
     setSelectedIcons(newSelection);
 
-    // Si ya seleccionó 3 iconos, validamos
     if (newSelection.length === 3) {
       const isCorrect = newSelection.every((val, index) => val === targetIcons[index]);
       
@@ -86,7 +85,6 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
   const resetStep3 = () => {
     setTimeout(() => {
       setSelectedIcons([]);
-      // Mezclar de nuevo si fallan
       setShuffledIcons([...shuffledIcons].sort(() => 0.5 - Math.random()));
     }, 1000);
   };
@@ -99,15 +97,26 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
       {/* --- PASO 1: CHECKBOX --- */}
       {step === 1 && (
         <div className="fade-in" style={{ display: 'flex', justifyContent: 'center' }}>
-          <div 
-            onClick={handleCheckbox}
-            style={{
+          <div style={{
               display: 'flex', alignItems: 'center', gap: '15px', 
               padding: '20px', background: '#1a1a1a', borderRadius: '8px', 
-              border: '1px solid #333', cursor: 'pointer', width: '250px'
+              border: '1px solid #333', width: '250px'
             }}
           >
-            <div style={{ width: '25px', height: '25px', border: '2px solid #888', borderRadius: '4px' }}></div>
+            {/* Solo esta pequeña casilla tiene el evento onClick ahora */}
+            <div 
+              onClick={handleCheckboxClick}
+              style={{ 
+                width: '28px', height: '28px', border: '2px solid #888', borderRadius: '4px',
+                display: 'flex', justifyContent: 'center', alignItems: 'center',
+                cursor: 'pointer', background: isChecked ? '#00ccff' : 'transparent',
+                transition: 'background 0.2s'
+              }}
+            >
+              {isChecked && <span style={{ color: '#000', fontWeight: 'bold', fontSize: '18px' }}>✓</span>}
+            </div>
+            
+            {/* Si quieres que el texto también sea clickeable, puedes agregarle el onClick también al span */}
             <span style={{ color: '#fff', fontSize: '16px' }}>Soy humano</span>
           </div>
         </div>
@@ -122,14 +131,12 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
             width: '280px', height: '150px', background: 'linear-gradient(45deg, #2a3b4c, #112233)', 
             borderRadius: '10px', position: 'relative', overflow: 'hidden', border: '2px solid #333'
           }}>
-            {/* El Hueco */}
             <div style={{
               width: '40px', height: '40px', background: 'rgba(0,0,0,0.6)', 
               position: 'absolute', top: '55px', left: `${targetPosition}%`, 
               boxShadow: 'inset 0 0 10px #000', borderRadius: '5px'
             }}></div>
 
-            {/* La Pieza que se mueve */}
             <div style={{
               width: '40px', height: '40px', background: '#00ccff', 
               position: 'absolute', top: '55px', left: `${sliderValue}%`, 
@@ -143,8 +150,8 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
             min="0" max="85" 
             value={sliderValue} 
             onChange={(e) => setSliderValue(e.target.value)}
-            onMouseUp={handleSliderRelease}    // Para PC
-            onTouchEnd={handleSliderRelease}   // Para Móviles
+            onMouseUp={handleSliderRelease}
+            onTouchEnd={handleSliderRelease}
             style={{ width: '280px', marginTop: '10px' }}
           />
         </div>
@@ -153,8 +160,6 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
       {/* --- PASO 3: ORDEN DE ICONOS --- */}
       {step === 3 && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          
-          {/* Indicador de orden */}
           <div style={{ background: '#111', padding: '15px', borderRadius: '10px', width: '280px', border: '1px solid #333' }}>
             <p style={{color: '#888', margin: '0 0 10px 0'}}>Selecciona en este orden:</p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '24px' }}>
@@ -164,7 +169,6 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
             </div>
           </div>
 
-          {/* Cuadrícula de iconos */}
           <div style={{ 
             display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', 
             marginTop: '30px', width: '280px' 
@@ -180,11 +184,11 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
                     fontSize: '30px', padding: '15px 0', borderRadius: '10px',
                     background: isSelected ? '#004466' : '#1a1a1a',
                     border: isSelected ? '2px solid #00ccff' : '2px solid #333',
-                    opacity: isSelected ? 0.5 : 1, cursor: 'pointer', transition: 'all 0.2s'
+                    opacity: isSelected ? 0.5 : 1, cursor: 'pointer', transition: 'all 0.2s',
+                    position: 'relative'
                   }}
                 >
                   {icon}
-                  {/* Número de selección encima del icono */}
                   {isSelected && (
                     <div style={{
                       position: 'absolute', top: '5px', right: '5px', background: '#00ccff',
