@@ -1,182 +1,206 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { botApi } from '../api/botApi';
 import { s } from '../styles/appStyles.js';
 
 export default function CaptchaVerification({ userData, setIsHuman }) {
-  const [mathProblem, setMathProblem] = useState({ result: 0 });
-  const [userAnswer, setUserAnswer] = useState('');
-  
-  const [attemptsLeft, setAttemptsLeft] = useState(3);
-  const [isLocked, setIsLocked] = useState(false);
-  
-  // Referencia para controlar el elemento Canvas
-  const canvasRef = useRef(null);
+  // Estado para controlar en qué paso del CAPTCHA estamos (1, 2 o 3)
+  const [step, setStep] = useState(1);
 
-  const drawCaptcha = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+  // --- ESTADOS PARA EL PASO 2 (PUZZLE) ---
+  const [targetPosition, setTargetPosition] = useState(0);
+  const [sliderValue, setSliderValue] = useState(0);
 
-    // Limpiamos el canvas anterior
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // --- ESTADOS PARA EL PASO 3 (ICONOS) ---
+  const [targetIcons, setTargetIcons] = useState([]);
+  const [shuffledIcons, setShuffledIcons] = useState([]);
+  const [selectedIcons, setSelectedIcons] = useState([]);
 
-    // 1. Generamos los números
-    const n1 = Math.floor(Math.random() * 20) + 1;
-    const n2 = Math.floor(Math.random() * 10) + 1;
-    setMathProblem({ result: n1 + n2 });
-    setUserAnswer('');
-
-    // 2. Fondo del canvas
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 3. Dibujamos líneas de ruido (para confundir a los bots OCR si intentan leer la imagen)
-    for (let i = 0; i < 7; i++) {
-      ctx.strokeStyle = ['#333', '#444', '#555'][Math.floor(Math.random() * 3)];
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
-      ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
-      ctx.lineWidth = Math.random() * 3;
-      ctx.stroke();
-    }
-
-    // 4. Función para dibujar texto distorsionado
-    const drawDistortedText = (text, x) => {
-      ctx.save();
-      // Fuentes irregulares aleatorias
-      const fonts = ['28px "Comic Sans MS"', '30px "Courier New"', '32px "Impact"'];
-      ctx.font = fonts[Math.floor(Math.random() * fonts.length)];
-      ctx.fillStyle = '#ffffff';
-      
-      // Distorsión: Rotación y movimiento aleatorio
-      const angle = (Math.random() * 0.6) - 0.3; // Rotación leve
-      const offsetY = (Math.random() * 10) - 5;
-      
-      ctx.translate(x, canvas.height / 2 + 10 + offsetY);
-      ctx.rotate(angle);
-      ctx.fillText(text, 0, 0);
-      ctx.restore();
-    };
-
-    // 5. Escribimos la operación en el canvas (separados para distorsionarlos distinto)
-    drawDistortedText(n1.toString(), 40);
-    drawDistortedText("+", 100);
-    drawDistortedText(n2.toString(), 140);
-    drawDistortedText("= ?", 190);
-  };
-
-  // Dibujar el captcha inicial cuando cargue el componente
+  // Inicializar los retos
   useEffect(() => {
-    drawCaptcha();
+    // Generar posición aleatoria para el hueco del puzzle (entre 40% y 80%)
+    setTargetPosition(Math.floor(Math.random() * 40) + 40);
+
+    // Configurar iconos para el paso 3
+    const allIcons = ['⭐', '🛒', '📅', '🍎', '🚀', '🍕', '⚽', '🚗'];
+    const shuffledAll = [...allIcons].sort(() => 0.5 - Math.random());
+    
+    // Elegir 3 iconos como objetivo
+    const targets = shuffledAll.slice(0, 3);
+    setTargetIcons(targets);
+    
+    // Mostrar 6 iconos en total (los 3 objetivos + 3 distractores) desordenados
+    const displayIcons = shuffledAll.slice(0, 6).sort(() => 0.5 - Math.random());
+    setShuffledIcons(displayIcons);
   }, []);
 
-  const handleValidate = async () => {
-    if (isLocked) return;
+  // --- LÓGICA PASO 1 ---
+  const handleCheckbox = () => {
+    setStep(2);
+  };
 
-    if (parseInt(userAnswer) === mathProblem.result) {
-      const tid = toast.loading("Validando seguridad...");
-      try {
-        const res = await botApi.verifyHuman(userData.id, 'app-verified-math');
-        if (res.success) {
-          setIsHuman(true);
-          toast.success("¡Acceso concedido!", { id: tid });
-        }
-      } catch (e) {
-        toast.error("Validación fallida.", { id: tid });
-      }
+  // --- LÓGICA PASO 2 ---
+  const handleSliderRelease = () => {
+    // Validar si la pieza está cerca del hueco (margen de error de 5%)
+    if (Math.abs(sliderValue - targetPosition) < 5) {
+      toast.success("¡Puzzle completado!");
+      setTimeout(() => setStep(3), 500);
     } else {
-      const newAttempts = attemptsLeft - 1;
-      setAttemptsLeft(newAttempts);
+      toast.error("Posición incorrecta, intenta de nuevo.");
+      setSliderValue(0);
+      setTargetPosition(Math.floor(Math.random() * 40) + 40); // Cambiar posición si falla
+    }
+  };
 
-      if (newAttempts <= 0) {
-        setIsLocked(true);
-        toast.error("Has fallado demasiadas veces. Acceso bloqueado.");
+  // --- LÓGICA PASO 3 ---
+  const handleIconSelect = async (icon) => {
+    // Evitar seleccionar el mismo más de una vez
+    if (selectedIcons.includes(icon)) return;
+
+    const newSelection = [...selectedIcons, icon];
+    setSelectedIcons(newSelection);
+
+    // Si ya seleccionó 3 iconos, validamos
+    if (newSelection.length === 3) {
+      const isCorrect = newSelection.every((val, index) => val === targetIcons[index]);
+      
+      if (isCorrect) {
+        const tid = toast.loading("Verificando seguridad...");
+        try {
+          const res = await botApi.verifyHuman(userData.id, 'app-verified-3step');
+          if (res.success) {
+            setIsHuman(true);
+            toast.success("¡Verificación exitosa!", { id: tid });
+          }
+        } catch (e) {
+          toast.error("Error en el servidor.", { id: tid });
+          resetStep3();
+        }
       } else {
-        toast.error(`Incorrecto. Te quedan ${newAttempts} intentos.`);
-        drawCaptcha(); // Redibujamos un nuevo reto en el canvas si falla
+        toast.error("Orden incorrecto.");
+        resetStep3();
       }
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleValidate();
-    }
+  const resetStep3 = () => {
+    setTimeout(() => {
+      setSelectedIcons([]);
+      // Mezclar de nuevo si fallan
+      setShuffledIcons([...shuffledIcons].sort(() => 0.5 - Math.random()));
+    }, 1000);
   };
 
   return (
-    <div style={{...s.container, padding: '50px 20px', textAlign: 'center'}}>
+    <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
       <Toaster position="top-center" />
-      <h2 style={{color: isLocked ? '#ff4444' : '#0088cc'}}>
-        {isLocked ? '🚫 Acceso Bloqueado' : '¡Verificación Rápida! ⚡'}
-      </h2>
-      
-      {!isLocked ? (
-        <p style={{color: '#888', fontSize: '15px', marginBottom: '30px'}}>
-          Demuestra que eres humano resolviendo esta suma:
-        </p>
-      ) : (
-        <p style={{color: '#ff4444', fontSize: '15px', marginBottom: '30px', fontWeight: 'bold'}}>
-          Has agotado tus 3 intentos.
-        </p>
-      )}
+      <h2 style={{color: '#fff', marginBottom: '30px'}}>Verificación de Seguridad</h2>
 
-      {!isLocked && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', marginBottom: '30px' }}>
-          
-          {/* Aquí está la magia: Un lienzo donde se PINTA la suma. Los bots no pueden leer esto en el código fuente */}
-          <canvas 
-            ref={canvasRef} 
-            width={280} 
-            height={80} 
+      {/* --- PASO 1: CHECKBOX --- */}
+      {step === 1 && (
+        <div className="fade-in" style={{ display: 'flex', justifyContent: 'center' }}>
+          <div 
+            onClick={handleCheckbox}
             style={{
-              borderRadius: '15px',
-              border: '2px solid #444',
-              boxShadow: 'inset 0px 0px 10px rgba(0,0,0,0.8)'
-            }}
-          />
-
-          <input 
-            type="number" 
-            value={userAnswer}
-            onChange={(e) => setUserAnswer(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Tu respuesta"
-            style={{
-              padding: '15px',
-              fontSize: '20px',
-              borderRadius: '10px',
-              border: '2px solid #333',
-              background: '#1a1a1a',
-              color: '#fff',
-              textAlign: 'center',
-              width: '150px',
-              outline: 'none'
-            }}
-          />
-
-          <button 
-            onClick={handleValidate}
-            style={{
-              ...s.btnGreen,
-              padding: '12px 30px',
-              fontSize: '16px',
-              marginTop: '10px'
+              display: 'flex', alignItems: 'center', gap: '15px', 
+              padding: '20px', background: '#1a1a1a', borderRadius: '8px', 
+              border: '1px solid #333', cursor: 'pointer', width: '250px'
             }}
           >
-            Verificar
-          </button>
-          
-          <p style={{fontSize: '14px', color: attemptsLeft === 1 ? '#ffcc00' : '#888', fontWeight: 'bold'}}>
-            Intentos restantes: {attemptsLeft}
-          </p>
+            <div style={{ width: '25px', height: '25px', border: '2px solid #888', borderRadius: '4px' }}></div>
+            <span style={{ color: '#fff', fontSize: '16px' }}>Soy humano</span>
+          </div>
         </div>
       )}
 
-      <p style={{fontSize: '12px', color: '#555', marginTop: '20px'}}>
-        Esta verificación solo aparece la primera vez que inicies.
-      </p>
+      {/* --- PASO 2: PUZZLE SLIDER --- */}
+      {step === 2 && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <p style={{color: '#aaa'}}>Desliza para completar la imagen</p>
+          
+          <div style={{ 
+            width: '280px', height: '150px', background: 'linear-gradient(45deg, #2a3b4c, #112233)', 
+            borderRadius: '10px', position: 'relative', overflow: 'hidden', border: '2px solid #333'
+          }}>
+            {/* El Hueco */}
+            <div style={{
+              width: '40px', height: '40px', background: 'rgba(0,0,0,0.6)', 
+              position: 'absolute', top: '55px', left: `${targetPosition}%`, 
+              boxShadow: 'inset 0 0 10px #000', borderRadius: '5px'
+            }}></div>
+
+            {/* La Pieza que se mueve */}
+            <div style={{
+              width: '40px', height: '40px', background: '#00ccff', 
+              position: 'absolute', top: '55px', left: `${sliderValue}%`, 
+              boxShadow: '0 0 10px #00ccff', borderRadius: '5px', opacity: 0.9,
+              transition: 'left 0.1s ease-out'
+            }}></div>
+          </div>
+
+          <input 
+            type="range" 
+            min="0" max="85" 
+            value={sliderValue} 
+            onChange={(e) => setSliderValue(e.target.value)}
+            onMouseUp={handleSliderRelease}    // Para PC
+            onTouchEnd={handleSliderRelease}   // Para Móviles
+            style={{ width: '280px', marginTop: '10px' }}
+          />
+        </div>
+      )}
+
+      {/* --- PASO 3: ORDEN DE ICONOS --- */}
+      {step === 3 && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          
+          {/* Indicador de orden */}
+          <div style={{ background: '#111', padding: '15px', borderRadius: '10px', width: '280px', border: '1px solid #333' }}>
+            <p style={{color: '#888', margin: '0 0 10px 0'}}>Selecciona en este orden:</p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '24px' }}>
+              {targetIcons.map((icon, i) => (
+                <span key={i} style={{ opacity: selectedIcons.length > i ? 0.3 : 1 }}>{icon}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Cuadrícula de iconos */}
+          <div style={{ 
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', 
+            marginTop: '30px', width: '280px' 
+          }}>
+            {shuffledIcons.map((icon, i) => {
+              const isSelected = selectedIcons.includes(icon);
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleIconSelect(icon)}
+                  disabled={isSelected}
+                  style={{
+                    fontSize: '30px', padding: '15px 0', borderRadius: '10px',
+                    background: isSelected ? '#004466' : '#1a1a1a',
+                    border: isSelected ? '2px solid #00ccff' : '2px solid #333',
+                    opacity: isSelected ? 0.5 : 1, cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                >
+                  {icon}
+                  {/* Número de selección encima del icono */}
+                  {isSelected && (
+                    <div style={{
+                      position: 'absolute', top: '5px', right: '5px', background: '#00ccff',
+                      color: '#000', borderRadius: '50%', width: '20px', height: '20px',
+                      fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
+                    }}>
+                      {selectedIcons.indexOf(icon) + 1}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
