@@ -35,7 +35,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    // 👇 Cambiamos captchaToken por method
     const { user, action, userId, amount, address, start_param, method } = req.body; 
 
     // --- ACCIÓN: OBTENER HISTORIAL ---
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
 
     // --- ACCIÓN: VERIFICAR HUMANO ---
     if (action === 'verify-human') {
-      // 👇 Actualizamos para validar el método correcto de 3 pasos
       if (!method) return res.status(400).json({ error: 'Falta el método de seguridad' });
       if (method !== 'app-verified-3step') {
         return res.status(403).json({ error: 'Validación de seguridad fallida' });
@@ -193,15 +191,60 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- ACCIÓN: REGISTRO / LOGIN ---
+    // --- ACCIÓN: REGISTRO / LOGIN CON SEGURIDAD ESTRICTA ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
 
+    // 🛡️ EXTRACCIÓN DE DATOS DE SEGURIDAD
+    // Vercel guarda la IP en 'x-forwarded-for'. Limpiamos por si vienen múltiples IPs separadas por coma.
+    const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'IP_DESCONOCIDA';
+    const cleanIp = rawIp.split(',')[0].trim();
+    const deviceId = targetUser.deviceId || req.body.deviceId;
+    const previousAccountDetected = targetUser.previousAccountDetected || req.body.previousAccountDetected;
+
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
+    // 🚫 A) VERIFICACIÓN DE BANEO
+    if (dbUser && dbUser.is_banned) {
+      return res.status(403).json({ error: 'Esta cuenta ha sido baneada permanentemente.' });
+    }
+
+    // 🚫 B) FILTRO ESTRICTO PARA NUEVAS CUENTAS
     if (!dbUser) {
-      const newUserObj = { id: targetId, username: targetUser.username || 'Usuario', balance: 0, is_human: false };
+      // 1. Trampa de LocalStorage / Cookies
+      if (previousAccountDetected) {
+         return res.status(403).json({ error: 'Se ha detectado el uso de múltiples cuentas en este dispositivo.' });
+      }
+
+      // 2. Trampa de Huella Digital (1 por Dispositivo)
+      if (deviceId) {
+        const { data: deviceMatch } = await supabase.from('users').select('id').eq('device_id', deviceId).limit(1);
+        if (deviceMatch && deviceMatch.length > 0) {
+           return res.status(403).json({ error: 'Este dispositivo ya tiene una cuenta registrada.' });
+        }
+      }
+
+      // 3. Trampa de IP ESTRICTA (1 por IP, sin excepciones)
+      if (cleanIp !== 'IP_DESCONOCIDA') {
+        const { data: ipMatch } = await supabase.from('users').select('id').eq('ip_address', cleanIp).limit(1);
+        if (ipMatch && ipMatch.length > 0) {
+           return res.status(403).json({ error: 'Límite estricto: Solo se permite una cuenta por dirección IP.' });
+        }
+      }
+    }
+
+    // ✅ C) REGISTRO EXITOSO
+    if (!dbUser) {
+      const newUserObj = { 
+        id: targetId, 
+        username: targetUser.username || 'Usuario', 
+        balance: 0, 
+        is_human: false,
+        device_id: deviceId || null,               // Guardamos la huella digital
+        ip_address: cleanIp !== 'IP_DESCONOCIDA' ? cleanIp : null // Guardamos la IP
+      };
+      
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
       }
@@ -252,7 +295,6 @@ export default async function handler(req, res) {
     const isMember1 = await checkMembership(targetId, "-1002228067712");
     const isMember2 = await checkMembership(targetId, "-1003747302094");
 
-    // 🔥 SOLUCIÓN ERROR 1: Buscamos y adjuntamos las misiones completadas
     const { data: completedMissions } = await supabase
       .from('user_missions')
       .select('mission_id')
