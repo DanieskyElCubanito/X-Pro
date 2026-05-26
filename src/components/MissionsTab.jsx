@@ -10,6 +10,33 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
   const isEarnStarsCompleted = userData?.missions_completed?.includes('earn_stars');
   const isGemFluxCompleted = userData?.missions_completed?.includes('gemflux');
 
+  // --- LÓGICA DE ANUNCIOS INTERCEPTORA ---
+  const handleAdAndClaim = (missionId) => {
+    // 1. Validamos que el botón no esté opaco/desactivado
+    if (!openedApps[missionId]) {
+      alert("Debes abrir la app primero antes de poder reclamar.");
+      return;
+    }
+
+    // 2. Llamamos al anuncio de Giga
+    if (typeof window.showGiga === 'function') {
+      window.showGiga()
+        .then(() => {
+          // ✅ El anuncio se vio correctamente. Procedemos a darle el dinero.
+          handleClaimMission(missionId);
+        })
+        .catch(e => {
+          // ❌ El usuario cerró el anuncio antes de tiempo o hubo un error de red.
+          console.error("El anuncio no se completó:", e);
+          alert("⚠️ Debes ver el anuncio completo para recibir la recompensa.");
+        });
+    } else {
+      // RESPALDO: Si el script de anuncios no cargó (ej. usaron AdBlocker), 
+      // puedes decidir si bloquearlos o darles el premio. Aquí se lo damos por defecto.
+      handleClaimMission(missionId);
+    }
+  };
+
   const MissionCard = ({ icon, title, isCompleted, missionId, url }) => (
     <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -25,7 +52,13 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
         ) : (
           <>
             <button style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff'}} onClick={() => handleOpenApp(missionId, url)}>Abrir App</button>
-            <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps[missionId] ? '#0088cc' : '#334455', opacity: openedApps[missionId] ? 1 : 0.6}} onClick={() => handleClaimMission(missionId)}>Reclamar</button>
+            {/* 👇 Aquí cambiamos handleClaimMission directo por nuestro interceptor de anuncios */}
+            <button 
+              style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps[missionId] ? '#0088cc' : '#334455', opacity: openedApps[missionId] ? 1 : 0.6}} 
+              onClick={() => handleAdAndClaim(missionId)}
+            >
+              Reclamar
+            </button>
           </>
         )}
       </div>
