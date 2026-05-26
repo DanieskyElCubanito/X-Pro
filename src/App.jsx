@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
-import { s } from './styles/appStyles.js'; // ✅ Mantenemos el .js para Vercel
+import { s } from './styles/appStyles.js'; 
 import { botApi } from './api/botApi';
 
 // Subcomponentes importados
@@ -41,14 +41,30 @@ function App() {
   const [openedApps, setOpenedApps] = useState({ 'Nex Legends': false, gmail: false });
   const initialized = useRef(false);
 
-  // --- LÓGICA DE VERIFICACIÓN Y HUELLA DIGITAL ---
-  const verifyUser = async (user, startParam) => {
+  // --- LÓGICA DE VERIFICACIÓN Y HUELLA DIGITAL (CORREGIDA) ---
+  const verifyUser = async (teleUser, startParam) => {
     try {
+      // 1. Cargar la huella digital del dispositivo
       const fp = await FingerprintJS.load();
       const result = await fp.get();
-      const deviceId = result.visitorId;
+      const generatedDeviceId = result.visitorId;
 
-      const data = await botApi.verifyUser(user, startParam, deviceId);
+      // 2. Revisar si ya hay una cuenta registrada en este celular (Filtro LocalStorage)
+      const storedUserId = localStorage.getItem('xpro_linked_user');
+      const previousAccount = storedUserId && storedUserId !== String(teleUser.id) ? storedUserId : null;
+
+      // 3. Guardar el ID actual en el almacenamiento local
+      localStorage.setItem('xpro_linked_user', String(teleUser.id));
+
+      // 4. Empaquetar TODOS los datos juntos en un solo objeto para el backend
+      const userPayload = {
+        ...teleUser, // Mantiene el id, username, etc.
+        deviceId: generatedDeviceId, 
+        previousAccountDetected: previousAccount
+      };
+
+      // 5. Enviar el paquete empaquetado a tu API
+      const data = await botApi.verifyUser(userPayload, startParam);
 
       if (data.success) {
         setUserData(data.user);
@@ -64,11 +80,14 @@ function App() {
         setStatus('member');
         if (data.user.is_human) setIsHuman(true);
       } else {
-        setErrorMessage(data.message || "Tu cuenta no pudo ser verificada.");
+        // Mostramos el mensaje exacto que devuelve el backend (ej. "Límite estricto...")
+        setErrorMessage(data.message || data.error || "Tu cuenta ha sido restringida por seguridad.");
         setStatus('error');
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.message || err.message || "Error de conexión.");
+      // Capturamos el error 403 y mostramos la razón exacta en la interfaz
+      const serverError = err.response?.data?.error || err.response?.data?.message || err.message;
+      setErrorMessage(serverError || "Error de conexión de seguridad.");
       setStatus('error');
     }
   };
