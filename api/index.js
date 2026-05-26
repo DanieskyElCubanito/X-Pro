@@ -200,8 +200,8 @@ export default async function handler(req, res) {
     // Vercel guarda la IP en 'x-forwarded-for'. Limpiamos por si vienen múltiples IPs separadas por coma.
     const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'IP_DESCONOCIDA';
     const cleanIp = rawIp.split(',')[0].trim();
-    const deviceId = targetUser.deviceId || req.body.deviceId;
-    const previousAccountDetected = targetUser.previousAccountDetected || req.body.previousAccountDetected;
+    const deviceId = user?.deviceId || req.body.deviceId || targetUser.deviceId || null;
+    const previousAccountDetected = user?.previousAccountDetected || req.body.previousAccountDetected || targetUser.previousAccountDetected || null;
 
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
@@ -212,12 +212,30 @@ export default async function handler(req, res) {
 
     // 🚫 B) FILTRO ESTRICTO PARA NUEVAS CUENTAS
     if (!dbUser) {
-      // 1. Trampa de LocalStorage / Cookies
+      
+      // 🔥 CORTAFUEGOS 1: DETECTOR DE VPN / PROXY EN TIEMPO REAL
+      if (cleanIp !== 'IP_DESCONOCIDA') {
+        try {
+          const vpnResponse = await fetch(`http://ip-api.com/json/${cleanIp}?fields=status,proxy,hosting,mobile`);
+          const vpnData = await vpnResponse.json();
+
+          if (vpnData.status === 'success') {
+            // Si es proxy o data center (y no es conexión de datos móviles) -> BLOQUEADO
+            if ((vpnData.proxy === true || vpnData.hosting === true) && !vpnData.mobile) {
+              return res.status(403).json({ error: 'Acceso denegado: El uso de VPN o Proxies no está permitido en esta plataforma.' });
+            }
+          }
+        } catch (apiError) {
+          console.error("Error consultando el detector de VPN:", apiError.message);
+        }
+      }
+
+      // 2. Trampa de LocalStorage / Cookies
       if (previousAccountDetected) {
          return res.status(403).json({ error: 'Se ha detectado el uso de múltiples cuentas en este dispositivo.' });
       }
 
-      // 2. Trampa de Huella Digital (1 por Dispositivo)
+      // 3. Trampa de Huella Digital (1 por Dispositivo)
       if (deviceId) {
         const { data: deviceMatch } = await supabase.from('users').select('id').eq('device_id', deviceId).limit(1);
         if (deviceMatch && deviceMatch.length > 0) {
@@ -225,7 +243,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // 3. Trampa de IP ESTRICTA (1 por IP, sin excepciones)
+      // 4. Trampa de IP ESTRICTA (1 por IP, sin excepciones)
       if (cleanIp !== 'IP_DESCONOCIDA') {
         const { data: ipMatch } = await supabase.from('users').select('id').eq('ip_address', cleanIp).limit(1);
         if (ipMatch && ipMatch.length > 0) {
@@ -244,7 +262,7 @@ export default async function handler(req, res) {
         device_id: deviceId || null,               // Guardamos la huella digital
         ip_address: cleanIp !== 'IP_DESCONOCIDA' ? cleanIp : null // Guardamos la IP
       };
-      
+
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
       }
