@@ -310,8 +310,8 @@ export default async function handler(req, res) {
       n3 = lv3?.length || 0;
     }
 
-    const isMember1 = await checkMembership(targetId, "-1002228067712");
-    const isMember2 = await checkMembership(targetId, "-1003747302094");
+    const isMember1 = await checkMembership(targetId, "-1004472305328");
+    const isMember2 = await checkMembership(targetId, "-1003970608283");
 
     const { data: completedMissions } = await supabase
       .from('user_missions')
