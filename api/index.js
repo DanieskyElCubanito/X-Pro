@@ -9,10 +9,10 @@ const supabase = createClient(
 );
 
 // --- CONFIGURACIÓN PRINCIPAL ---
-const BOT_TOKEN = "8647312677:AAHvJJJSaABf3606Zd-RnswmpIPUIgJTg_M";
+const BOT_TOKEN = "8846443547:AAHHOVlPUuyATcmukcU4HYGas0ZutZ8yNfI";
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
 const TON_API_KEY = "f8c2008d8ba557465e49df5bdd98eb987ef639a5ffabca82203c6d6f6b802fb5"; 
-const PAYMENTS_CHANNEL = "-1002352835078";
+const PAYMENTS_CHANNEL = "-1003928890953";
 const ADMIN_MNEMONIC = "gap chest saddle logic gesture better vapor chicken major math way clinic quick hero host rule bulb image there gallery sniff ecology will film";
 
 async function checkMembership(userId, chatId) {
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     // --- ACCIÓN: VERIFICAR CANALES ---
     if (action === 'check-channels') {
       const isMember1 = await checkMembership(userId, "-1002228067712");
-      const isMember2 = await checkMembership(userId, "-1003747302094");
+      const isMember2 = await checkMembership(userId, "-1004472305328");
       return res.status(200).json({
         success: true,
         channel1: isMember1,
