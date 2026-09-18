@@ -67,8 +67,8 @@ export default async function handler(req, res) {
 
     // --- ACCIÓN: VERIFICAR CANALES ---
     if (action === 'check-channels') {
-      const isMember1 = await checkMembership(userId, "-1002228067712");
-      const isMember2 = await checkMembership(userId, "-1004472305328");
+      const isMember1 = await checkMembership(userId, "-1004472305328");
+      const isMember2 = await checkMembership(userId, "-1003970608283");
       return res.status(200).json({
         success: true,
         channel1: isMember1,
