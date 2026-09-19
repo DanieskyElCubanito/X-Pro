@@ -2,12 +2,23 @@ import { createClient } from '@supabase/supabase-js';
 import { TonClient, WalletContractV5R1, internal, toNano } from "@ton/ton";
 import { mnemonicToPrivateKey } from "@ton/crypto";
 import axios from 'axios';
+import WebSocket from 'ws'; // <-- IMPORTACIÓN AÑADIDA PARA RESOLVER EL ERROR
 
 const supabase = createClient(
   "https://shfogfihzkwmusarhlxv.supabase.co",
-  "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx"
+  "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
+  {
+    auth: {
+      persistSession: false // Recomendado para Serverless Functions
+    },
+    realtime: {
+      transport: WebSocket // <-- INYECTA EL TRANSPORTE SEGÚN EL REQUISITO DE NODE < 22
+    },
+    global: {
+      WebSocket: WebSocket
+    }
+  }
 );
-
 
 // --- CONFIGURACIÓN PRINCIPAL ---
 const BOT_TOKEN = "8846443547:AAHHOVlPUuyATcmukcU4HYGas0ZutZ8yNfI";
@@ -198,7 +209,6 @@ export default async function handler(req, res) {
     if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
 
     // 🛡️ EXTRACCIÓN DE DATOS DE SEGURIDAD
-    // Vercel guarda la IP en 'x-forwarded-for'. Limpiamos por si vienen múltiples IPs separadas por coma.
     const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'IP_DESCONOCIDA';
     const cleanIp = rawIp.split(',')[0].trim();
     const deviceId = user?.deviceId || req.body.deviceId || targetUser.deviceId || null;
@@ -213,7 +223,7 @@ export default async function handler(req, res) {
 
     // 🚫 B) FILTRO ESTRICTO PARA NUEVAS CUENTAS
     if (!dbUser) {
-      
+
       // 🔥 CORTAFUEGOS 1: DETECTOR DE VPN / PROXY EN TIEMPO REAL
       if (cleanIp !== 'IP_DESCONOCIDA') {
         try {
@@ -221,7 +231,6 @@ export default async function handler(req, res) {
           const vpnData = await vpnResponse.json();
 
           if (vpnData.status === 'success') {
-            // Si es proxy o data center (y no es conexión de datos móviles) -> BLOQUEADO
             if ((vpnData.proxy === true || vpnData.hosting === true) && !vpnData.mobile) {
               return res.status(403).json({ error: 'Acceso denegado: El uso de VPN o Proxies no está permitido en esta plataforma.' });
             }
@@ -260,8 +269,8 @@ export default async function handler(req, res) {
         username: targetUser.username || 'Usuario', 
         balance: 0, 
         is_human: false,
-        device_id: deviceId || null,               // Guardamos la huella digital
-        ip_address: cleanIp !== 'IP_DESCONOCIDA' ? cleanIp : null // Guardamos la IP
+        device_id: deviceId || null,               
+        ip_address: cleanIp !== 'IP_DESCONOCIDA' ? cleanIp : null 
       };
 
       if (start_param && String(start_param) !== targetId) {
