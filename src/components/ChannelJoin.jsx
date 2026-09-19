@@ -32,16 +32,16 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
       <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
         {!channelStatus.c1 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff 360</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/Reff360')}>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff Free</p>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/ReffFre')}>
               Unirme al Grupo 1
             </button>
           </div>
         )}
         {!channelStatus.c2 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff Free</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/ReffFre')}>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff 360</p>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/Reff360')}>
               Unirme al Grupo 2
             </button>
           </div>
