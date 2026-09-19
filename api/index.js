@@ -79,8 +79,8 @@ export default async function handler(req, res) {
 
     // --- ACCIÓN: VERIFICAR CANALES ---
     if (action === 'check-channels') {
-      const isMember1 = await checkMembership(userId, "-1004472305328");
-      const isMember2 = await checkMembership(userId, "-1003970608283");
+      const isMember1 = await checkMembership(userId, "-1003970608283");
+      const isMember2 = await checkMembership(userId, "-1004472305328");
       return res.status(200).json({
         success: true,
         channel1: isMember1,
@@ -320,8 +320,8 @@ export default async function handler(req, res) {
       n3 = lv3?.length || 0;
     }
 
-    const isMember1 = await checkMembership(targetId, "-1004472305328");
-    const isMember2 = await checkMembership(targetId, "-1003970608283");
+    const isMember1 = await checkMembership(targetId, "-1003970608283");
+    const isMember2 = await checkMembership(targetId, "1004472305328");
 
     const { data: completedMissions } = await supabase
       .from('user_missions')
