@@ -8,6 +8,7 @@ const supabase = createClient(
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx"
 );
 
+
 // --- CONFIGURACIÓN PRINCIPAL ---
 const BOT_TOKEN = "8846443547:AAHHOVlPUuyATcmukcU4HYGas0ZutZ8yNfI";
 const TON_RPC = "https://toncenter.com/api/v2/jsonRPC";
