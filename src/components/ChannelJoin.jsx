@@ -4,7 +4,7 @@ import { botApi } from '../api/botApi';
 import { s } from '../styles/appStyles';
 
 export default function ChannelJoin({ channelStatus, setChannelStatus, userData, setMustJoin }) {
-  
+
   const handleCheckChannels = async () => {
     const tid = toast.loading("Verificando canales...");
     try {
@@ -30,18 +30,21 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
       </p>
 
       <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+        {/* SE INVIRTIÓ PARA COINCIDIR CON EL BACKEND */}
         {!channelStatus.c1 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff Free</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/ReffFre')}>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff 360</p>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/Reff360')}>
               Unirme al Grupo 1
             </button>
           </div>
         )}
+        
+        {/* SE INVIRTIÓ PARA COINCIDIR CON EL BACKEND */}
         {!channelStatus.c2 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff 360</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/Reff360')}>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff Free</p>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/ReffFre')}>
               Unirme al Grupo 2
             </button>
           </div>
