@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import WebApp from '@twa-dev/sdk';
 import toast from 'react-hot-toast';
 import { botApi } from '../api/botApi';
 import { s } from '../styles/appStyles';
@@ -7,136 +6,136 @@ import { s } from '../styles/appStyles';
 export default function DailyCheckIn({ userData, setUserData }) {
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState("");
-  const [canClaim, setCanClaim] = useState(false); // 🔥 Corrección: Iniciamos en false para evitar parpadeos
+  const [canClaim, setCanClaim] = useState(false);
+  const [adsWatched, setAdsWatched] = useState(0);
+
+  const REQUIRED_ADS = 15;
 
   useEffect(() => {
-    // Si los datos del usuario aún no han cargado desde el backend, protegemos el estado
     if (!userData || !userData.id) {
       setCanClaim(false);
       return;
     }
 
-    // Si el usuario nunca ha reclamado un bono, habilitamos de inmediato
-    if (!userData.last_bonus) {
-      setCanClaim(true);
-      setCooldown("");
-      return;
-    }
+    // Cargar progreso de anuncios desde el almacenamiento local
+    const savedAds = localStorage.getItem(`ads_progress_${userData.id}`);
+    if (savedAds) setAdsWatched(Number(savedAds));
 
     const checkCooldown = () => {
-      const now = Date.now();
-      const lastBonusTime = new Date(userData.last_bonus).getTime();
-      const timePassed = now - lastBonusTime;
+      if (!userData.last_bonus) return true;
+      const timePassed = Date.now() - new Date(userData.last_bonus).getTime();
       const twentyFourHours = 24 * 60 * 60 * 1000;
 
       if (timePassed < twentyFourHours) {
-        setCanClaim(false);
         const timeLeft = twentyFourHours - timePassed;
-
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
         const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-        setCooldown(`${hours}h ${minutes}m ${seconds}s`);
-        return false; // No se puede reclamar
-      } else {
-        setCanClaim(true);
-        setCooldown("");
-        return true; // Ya se puede reclamar
+        setCooldown(`${hours}h ${minutes}m`);
+        return false; 
       }
+      return true; 
     };
 
-    // Ejecutamos la verificación inmediatamente al montar o actualizar datos
     const available = checkCooldown();
+    setCanClaim(available);
 
-    // Solo activamos el intervalo de cuenta regresiva si el bono NO está disponible
     let interval;
     if (!available) {
       interval = setInterval(() => {
-        const stillLocked = !checkCooldown();
-        if (!stillLocked && interval) {
+        if (checkCooldown()) {
+          setCanClaim(true);
           clearInterval(interval);
         }
-      }, 1000);
+      }, 60000); // Actualiza cada minuto para ahorrar recursos
     }
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [userData]); // Escucha los cambios completos del objeto de usuario
+    return () => if (interval) clearInterval(interval);
+  }, [userData]);
 
-  const handleDailyCheck = async () => {
-    if (!canClaim || loading || !userData?.id) return;
+  const handleWatchAd = () => {
+    if (typeof window.showGiga !== 'function') {
+      return toast.error("El sistema de anuncios no está disponible ahora.");
+    }
+    
+    const tid = toast.loading("Cargando anuncio...");
+    window.showGiga()
+      .then(() => {
+        const newCount = adsWatched + 1;
+        setAdsWatched(newCount);
+        localStorage.setItem(`ads_progress_${userData.id}`, newCount.toString());
+        toast.success(`¡Anuncio visto! (${newCount}/${REQUIRED_ADS})`, { id: tid });
+      })
+      .catch(() => {
+        toast.error("Debes ver el anuncio completo.", { id: tid });
+      });
+  };
+
+  const handleClaimReward = async () => {
+    if (adsWatched < REQUIRED_ADS || loading) return;
     setLoading(true);
+    const tid = toast.loading("Reclamando 1 PT...");
 
     try {
-      const userId = userData?.id || 'invitado';
-      const shareUrl = `https://t.me/Xokpro_Bot/app?startapp=${userId}`;
-      const shareText = encodeURIComponent("🚀 ¡Mira esta Mini App para ganar Toncoin diario con Inteligencia Artificial! Entra ya: 💎");
-      const telegramShareLink = `https://t.me/share/url?url=${shareUrl}&text=${shareText}`;
-
-      WebApp.openTelegramLink(telegramShareLink);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      if (typeof window.showGiga === 'function') {
-        const tid = toast.loading("Cargando recompensa...");
-        window.showGiga()
-          .then(async () => {
-            const res = await botApi.claimBonus(userData.id);
-            if (res.success) {
-              toast.success("¡Bono diario reclamado con éxito! +0.001 TON", { id: tid });
-              setUserData(prev => ({
-                ...prev,
-                balance: res.newBalance,
-                last_bonus: new Date().toISOString()
-              }));
-            } else {
-              toast.error("Error al procesar el bono.", { id: tid });
-            }
-          })
-          .catch((err) => {
-            toast.error("⚠️ Debes ver el anuncio completo para recibir la recompensa.", { id: tid });
-            console.error(err);
-          })
-          .finally(() => setLoading(false));
+      const res = await botApi.claimBonus(userData.id);
+      if (res.success) {
+        toast.success("¡Has ganado 1 PT!", { id: tid });
+        setAdsWatched(0);
+        localStorage.removeItem(`ads_progress_${userData.id}`);
+        setUserData(prev => ({
+          ...prev,
+          points: res.points,
+          last_bonus: new Date().toISOString()
+        }));
       } else {
-        toast.error("Error al cargar el sistema de anuncios.");
-        setLoading(false);
+        toast.error("Error al procesar el bono.", { id: tid });
       }
     } catch (error) {
-      toast.error("Ocurrió un error inesperado.");
+      toast.error("Ocurrió un error inesperado.", { id: tid });
+    } finally {
       setLoading(false);
     }
   };
 
-  // Determinamos si todo el componente está esperando datos globales
   const isAppLoading = !userData || !userData.id;
+  const isReadyToClaim = adsWatched >= REQUIRED_ADS;
 
   return (
-    <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{ fontSize: '28px' }}>🎁</div>
-        <div>
-          <h4 style={{ margin: 0, fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>Check Daily</h4>
-          <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#888' }}>Comparte + Mira un Ad</p>
+    <div style={{...s.card, display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontSize: '28px' }}>🎁</div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>Bono Diario</h4>
+            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#888' }}>
+              {!canClaim ? `Vuelve en ${cooldown}` : `Mira ${REQUIRED_ADS} ads para 1 PT`}
+            </p>
+          </div>
         </div>
+        
+        {canClaim && (
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: isReadyToClaim ? '#FFD700' : '#888' }}>
+            {adsWatched} / {REQUIRED_ADS}
+          </div>
+        )}
       </div>
-      <button 
-        onClick={handleDailyCheck} 
-        disabled={!canClaim || loading || isAppLoading}
-        style={{
-          ...s.btnGreen,
-          padding: '8px 16px',
-          fontSize: '13px',
-          width: 'auto',
-          backgroundColor: canClaim && !isAppLoading ? '#0088cc' : '#334455',
-          opacity: canClaim && !loading && !isAppLoading ? 1 : 0.6,
-          cursor: canClaim && !loading && !isAppLoading ? 'pointer' : 'not-allowed',
-          border: 'none'
-        }}
-      >
-        {loading || isAppLoading ? "Cargando..." : canClaim ? "+0.001 TON" : cooldown}
-      </button>
+
+      {canClaim && (
+        <button 
+          onClick={isReadyToClaim ? handleClaimReward : handleWatchAd} 
+          disabled={loading || isAppLoading}
+          style={{
+            ...s.btnGreen,
+            width: '100%',
+            padding: '10px',
+            backgroundColor: isReadyToClaim ? '#FFD700' : '#0088cc',
+            color: isReadyToClaim ? '#000' : '#fff',
+            fontWeight: 'bold',
+            border: 'none'
+          }}
+        >
+          {loading ? "Procesando..." : isReadyToClaim ? "Reclamar 1 PT" : "Ver Anuncio"}
+        </button>
+      )}
     </div>
   );
 }
