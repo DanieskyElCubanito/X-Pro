@@ -49,8 +49,9 @@ export default function DailyCheckIn({ userData, setUserData }) {
       }, 60000); // Actualiza cada minuto para ahorrar recursos
     }
 
-    return () => if (interval) clearInterval(interval);
-  }, [userData]);
+    return () => {
+  if (interval) clearInterval(interval);
+};, [userData]);
 
   const handleWatchAd = () => {
     if (typeof window.showGiga !== 'function') {
