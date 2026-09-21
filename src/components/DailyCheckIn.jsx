@@ -51,7 +51,7 @@ export default function DailyCheckIn({ userData, setUserData }) {
 
     return () => {
   if (interval) clearInterval(interval);
-};, [userData]);
+}; [userData]);
 
   const handleWatchAd = () => {
     if (typeof window.showGiga !== 'function') {
