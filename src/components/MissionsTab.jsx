@@ -28,7 +28,7 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
   const MissionCard = ({ icon, title, isCompleted, missionId, url, reward, currency }) => {
     const isUSDT = currency === 'USDT';
     const currencyColor = isUSDT ? '#26A17B' : '#FFD700'; 
-    const currencyIcon = isUSDT ? '💵' : '🪙';
+    const currencySymbol = isUSDT ? '💲' : '⭐';
 
     return (
       <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
@@ -37,7 +37,7 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
           <div>
             <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{title}</p>
             <p style={{ margin: 0, color: currencyColor, fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>
-              {currencyIcon} +{reward} {currency}
+              {currencySymbol} +{reward} {currency}
             </p>
           </div>
         </div>
@@ -61,7 +61,17 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
   };
 
   return (
-    <div className="fade-in" style={{ marginTop: '10px', textAlign: 'left', maxHeight: '70vh', overflowY: 'auto', paddingRight: '5px', paddingBottom: '30px' }}>
+    <div 
+      className="fade-in" 
+      style={{ 
+        marginTop: '10px', 
+        textAlign: 'left', 
+        maxHeight: '80vh', 
+        overflowY: 'auto', 
+        paddingRight: '5px', 
+        paddingBottom: '130px' // 🔥 Espacio para que el menú flotante inferior no tape GemFlux
+      }}
+    >
       <div style={{textAlign: 'center', marginBottom: '20px'}}>
         <h2 style={{ margin: 0, color: '#fff' }}>📋 Panel de Misiones</h2>
         <p style={{ margin: 0, color: '#888', fontSize: '12px', marginTop: '5px' }}>Completa tareas para ganar recompensas</p>
@@ -71,7 +81,7 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
       <MissionCard icon="🤖" title="Start Nex Legends" isCompleted={isNexLegendsCompleted} missionId="Nex Legends" url="https://t.me/nexlegendsbot/hunt?startapp=7517815832" reward="0.10" currency="USDT" />
       <MissionCard icon="✉️" title="Start Gmail Farmer" isCompleted={isGmailCompleted} missionId="gmail" url="https://t.me/GmailFarmerBot?start=7517815832" reward="0.15" currency="USDT" />
 
-      <h3 style={{color: '#fff', fontSize: '14px', borderBottom: '1px solid #1a3a5a', paddingBottom: '5px', marginTop: '20px'}}>🪙 Misiones Normales</h3>
+      <h3 style={{color: '#fff', fontSize: '14px', borderBottom: '1px solid #1a3a5a', paddingBottom: '5px', marginTop: '20px'}}>🪙 Misiones Diarias</h3>
       <MissionCard icon="🍬" title="Dulce (CANDY)" isCompleted={isCandyCompleted} missionId="candy" url="https://t.me/dulcecandybot?start=7517815832" reward="50" currency="PT" />
       <MissionCard icon="⭐" title="Earn Stars" isCompleted={isEarnStarsCompleted} missionId="earn_stars" url="https://t.me/EarnStarsAppBot/?startapp=ref_3gbwvtk" reward="100" currency="PT" />
       <MissionCard icon="💎" title="GemFlux" isCompleted={isGemFluxCompleted} missionId="gemflux" url="https://t.me/GemFlux_bot/app?startapp=7517815832" reward="25" currency="PT" />
