@@ -9,9 +9,6 @@ export default function BottomNav({ activeTab, setActiveTab }) {
       <div onClick={() => setActiveTab('publish')} style={activeTab === 'publish' ? s.navItemActive : s.navItem}>
         <span style={{fontSize:'20px'}}>📢</span><span style={{fontSize:'10px'}}>PUBLICAR</span>
       </div>
-      <div onClick={() => setActiveTab('ads')} style={activeTab === 'ads' ? s.navItemActive : s.navItem}>
-        <span style={{fontSize:'20px'}}>📺</span><span style={{fontSize:'10px'}}>ANUNCIOS</span>
-      </div>
       <div onClick={() => setActiveTab('share')} style={activeTab === 'share' ? s.navItemActive : s.navItem}>
         <span style={{fontSize:'20px'}}>👥</span><span style={{fontSize:'10px'}}>AMIGOS</span>
       </div>
