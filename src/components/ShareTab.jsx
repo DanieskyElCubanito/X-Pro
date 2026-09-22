@@ -79,7 +79,7 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
           <div>
             <p style={{ fontSize: '10px', color: '#888', margin: 0 }}>GANANCIAS TOTALES</p>
             <p style={{ fontSize: '18px', fontWeight: '900', color: '#26A17B', margin: 0 }}>
-              ${totalEarned} <span style={{ fontSize: '12px' }}>USDT</span>
+              ${totalEarned} <span style={{ fontSize: '12px' }}>PT</span>
             </p>
           </div>
           <div style={{ backgroundColor: '#26A17B22', padding: '8px', borderRadius: '12px' }}>
