@@ -54,23 +54,7 @@ export const botApi = {
     }
   },
 
-  // 4. Retirar Saldo
-  withdraw: async (userId, address, amount) => {
-    try {
-      const res = await api.post('', { 
-        action: 'withdraw', 
-        userId, 
-        address, 
-        amount 
-      });
-      return res.data;
-    } catch (error) {
-      console.error("Error en withdraw:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // 5. Obtener Historial
+  // 4. Obtener Historial
   getHistory: async (userId) => {
     try {
       const res = await api.post('', { 
@@ -84,7 +68,7 @@ export const botApi = {
     }
   },
 
-  // 6. Verificar Humano con Captcha 3 Pasos
+  // 5. Verificar Humano con Captcha 3 Pasos
   verifyHuman: async (userId, method) => {
     try {
       const res = await api.post('', {
@@ -99,7 +83,7 @@ export const botApi = {
     }
   },
 
-  // 7. Reclamar Misión
+  // 6. Reclamar Misión
   claimMission: async (userId, missionId) => {
     try {
       const res = await api.post('', {
@@ -114,7 +98,7 @@ export const botApi = {
     }
   },
 
-  // 8. Obtener misiones activas creadas por la comunidad
+  // 7. Obtener misiones activas creadas por la comunidad
   getActiveMissions: async () => {
     try {
       const res = await api.post('', {
@@ -127,7 +111,7 @@ export const botApi = {
     }
   },
 
-  // 9. Crear una nueva misión usando puntos PT
+  // 8. Crear una nueva misión usando puntos PT (balance)
   createMission: async ({ userId, title, url, totalClicks, rewardPerClick, totalCost }) => {
     try {
       const res = await api.post('', {
