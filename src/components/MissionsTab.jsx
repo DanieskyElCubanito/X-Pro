@@ -1,11 +1,29 @@
+import { useState, useEffect } from 'react';
 import { s } from '../styles/appStyles.js'; 
+import CreateMissionModal from './CreateMissionModal'; // Asegúrate de crear e importar este archivo
+import { botApi } from '../api/botApi'; // Para cargar las misiones dinámicas
 
-export default function MissionsTab({ userData, openedApps, handleOpenApp, handleClaimMission }) {
-  const isNexLegendsCompleted = userData?.missions_completed?.includes('Nex Legends');
-  const isGmailCompleted = userData?.missions_completed?.includes('gmail');
-  const isCandyCompleted = userData?.missions_completed?.includes('candy');
-  const isEarnStarsCompleted = userData?.missions_completed?.includes('earn_stars');
-  const isGemFluxCompleted = userData?.missions_completed?.includes('gemflux');
+export default function MissionsTab({ userData, setUserData, openedApps, handleOpenApp, handleClaimMission }) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [missions, setMissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Cargar misiones desde la base de datos al montar el componente
+  useEffect(() => {
+    const fetchMissions = async () => {
+      try {
+        const res = await botApi.getActiveMissions(); 
+        if (res.success) {
+          setMissions(res.missions);
+        }
+      } catch (e) {
+        console.error("Error cargando misiones", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMissions();
+  }, [showCreateModal]); // Se vuelve a ejecutar cuando se cierra el modal para actualizar la lista
 
   const handleAdAndClaim = (missionId) => {
     if (!openedApps[missionId]) {
@@ -25,19 +43,19 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
     }
   };
 
-  const MissionCard = ({ icon, title, isCompleted, missionId, url, reward, currency }) => {
-    const isUSDT = currency === 'USDT';
-    const currencyColor = isUSDT ? '#26A17B' : '#FFD700'; 
-    const currencySymbol = isUSDT ? '💲' : '⭐';
+  const MissionCard = ({ mission }) => {
+    const isCompleted = userData?.missions_completed?.includes(mission.id);
 
     return (
       <div style={{...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>{icon}</div>
+          <div style={{ width: '40px', height: '40px', backgroundColor: '#004466', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>
+            🔗
+          </div>
           <div>
-            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{title}</p>
-            <p style={{ margin: 0, color: currencyColor, fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>
-              {currencySymbol} +{reward} {currency}
+            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{mission.title}</p>
+            <p style={{ margin: 0, color: '#FFD700', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>
+              🪙 +{mission.reward_per_click} PT
             </p>
           </div>
         </div>
@@ -46,10 +64,10 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
             <button style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', opacity: 0.5, backgroundColor: '#445566'}} disabled>Hecho</button>
           ) : (
             <>
-              <button style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff'}} onClick={() => handleOpenApp(missionId, url)}>Abrir App</button>
+              <button style={{...s.btnOutline, padding: '6px 12px', fontSize: '12px', borderColor: '#00ccff', color: '#00ccff'}} onClick={() => handleOpenApp(mission.id, mission.url)}>Abrir App</button>
               <button 
-                style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps[missionId] ? '#0088cc' : '#334455', opacity: openedApps[missionId] ? 1 : 0.6}} 
-                onClick={() => handleAdAndClaim(missionId)}
+                style={{...s.btnGreen, padding: '6px 12px', fontSize: '12px', backgroundColor: openedApps[mission.id] ? '#0088cc' : '#334455', opacity: openedApps[mission.id] ? 1 : 0.6}} 
+                onClick={() => handleAdAndClaim(mission.id)}
               >
                 Reclamar
               </button>
@@ -69,22 +87,49 @@ export default function MissionsTab({ userData, openedApps, handleOpenApp, handl
         maxHeight: '80vh', 
         overflowY: 'auto', 
         paddingRight: '5px', 
-        paddingBottom: '130px' // 🔥 Espacio para que el menú flotante inferior no tape GemFlux
+        paddingBottom: '130px' 
       }}
     >
       <div style={{textAlign: 'center', marginBottom: '20px'}}>
         <h2 style={{ margin: 0, color: '#fff' }}>📋 Panel de Misiones</h2>
-        <p style={{ margin: 0, color: '#888', fontSize: '12px', marginTop: '5px' }}>Completa tareas para ganar recompensas</p>
+        <p style={{ margin: 0, color: '#888', fontSize: '12px', marginTop: '5px' }}>Completa tareas de otros usuarios o promociona la tuya</p>
       </div>
 
-      <h3 style={{color: '#fff', fontSize: '14px', borderBottom: '1px solid #1a3a5a', paddingBottom: '5px'}}>💎 Misiones Premium</h3>
-      <MissionCard icon="🤖" title="Start Nex Legends" isCompleted={isNexLegendsCompleted} missionId="Nex Legends" url="https://t.me/nexlegendsbot/hunt?startapp=7517815832" reward="0.10" currency="USDT" />
-      <MissionCard icon="✉️" title="Start Gmail Farmer" isCompleted={isGmailCompleted} missionId="gmail" url="https://t.me/GmailFarmerBot?start=7517815832" reward="0.15" currency="USDT" />
+      <button 
+        onClick={() => setShowCreateModal(true)} 
+        style={{
+          ...s.btnGreen, 
+          width: '100%', 
+          marginBottom: '20px', 
+          backgroundColor: '#FFD700', 
+          color: '#000', 
+          fontWeight: 'bold',
+          padding: '12px',
+          fontSize: '14px'
+        }}
+      >
+        ➕ Crear mi Misión (Usar PT)
+      </button>
 
-      <h3 style={{color: '#fff', fontSize: '14px', borderBottom: '1px solid #1a3a5a', paddingBottom: '5px', marginTop: '20px'}}>🪙 Misiones Diarias</h3>
-      <MissionCard icon="🍬" title="Dulce (CANDY)" isCompleted={isCandyCompleted} missionId="candy" url="https://t.me/dulcecandybot?start=7517815832" reward="50" currency="PT" />
-      <MissionCard icon="⭐" title="Earn Stars" isCompleted={isEarnStarsCompleted} missionId="earn_stars" url="https://t.me/EarnStarsAppBot/?startapp=ref_3gbwvtk" reward="100" currency="PT" />
-      <MissionCard icon="💎" title="GemFlux" isCompleted={isGemFluxCompleted} missionId="gemflux" url="https://t.me/GemFlux_bot/app?startapp=7517815832" reward="25" currency="PT" />
+      <h3 style={{color: '#fff', fontSize: '14px', borderBottom: '1px solid #1a3a5a', paddingBottom: '5px'}}>🌍 Misiones de la Comunidad</h3>
+      
+      {loading ? (
+        <p style={{ textAlign: 'center', color: '#888', fontSize: '12px', marginTop: '20px' }}>Cargando misiones disponibles...</p>
+      ) : missions.length > 0 ? (
+        missions.map((mission) => (
+          <MissionCard key={mission.id} mission={mission} />
+        ))
+      ) : (
+        <p style={{ textAlign: 'center', color: '#888', fontSize: '12px', marginTop: '20px' }}>No hay misiones activas en este momento. ¡Sé el primero en crear una!</p>
+      )}
+
+      {showCreateModal && (
+        <CreateMissionModal 
+          userData={userData} 
+          setUserData={setUserData} 
+          onClose={() => setShowCreateModal(false)} 
+        />
+      )}
     </div>
   );
 }
