@@ -6,8 +6,8 @@ import { s } from '../styles/appStyles';
 export default function CreateMissionModal({ userData, setUserData, onClose }) {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
-  const [totalClicks, setTotalClicks] = useState(10);
-  const [rewardPerClick, setRewardPerClick] = useState(1);
+  const [totalClicks, setTotalClicks] = useState(20); // Mínimo inicial por defecto: 20
+  const [rewardPerClick, setRewardPerClick] = useState(5); // Mínimo inicial por defecto: 5
   const [loading, setLoading] = useState(false);
 
   const totalCost = totalClicks * rewardPerClick;
@@ -23,8 +23,21 @@ export default function CreateMissionModal({ userData, setUserData, onClose }) {
       return toast.error("El enlace debe comenzar con https://t.me/");
     }
 
-    if ((userData?.points || 0) < totalCost) {
-      return toast.error(`Saldo insuficiente. Necesitas ${totalCost} PT.`);
+    // --- RESTRICCIONES ESTRICTAS ---
+    if (totalClicks < 20) {
+      return toast.error("El número mínimo de usuarios es 20");
+    }
+
+    if (rewardPerClick < 5) {
+      return toast.error("El pago mínimo por usuario es 5 PT");
+    }
+
+    if (totalCost < 100) {
+      return toast.error("El costo total mínimo de la misión debe ser 100 PT");
+    }
+
+    if ((userData?.balance || 0) < totalCost) {
+      return toast.error(`Saldo insuficiente. Necesitas ${totalCost} PT y tienes ${userData?.balance || 0} PT.`);
     }
 
     setLoading(true);
@@ -42,7 +55,8 @@ export default function CreateMissionModal({ userData, setUserData, onClose }) {
 
       if (res.success) {
         toast.success("¡Misión publicada con éxito!", { id: tid });
-        setUserData(prev => ({ ...prev, points: prev.points - totalCost }));
+        // Se descuenta del balance localmente para reflejar el cambio al instante
+        setUserData(prev => ({ ...prev, balance: prev.balance - totalCost }));
         onClose();
       } else {
         toast.error(res.message || "Error al crear la misión", { id: tid });
@@ -81,10 +95,10 @@ export default function CreateMissionModal({ userData, setUserData, onClose }) {
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '11px', color: '#888' }}>Cantidad de usuarios</label>
+              <label style={{ fontSize: '11px', color: '#888' }}>Usuarios (Mín. 20)</label>
               <input
                 type="number"
-                min="5"
+                min="20"
                 value={totalClicks}
                 onChange={(e) => setTotalClicks(Number(e.target.value))}
                 style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #1a3a5a', backgroundColor: '#001122', color: '#fff' }}
@@ -92,10 +106,10 @@ export default function CreateMissionModal({ userData, setUserData, onClose }) {
             </div>
 
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '11px', color: '#888' }}>Pago por usuario (PT)</label>
+              <label style={{ fontSize: '11px', color: '#888' }}>Pago/Usuario (Mín. 5 PT)</label>
               <input
                 type="number"
-                min="1"
+                min="5"
                 value={rewardPerClick}
                 onChange={(e) => setRewardPerClick(Number(e.target.value))}
                 style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #1a3a5a', backgroundColor: '#001122', color: '#fff' }}
@@ -104,7 +118,7 @@ export default function CreateMissionModal({ userData, setUserData, onClose }) {
           </div>
 
           <div style={{ backgroundColor: '#002233', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '10px' }}>
-            <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>Costo Total:</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#aaa' }}>Costo Total (Mín. 100 PT):</p>
             <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#FFD700' }}>🪙 {totalCost} PT</p>
           </div>
 
