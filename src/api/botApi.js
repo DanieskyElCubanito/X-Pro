@@ -1,9 +1,5 @@
 import axios from 'axios';
 
-/**
- * Configuración unificada para Vercel.
- * Se aumenta el timeout a 20s para evitar cortes por "Cold Start" en Vercel.
- */
 const api = axios.create({
   baseURL: '/api', 
   timeout: 20000, 
@@ -11,14 +7,9 @@ const api = axios.create({
 });
 
 export const botApi = {
-  // 1. Verificar Usuario e Inicio
   verifyUser: async (user, startParam) => {
     try {
-      const res = await api.post('', { 
-        action: 'verify',
-        user, 
-        start_param: startParam 
-      });
+      const res = await api.post('', { action: 'verify', user, start_param: startParam });
       return res.data;
     } catch (error) {
       console.error("Error en verifyUser:", error.response?.data || error.message);
@@ -26,13 +17,9 @@ export const botApi = {
     }
   },
 
-  // 2. Re-verificar unión a canales
   checkChannels: async (userId) => {
     try {
-      const res = await api.post('', { 
-        action: 'check-channels', 
-        userId 
-      });
+      const res = await api.post('', { action: 'check-channels', userId });
       return res.data;
     } catch (error) {
       console.error("Error en checkChannels:", error.response?.data || error.message);
@@ -40,13 +27,9 @@ export const botApi = {
     }
   },
 
-  // 3. Reclamar Bono Diario
   claimBonus: async (userId) => {
     try {
-      const res = await api.post('', { 
-        action: 'claim-bonus', 
-        userId 
-      });
+      const res = await api.post('', { action: 'claim-bonus', userId });
       return res.data;
     } catch (error) {
       console.error("Error en claimBonus:", error.response?.data || error.message);
@@ -54,28 +37,9 @@ export const botApi = {
     }
   },
 
-  // 4. Obtener Historial
-  getHistory: async (userId) => {
-    try {
-      const res = await api.post('', { 
-        action: 'get-history', 
-        userId 
-      });
-      return res.data;
-    } catch (error) {
-      console.error("Error en getHistory:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // 5. Verificar Humano con Captcha 3 Pasos
   verifyHuman: async (userId, method) => {
     try {
-      const res = await api.post('', {
-        action: 'verify-human',
-        userId,
-        method // Enviará 'app-verified-3step'
-      });
+      const res = await api.post('', { action: 'verify-human', userId, method });
       return res.data;
     } catch (error) {
       console.error("Error en verifyHuman:", error.response?.data || error.message);
@@ -83,49 +47,34 @@ export const botApi = {
     }
   },
 
-  // 6. Reclamar Misión
-  claimMission: async (userId, missionId) => {
+  // Publicar en Grupos (Costo 1 PT)
+  publishPost: async (userId, text, link, photoUrl, chatId) => {
     try {
       const res = await api.post('', {
-        action: 'claim-mission', 
+        action: 'publish-post',
         userId,
-        missionId
+        text,
+        link,
+        photoUrl,
+        chatId
       });
       return res.data;
     } catch (error) {
-      console.error("Error en claimMission:", error.response?.data || error.message);
+      console.error("Error en publishPost:", error.response?.data || error.message);
       throw error;
     }
   },
 
-  // 7. Obtener misiones activas creadas por la comunidad
-  getActiveMissions: async () => {
+  // Reclamar recompensa por ver 4 anuncios (1 PT diario)
+  claimAdReward: async (userId) => {
     try {
       const res = await api.post('', {
-        action: 'get-active-missions'
+        action: 'claim-ad-reward',
+        userId
       });
       return res.data;
     } catch (error) {
-      console.error("Error en getActiveMissions:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // 8. Crear una nueva misión usando puntos PT (balance)
-  createMission: async ({ userId, title, url, totalClicks, rewardPerClick, totalCost }) => {
-    try {
-      const res = await api.post('', {
-        action: 'create-mission',
-        userId,
-        title,
-        url,
-        totalClicks,
-        rewardPerClick,
-        totalCost
-      });
-      return res.data;
-    } catch (error) {
-      console.error("Error en createMission:", error.response?.data || error.message);
+      console.error("Error en claimAdReward:", error.response?.data || error.message);
       throw error;
     }
   }
