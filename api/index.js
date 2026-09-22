@@ -27,6 +27,37 @@ async function checkMembership(userId, chatId) {
   }
 }
 
+// Función para enviar mensajes o fotos a los grupos de Telegram
+async function publishToTelegramGroup(chatId, text, photoUrl, userLink, username) {
+  try {
+    const formattedText = `${text}\n\n🔗 Enlace: ${userLink}\n👤 Publicado por: @${username || 'Usuario'}`;
+    
+    if (photoUrl) {
+      // Enviar con foto (sendPhoto)
+      const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
+      await axios.post(url, {
+        chat_id: chatId,
+        photo: photoUrl,
+        caption: formattedText,
+        parse_mode: 'HTML'
+      });
+    } else {
+      // Enviar solo texto (sendMessage)
+      const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+      await axios.post(url, {
+        chat_id: chatId,
+        text: formattedText,
+        parse_mode: 'HTML',
+        disable_web_page_preview: false
+      });
+    }
+    return true;
+  } catch (error) {
+    console.error("Error al publicar en Telegram:", error.response?.data || error.message);
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -36,19 +67,75 @@ export default async function handler(req, res) {
   try {
     const { user, action, userId, start_param, method } = req.body; 
 
-    // --- ACCIÓN: OBTENER HISTORIAL ---
-    if (action === 'get-history') {
-      const { data, error } = await supabase.from('withdrawals').select('*').eq('user_id', String(userId)).order('created_at', { ascending: false });
-      if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ success: true, history: data });
+    // --- ACCIÓN: PUBLICAR EN GRUPO (COSTO 1 PT) ---
+    if (action === 'publish-post') {
+      const { text, link, photoUrl, chatId } = req.body;
+      if (!text || !link || !chatId) {
+        return res.status(400).json({ success: false, error: 'Faltan datos obligatorios (texto, enlace o grupo).' });
+      }
+
+      // Validar grupos permitidos
+      const allowedGroups = ["-1003970608283", "-1004472305328"];
+      if (!allowedGroups.includes(String(chatId))) {
+        return res.status(400).json({ success: false, error: 'Grupo no válido.' });
+      }
+
+      // Obtener usuario y verificar balance
+      const { data: dbUser, error: userErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
+      if (userErr || !dbUser) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
+
+      const currentBalance = Number(dbUser.balance || 0);
+      if (currentBalance < 1) {
+        return res.status(400).json({ success: false, error: 'Saldo insuficiente. Necesitas al menos 1 PT.' });
+      }
+
+      // Intentar publicar en Telegram
+      const published = await publishToTelegramGroup(chatId, text, photoUrl, link, dbUser.username);
+      if (!published) {
+        return res.status(500).json({ success: false, error: 'El bot no pudo publicar en el grupo. Asegúrate de que sea administrador.' });
+      }
+
+      // Descontar 1 PT del balance
+      const newBalance = currentBalance - 1;
+      await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+
+      return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: VERIFICAR HUMANO ---
-    if (action === 'verify-human') {
-      if (!method || method !== 'app-verified-3step') return res.status(403).json({ error: 'Validación fallida' });
-      const { error } = await supabase.from('users').update({ is_human: true }).eq('id', String(userId));
-      if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ success: true });
+    // --- ACCIÓN: REGISTRAR VISTA DE ANUNCIO (4 ANUNCIOS = 1 PT DIARIO) ---
+    if (action === 'claim-ad-reward') {
+      const { data: dbUser, error: userErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
+      if (userErr || !dbUser) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
+
+      const today = new Date().toISOString().split('T')[0]; // Fecha actual YYYY-MM-DD
+      let lastDate = dbUser.last_ad_date || '';
+      let adsCount = lastDate === today ? (Number(dbUser.ads_watched_today) || 0) : 0;
+
+      adsCount += 1;
+
+      if (adsCount >= 4) {
+        // Verificar si ya reclamó hoy
+        if (dbUser.last_ad_claimed_date === today) {
+          return res.status(400).json({ success: false, error: 'Ya reclamaste tu recompensa de anuncios de hoy.' });
+        }
+
+        const newBalance = Number(dbUser.balance || 0) + 1;
+        await supabase.from('users').update({ 
+          balance: newBalance, 
+          ads_watched_today: adsCount, 
+          last_ad_date: today,
+          last_ad_claimed_date: today 
+        }).eq('id', String(userId));
+
+        return res.status(200).json({ success: true, balance: newBalance, message: '¡Has ganado 1 PT por ver 4 anuncios!' });
+      } else {
+        await supabase.from('users').update({ 
+          ads_watched_today: adsCount, 
+          last_ad_date: today 
+        }).eq('id', String(userId));
+
+        return res.status(200).json({ success: true, adsCount, remaining: 4 - adsCount });
+      }
     }
 
     // --- ACCIÓN: VERIFICAR CANALES ---
@@ -56,19 +143,6 @@ export default async function handler(req, res) {
       const isMember1 = await checkMembership(userId, "-1003970608283");
       const isMember2 = await checkMembership(userId, "-1004472305328");
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2 });
-    }
-
-    // --- ACCIÓN: RECLAMAR MISIÓN ---
-    if (action === 'claim-mission') {
-      const { missionId } = req.body;
-      if (!missionId) return res.status(400).json({ error: 'Falta ID de la misión' });
-
-      const { data: existingMission } = await supabase.from('user_missions').select('id').eq('user_id', String(userId)).eq('mission_id', missionId).single();
-      if (existingMission) return res.status(400).json({ error: 'Ya completaste esta misión.' });
-
-      // Solo guarda la misión como completada en la base de datos
-      await supabase.from('user_missions').insert([{ user_id: String(userId), mission_id: missionId }]);
-      return res.status(200).json({ success: true });
     }
 
     // --- ACCIÓN: COBRAR BONO DIARIO ---
@@ -79,84 +153,54 @@ export default async function handler(req, res) {
       if (now - lastBonus < 24 * 60 * 60 * 1000) return res.status(400).json({ error: `Espera 24h` });
 
       const rewardPoints = 50; 
-      const newPts = (Number(u.points) || 0) + rewardPoints;
-      await supabase.from('users').update({ points: newPts, last_bonus: new Date().toISOString() }).eq('id', String(userId));
-      return res.status(200).json({ success: true, points: newPts });
+      const newBalance = (Number(u.balance) || 0) + rewardPoints;
+      await supabase.from('users').update({ balance: newBalance, last_bonus: new Date().toISOString() }).eq('id', String(userId));
+      return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: REGISTRO / LOGIN ---
+    // --- ACCIÓN: REGISTRO / LOGIN (REFERIDOS 1 SOLO NIVEL = 1 PT) ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
-
-    const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'IP_DESCONOCIDA';
-    const cleanIp = rawIp.split(',')[0].trim();
-    const deviceId = user?.deviceId || req.body.deviceId || targetUser.deviceId || null;
-    const previousAccountDetected = user?.previousAccountDetected || req.body.previousAccountDetected || targetUser.previousAccountDetected || null;
 
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
     if (dbUser && dbUser.is_banned) return res.status(403).json({ error: 'Esta cuenta ha sido baneada.' });
 
     if (!dbUser) {
-      if (previousAccountDetected) return res.status(403).json({ error: 'Múltiples cuentas detectadas.' });
-      if (deviceId) {
-        const { data: devM } = await supabase.from('users').select('id').eq('device_id', deviceId).limit(1);
-        if (devM && devM.length > 0) return res.status(403).json({ error: 'Dispositivo ya registrado.' });
-      }
-      
-      // Restricción de 1 cuenta por IP (puedes borrar este bloque si necesitas múltiples cuentas por IP/VPN)
-      if (cleanIp !== 'IP_DESCONOCIDA') {
-        const { data: ipM } = await supabase.from('users').select('id').eq('ip_address', cleanIp).limit(1);
-        if (ipM && ipM.length > 0) return res.status(403).json({ error: 'Límite: 1 cuenta por IP.' });
-      }
-    }
-
-    if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
         username: targetUser.username || 'Usuario', 
         balance: 0, 
-        points: 0, 
-        is_human: false,
-        device_id: deviceId || null,               
-        ip_address: cleanIp !== 'IP_DESCONOCIDA' ? cleanIp : null 
+        is_human: false
       };
 
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
+
+        // Acreditar 1 PT al referido de nivel 1
+        const { data: referrer } = await supabase.from('users').select('balance').eq('id', String(start_param)).single();
+        if (referrer) {
+          const refNewBalance = Number(referrer.balance || 0) + 1;
+          await supabase.from('users').update({ balance: refNewBalance }).eq('id', String(start_param));
+        }
       }
 
       const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
       dbUser = newUser || await supabase.from('users').select('*').eq('id', targetId).single().then(res => res.data);
     }
 
-    // Calcular estadísticas de red
-    const { data: lv1 } = await supabase.from('users').select('id').eq('referred_by', targetId);
+    // Estadísticas de referidos (Solo 1 Nivel)
+    const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
-    const ids1 = lv1?.map(u => u.id) || [];
-    let n2 = 0, ids2 = [];
-    if (ids1.length > 0) {
-      const { data: lv2 } = await supabase.from('users').select('id').in('referred_by', ids1);
-      n2 = lv2?.length || 0;
-      ids2 = lv2?.map(u => u.id) || [];
-    }
-    let n3 = 0;
-    if (ids2.length > 0) {
-      const { data: lv3 } = await supabase.from('users').select('id').in('referred_by', ids2);
-      n3 = lv3?.length || 0;
-    }
 
     const isMember1 = await checkMembership(targetId, "-1003970608283");
     const isMember2 = await checkMembership(targetId, "-1004472305328");
 
-    const { data: completedMissions } = await supabase.from('user_missions').select('mission_id').eq('user_id', targetId);
-    dbUser.missions_completed = completedMissions?.map(m => m.mission_id) || [];
-
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, n2, n3 }, 
+      stats: { n1, referralsList: lv1 || [] }, 
       channels: { c1: isMember1, c2: isMember2 }
     });
 
