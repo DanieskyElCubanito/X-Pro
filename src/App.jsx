@@ -8,7 +8,8 @@ import { botApi } from './api/botApi';
 // Subcomponentes importados
 import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';
-import MissionsTab from './components/MissionsTab';
+import PublishTab from './components/PublishTab'; // NUEVO COMPONENTE
+import AdsTab from './components/AdsTab';         // NUEVO COMPONENTE
 import ShareTab from './components/ShareTab';
 import BottomNav from './components/BottomNav';
 import ChannelJoin from './components/ChannelJoin';
@@ -19,7 +20,7 @@ function App() {
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
-  const [stats, setStats] = useState({ n1: 0, c1: "0.000", n2: 0, c2: "0.000", n3: 0, c3: "0.000" });
+  const [stats, setStats] = useState({ n1: 0, c1: "0.000" }); // Solo nivel 1
 
   // Estados de seguridad y validación
   const [mustJoin, setMustJoin] = useState(false);
@@ -27,8 +28,6 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Estados de misiones
-  const [openedApps, setOpenedApps] = useState({ 'Nex Legends': false, gmail: false });
   const initialized = useRef(false);
 
   // --- LÓGICA DE VERIFICACIÓN Y HUELLA DIGITAL ---
@@ -99,34 +98,11 @@ function App() {
     return () => clearTimeout(initTimer);
   }, []);
 
-  // --- LÓGICA DE MISIONES Y COMPARTIR ---
+  // --- LÓGICA DE COMPARTIR ---
   const handleShare = () => {
     const inviteLink = `https://t.me/Xokpro_Bot/app?startapp=${userData?.id}`;
-    const text = "🚀 ¡Únete, completa misiones y acumula Puntos (PT)! 🪙";
+    const text = "🚀 ¡Únete, publica en grupos y acumula Puntos (PT)! 🪙";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
-  };
-
-  const handleOpenApp = (missionId, url) => {
-    WebApp.openTelegramLink(url);
-    setOpenedApps(prev => ({ ...prev, [missionId]: true }));
-  };
-
-  const handleClaimMission = async (missionId) => {
-    if (!openedApps[missionId]) return toast.error("Debes abrir la app primero.");
-    const tid = toast.loading("Verificando misión...");
-    try {
-      const res = await botApi.claimMission(userData.id, missionId);
-      if (res.success) {
-        setUserData(prev => ({ 
-          ...prev, 
-          points: res.newPoints || prev.points,
-          missions_completed: [...(prev.missions_completed || []), missionId] 
-        }));
-        toast.success("¡Misión completada!", { id: tid });
-      }
-    } catch (e) {
-      toast.error(e.message || "Error al verificar", { id: tid });
-    }
   };
 
   if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
@@ -156,13 +132,13 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'missions' && (
-          <MissionsTab 
-            userData={userData} 
-            openedApps={openedApps} 
-            handleOpenApp={handleOpenApp} 
-            handleClaimMission={handleClaimMission} 
-          />
+        {/* NUEVAS PESTAÑAS AÑADIDAS */}
+        {activeTab === 'publish' && (
+          <PublishTab userData={userData} setUserData={setUserData} />
+        )}
+
+        {activeTab === 'ads' && (
+          <AdsTab userData={userData} setUserData={setUserData} />
         )}
 
         {activeTab === 'share' && (
