@@ -112,6 +112,38 @@ export const botApi = {
       console.error("Error en claimMission:", error.response?.data || error.message);
       throw error;
     }
+  },
+
+  // 8. Obtener misiones activas creadas por la comunidad
+  getActiveMissions: async () => {
+    try {
+      const res = await api.post('', {
+        action: 'get-active-missions'
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en getActiveMissions:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // 9. Crear una nueva misión usando puntos PT
+  createMission: async ({ userId, title, url, totalClicks, rewardPerClick, totalCost }) => {
+    try {
+      const res = await api.post('', {
+        action: 'create-mission',
+        userId,
+        title,
+        url,
+        totalClicks,
+        rewardPerClick,
+        totalCost
+      });
+      return res.data;
+    } catch (error) {
+      console.error("Error en createMission:", error.response?.data || error.message);
+      throw error;
+    }
   }
 };
 
