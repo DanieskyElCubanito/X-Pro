@@ -2,21 +2,14 @@ import { s } from '../styles/appStyles';
 import toast from 'react-hot-toast';
 
 function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
-  // Aseguramos que los valores sean números
   const n1 = stats?.n1 || 0;
-  const n2 = stats?.n2 || 0;
-  const n3 = stats?.n3 || 0;
-
   const c1 = parseFloat(stats?.c1 || 0);
-  const c2 = parseFloat(stats?.c2 || 0);
-  const c3 = parseFloat(stats?.c3 || 0);
 
-  // Total acumulado
+  // Total acumulado (solo nivel 1)
   const totalEarned = totalReferralEarnings !== undefined 
     ? parseFloat(totalReferralEarnings).toFixed(4) 
-    : (c1 + c2 + c3).toFixed(4);
+    : c1.toFixed(4);
 
-  // Función para copiar el enlace
   const handleCopy = () => {
     if (!userId) {
       toast.error("Error: ID de usuario no encontrado.");
@@ -38,14 +31,13 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
           </h4>
         </div>
 
-        {/* Muestra de Porcentajes por Nivel */}
         <div style={s.row}>
-          <div style={s.box}>NIVEL 1<br /><b style={{ color: '#26A17B', fontSize: '13px' }}>10%</b></div>
-          <div style={s.box}>NIVEL 2<br /><b style={{ color: '#26A17B', fontSize: '13px' }}>6%</b></div>
-          <div style={s.box}>NIVEL 3<br /><b style={{ color: '#26A17B', fontSize: '13px' }}>4%</b></div>
+          <div style={{...s.box, width: '100%'}}>
+            TUS REFERIDOS DIRECTOS<br />
+            <b style={{ color: '#26A17B', fontSize: '16px' }}>{n1} Usuarios</b>
+          </div>
         </div>
 
-        {/* ESTRUCTURA DE BOTONES */}
         <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
           <button 
             style={{ ...s.btnGreen, flex: 1, padding: '12px 0', fontSize: '13px', backgroundColor: '#0088cc' }} 
@@ -53,7 +45,7 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
           >
             🚀 INVITAR
           </button>
-          
+
           <button 
             style={{ 
               ...s.btnGreen, 
@@ -76,22 +68,10 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
         </h4>
 
         <div style={s.statsGrid}>
-          <div style={s.statCol}>
-            <p style={s.statLabel}>Directos (10%)</p>
+          <div style={{...s.statCol, flex: '1'}}>
+            <p style={s.statLabel}>Directos (Nivel 1)</p>
             <p style={s.statValue}>{n1}</p>
             <p style={s.statCom}>+${c1.toFixed(4)}</p>
-          </div>
-
-          <div style={s.statCol}>
-            <p style={s.statLabel}>Nivel 2 (6%)</p>
-            <p style={s.statValue}>{n2}</p>
-            <p style={s.statCom}>+${c2.toFixed(4)}</p>
-          </div>
-
-          <div style={s.statCol}>
-            <p style={s.statLabel}>Nivel 3 (4%)</p>
-            <p style={s.statValue}>{n3}</p>
-            <p style={s.statCom}>+${c3.toFixed(4)}</p>
           </div>
         </div>
 
@@ -109,7 +89,7 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
       </div>
 
       <p style={{ textAlign: 'center', fontSize: '10px', color: '#666', marginTop: '10px' }}>
-        Las comisiones se acreditan automáticamente al completar Misiones Premium.
+        Ganas recompensas directamente por los usuarios que invites con tu enlace.
       </p>
     </div>
   );
