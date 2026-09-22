@@ -31,7 +31,7 @@ async function checkMembership(userId, chatId) {
 async function publishToTelegramGroup(chatId, text, photoUrl, userLink, username) {
   try {
     const formattedText = `${text}\n\n🔗 Enlace: ${userLink}\n👤 Publicado por: @${username || 'Usuario'}`;
-    
+
     if (photoUrl) {
       // Enviar con foto (sendPhoto)
       const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
@@ -96,46 +96,10 @@ export default async function handler(req, res) {
       }
 
       // Descontar 1 PT del balance
-      const newBalance = currentBalance - 1;
+      const newBalance = Number((currentBalance - 1).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
 
       return res.status(200).json({ success: true, balance: newBalance });
-    }
-
-    // --- ACCIÓN: REGISTRAR VISTA DE ANUNCIO (4 ANUNCIOS = 1 PT DIARIO) ---
-    if (action === 'claim-ad-reward') {
-      const { data: dbUser, error: userErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
-      if (userErr || !dbUser) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
-
-      const today = new Date().toISOString().split('T')[0]; // Fecha actual YYYY-MM-DD
-      let lastDate = dbUser.last_ad_date || '';
-      let adsCount = lastDate === today ? (Number(dbUser.ads_watched_today) || 0) : 0;
-
-      adsCount += 1;
-
-      if (adsCount >= 4) {
-        // Verificar si ya reclamó hoy
-        if (dbUser.last_ad_claimed_date === today) {
-          return res.status(400).json({ success: false, error: 'Ya reclamaste tu recompensa de anuncios de hoy.' });
-        }
-
-        const newBalance = Number(dbUser.balance || 0) + 1;
-        await supabase.from('users').update({ 
-          balance: newBalance, 
-          ads_watched_today: adsCount, 
-          last_ad_date: today,
-          last_ad_claimed_date: today 
-        }).eq('id', String(userId));
-
-        return res.status(200).json({ success: true, balance: newBalance, message: '¡Has ganado 1 PT por ver 4 anuncios!' });
-      } else {
-        await supabase.from('users').update({ 
-          ads_watched_today: adsCount, 
-          last_ad_date: today 
-        }).eq('id', String(userId));
-
-        return res.status(200).json({ success: true, adsCount, remaining: 4 - adsCount });
-      }
     }
 
     // --- ACCIÓN: VERIFICAR CANALES ---
@@ -145,16 +109,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2 });
     }
 
-    // --- ACCIÓN: COBRAR BONO DIARIO ---
+    // --- ACCIÓN: RECOMPENSA POR VER ANUNCIO (0.1 PT SIN LÍMITE) ---
     if (action === 'claim-bonus') {
-      const { data: u } = await supabase.from('users').select('*').eq('id', String(userId)).single();
-      const now = Date.now();
-      const lastBonus = u.last_bonus ? new Date(u.last_bonus).getTime() : 0;
-      if (now - lastBonus < 24 * 60 * 60 * 1000) return res.status(400).json({ error: `Espera 24h` });
+      const { data: u, error: uErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
+      if (uErr || !u) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
 
-      const rewardPoints = 50; 
-      const newBalance = (Number(u.balance) || 0) + rewardPoints;
-      await supabase.from('users').update({ balance: newBalance, last_bonus: new Date().toISOString() }).eq('id', String(userId));
+      // Se suma 0.1 PT. Usamos toFixed(2) y Number para evitar decimales infinitos de JS (ej. 0.300000004)
+      const rewardPoints = 0.1; 
+      const currentBalance = Number(u.balance || 0);
+      const newBalance = Number((currentBalance + rewardPoints).toFixed(2));
+      
+      await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+      
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
@@ -181,7 +147,7 @@ export default async function handler(req, res) {
         // Acreditar 1 PT al referido de nivel 1
         const { data: referrer } = await supabase.from('users').select('balance').eq('id', String(start_param)).single();
         if (referrer) {
-          const refNewBalance = Number(referrer.balance || 0) + 1;
+          const refNewBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
           await supabase.from('users').update({ balance: refNewBalance }).eq('id', String(start_param));
         }
       }
