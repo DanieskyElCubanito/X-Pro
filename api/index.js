@@ -33,7 +33,6 @@ async function publishToTelegramGroup(chatId, text, photoUrl, userLink, username
     const formattedText = `${text}\n\n🔗 Enlace: ${userLink}\n👤 Publicado por: @${username || 'Usuario'}`;
 
     if (photoUrl) {
-      // Enviar con foto (sendPhoto)
       const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
       await axios.post(url, {
         chat_id: chatId,
@@ -42,7 +41,6 @@ async function publishToTelegramGroup(chatId, text, photoUrl, userLink, username
         parse_mode: 'HTML'
       });
     } else {
-      // Enviar solo texto (sendMessage)
       const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
       await axios.post(url, {
         chat_id: chatId,
@@ -74,13 +72,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Faltan datos obligatorios (texto, enlace o grupo).' });
       }
 
-      // Validar grupos permitidos
       const allowedGroups = ["-1002228067712", "-1004472305328"];
       if (!allowedGroups.includes(String(chatId))) {
         return res.status(400).json({ success: false, error: 'Grupo no válido.' });
       }
 
-      // Obtener usuario y verificar balance
       const { data: dbUser, error: userErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
       if (userErr || !dbUser) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
 
@@ -89,13 +85,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Saldo insuficiente. Necesitas al menos 1 PT.' });
       }
 
-      // Intentar publicar en Telegram
       const published = await publishToTelegramGroup(chatId, text, photoUrl, link, dbUser.username);
       if (!published) {
         return res.status(500).json({ success: false, error: 'El bot no pudo publicar en el grupo. Asegúrate de que sea administrador.' });
       }
 
-      // Descontar 1 PT del balance
       const newBalance = Number((currentBalance - 1).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
 
@@ -114,12 +108,50 @@ export default async function handler(req, res) {
       const { data: u, error: uErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
       if (uErr || !u) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
 
-      // Se suma 0.1 PT. Usamos toFixed(2) y Number para evitar decimales infinitos de JS (ej. 0.300000004)
       const rewardPoints = 0.1; 
       const currentBalance = Number(u.balance || 0);
       const newBalance = Number((currentBalance + rewardPoints).toFixed(2));
-      
+
       await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+
+      return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    // --- ACCIÓN: RECOMPENSA DIARIA POR UNIRSE A CANALES (0.1 PT) ---
+    if (action === 'claim-daily-channel') {
+      const { channelId } = req.body;
+      
+      const allowedDailyChannels = {
+        "-1004308461940": "last_claim_cryptotio",
+        "-1003928890953": "last_claim_paymentoffers"
+      };
+
+      if (!allowedDailyChannels[channelId]) {
+        return res.status(400).json({ success: false, error: 'Canal no válido.' });
+      }
+
+      const isMember = await checkMembership(userId, channelId);
+      if (!isMember) {
+        return res.status(400).json({ success: false, error: 'Debes unirte al canal primero para reclamar.' });
+      }
+
+      const { data: u, error: uErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
+      if (uErr || !u) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
+
+      const today = new Date().toISOString().split('T')[0];
+      const columnToUpdate = allowedDailyChannels[channelId];
+
+      if (u[columnToUpdate] === today) {
+        return res.status(400).json({ success: false, error: 'Ya reclamaste la recompensa de este canal hoy. Vuelve mañana.' });
+      }
+
+      const currentBalance = Number(u.balance || 0);
+      const newBalance = Number((currentBalance + 0.1).toFixed(2));
+      
+      await supabase.from('users').update({ 
+        balance: newBalance,
+        [columnToUpdate]: today
+      }).eq('id', String(userId));
       
       return res.status(200).json({ success: true, balance: newBalance });
     }
@@ -143,8 +175,6 @@ export default async function handler(req, res) {
 
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
-
-        // Acreditar 1 PT al referido de nivel 1
         const { data: referrer } = await supabase.from('users').select('balance').eq('id', String(start_param)).single();
         if (referrer) {
           const refNewBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
@@ -156,7 +186,6 @@ export default async function handler(req, res) {
       dbUser = newUser || await supabase.from('users').select('*').eq('id', targetId).single().then(res => res.data);
     }
 
-    // Estadísticas de referidos (Solo 1 Nivel)
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
