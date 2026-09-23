@@ -19,7 +19,7 @@ function PublishTab({ userData, setUserData }) {
     }
 
     // Asignar el ID del grupo según la selección
-    const chatId = group === 'Reff Free' ? "-1003970608283" : "-1004472305328";
+    const chatId = group === 'Reff Free' ? "-1002228067712" : "-1004472305328";
 
     setIsPublishing(true);
     const tid = toast.loading("Enviando al grupo de Telegram...");
