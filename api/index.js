@@ -12,7 +12,7 @@ const supabase = createClient(
   }
 );
 
-const BOT_TOKEN = "8846443547:AAHHOVlPUuyATcmukcU4HYGas0ZutZ8yNfI";
+const BOT_TOKEN = "8647312677:AAHvJJJSaABf3606Zd-RnswmpIPUIgJTg_M";
 
 async function checkMembership(userId, chatId) {
   try {
