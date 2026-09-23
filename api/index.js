@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       }
 
       // Validar grupos permitidos
-      const allowedGroups = ["-1003970608283", "-1004472305328"];
+      const allowedGroups = ["-1002228067712", "-1004472305328"];
       if (!allowedGroups.includes(String(chatId))) {
         return res.status(400).json({ success: false, error: 'Grupo no válido.' });
       }
