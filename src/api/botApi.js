@@ -47,7 +47,6 @@ export const botApi = {
     }
   },
 
-  // Publicar en Grupos (Costo 1 PT)
   publishPost: async (userId, text, link, photoUrl, chatId) => {
     try {
       const res = await api.post('', {
@@ -65,16 +64,17 @@ export const botApi = {
     }
   },
 
-  // Reclamar recompensa por ver 4 anuncios (1 PT diario)
-  claimAdReward: async (userId) => {
+  // NUEVO: Reclamar recompensa diaria por canal (0.1 PT)
+  claimDailyChannel: async (userId, channelId) => {
     try {
       const res = await api.post('', {
-        action: 'claim-ad-reward',
-        userId
+        action: 'claim-daily-channel',
+        userId,
+        channelId
       });
       return res.data;
     } catch (error) {
-      console.error("Error en claimAdReward:", error.response?.data || error.message);
+      console.error("Error en claimDailyChannel:", error.response?.data || error.message);
       throw error;
     }
   }
