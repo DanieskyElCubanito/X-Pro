@@ -8,21 +8,19 @@ import { botApi } from './api/botApi';
 // Subcomponentes importados
 import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';
-import PublishTab from './components/PublishTab'; // NUEVO COMPONENTE
-import AdsTab from './components/AdsTab';         // NUEVO COMPONENTE
+import PublishTab from './components/PublishTab';
+import AdsTab from './components/AdsTab';
 import ShareTab from './components/ShareTab';
 import BottomNav from './components/BottomNav';
 import ChannelJoin from './components/ChannelJoin';
 import CaptchaVerification from './components/CaptchaVerification';
 
 function App() {
-  // Estados de navegación y usuario
   const [status, setStatus] = useState('loading'); 
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
-  const [stats, setStats] = useState({ n1: 0, c1: "0.000" }); // Solo nivel 1
+  const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
 
-  // Estados de seguridad y validación
   const [mustJoin, setMustJoin] = useState(false);
   const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
   const [isHuman, setIsHuman] = useState(false);
@@ -30,7 +28,6 @@ function App() {
 
   const initialized = useRef(false);
 
-  // --- LÓGICA DE VERIFICACIÓN Y HUELLA DIGITAL ---
   const verifyUser = async (teleUser, startParam) => {
     try {
       const fp = await FingerprintJS.load();
@@ -98,7 +95,6 @@ function App() {
     return () => clearTimeout(initTimer);
   }, []);
 
-  // --- LÓGICA DE COMPARTIR ---
   const handleShare = () => {
     const inviteLink = `https://t.me/Referidos_Gratis_bot/app?startapp=${userData?.id}`;
     const text = "🚀 ¡Únete, publica en grupos y acumula Puntos (PT)! 🪙";
@@ -132,7 +128,6 @@ function App() {
           </div>
         )}
 
-        {/* NUEVAS PESTAÑAS AÑADIDAS */}
         {activeTab === 'publish' && (
           <PublishTab userData={userData} setUserData={setUserData} />
         )}
