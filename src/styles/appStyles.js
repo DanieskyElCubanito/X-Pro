@@ -30,21 +30,22 @@ export const s = {
   container: { 
     backgroundColor: '#050505', 
     color: '#ffffff', 
-    minHeight: '100vh', 
+    height: '100vh', // Fija la app al tamaño exacto de la pantalla del celular
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif',
     display: 'flex', 
     flexDirection: 'column',
-    overflowX: 'hidden'
+    overflow: 'hidden', // Evita el "rebote" de toda la página
+    boxSizing: 'border-box'
   },
 
   main: { 
-    padding: '16px', 
+    flex: 1, // Toma todo el espacio disponible entre arriba y el menú inferior
+    padding: '16px 16px 100px 16px', // 100px de padding inferior para que nada quede debajo del menú
     maxWidth: '500px', 
     margin: '0 auto', 
     width: '100%', 
-    boxSizing: 'border-box', 
-    paddingBottom: '180px', // Aumentado a 180px para que el menú inferior no tape las tarjetas
-    overflowY: 'auto',      // Habilita el desplazamiento vertical en móviles
+    boxSizing: 'border-box',
+    overflowY: 'auto', // El deslizamiento solo ocurre en esta sección
     WebkitOverflowScrolling: 'touch'
   }, 
 
