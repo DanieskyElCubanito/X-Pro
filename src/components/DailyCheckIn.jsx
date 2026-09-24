@@ -51,7 +51,7 @@ export default function DailyCheckIn({ userData, setUserData }) {
   const handleClaimChannel = async (channel) => {
     setLoadingId(channel.id);
     const tid = toast.loading(`Verificando ${channel.name}...`);
-    
+
     try {
       const res = await botApi.claimDailyChannel(userData.id, channel.id);
       if (res.success) {
@@ -79,14 +79,7 @@ export default function DailyCheckIn({ userData, setUserData }) {
   const isAppLoading = !userData || !userData.id;
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      gap: '15px', 
-      paddingBottom: '180px', // Espacio suficiente para no chocar con el menú inferior
-      overflowY: 'auto',      // Habilita el desplazamiento de la pantalla
-      WebkitOverflowScrolling: 'touch'
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
       
       {/* TARJETA DE ANUNCIOS */}
       <div style={{...s.card, display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
@@ -132,7 +125,7 @@ export default function DailyCheckIn({ userData, setUserData }) {
                     <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '13px' }}>{ch.name}</span>
                     <span style={{ color: '#0088cc', fontSize: '11px' }}>@{ch.username}</span>
                   </div>
-                  
+
                   {isClaimedToday ? (
                     <span style={{ color: '#26A17B', fontSize: '12px', fontWeight: 'bold' }}>✅ Reclamado</span>
                   ) : (
