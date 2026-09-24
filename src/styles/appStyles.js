@@ -16,7 +16,7 @@ export const s = {
     border: '4px solid #222',
     borderTop: '4px solid #0088cc',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite', // Requiere el CSS de abajo
+    animation: 'spin 1s linear infinite',
     marginBottom: '15px'
   },
   errorText: {
@@ -33,7 +33,8 @@ export const s = {
     minHeight: '100vh', 
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif',
     display: 'flex', 
-    flexDirection: 'column'
+    flexDirection: 'column',
+    overflowX: 'hidden'
   },
 
   main: { 
@@ -42,7 +43,9 @@ export const s = {
     margin: '0 auto', 
     width: '100%', 
     boxSizing: 'border-box', 
-    paddingBottom: '120px' 
+    paddingBottom: '180px', // Aumentado a 180px para que el menú inferior no tape las tarjetas
+    overflowY: 'auto',      // Habilita el desplazamiento vertical en móviles
+    WebkitOverflowScrolling: 'touch'
   }, 
 
   // --- [ PERFIL DE USUARIO ] ---
@@ -194,7 +197,7 @@ export const s = {
     bottom: 0, 
     left: 0, 
     right: 0, 
-    backgroundColor: 'rgba(5, 5, 5, 0.8)', 
+    backgroundColor: 'rgba(5, 5, 5, 0.95)', 
     backdropFilter: 'blur(15px)', 
     display: 'flex', 
     justifyContent: 'space-around', 
