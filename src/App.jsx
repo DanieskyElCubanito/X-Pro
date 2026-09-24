@@ -100,7 +100,7 @@ function App() {
 
   // --- LÓGICA DE COMPARTIR ---
   const handleShare = () => {
-    const inviteLink = `https://t.me/Xokpro_Bot/app?startapp=${userData?.id}`;
+    const inviteLink = `https://t.me/Referidos_Gratis_bot/app?startapp=${userData?.id}`;
     const text = "🚀 ¡Únete, publica en grupos y acumula Puntos (PT)! 🪙";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
