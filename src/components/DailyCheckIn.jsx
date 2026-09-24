@@ -79,7 +79,14 @@ export default function DailyCheckIn({ userData, setUserData }) {
   const isAppLoading = !userData || !userData.id;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '15px', 
+      paddingBottom: '180px', // Espacio suficiente para no chocar con el menú inferior
+      overflowY: 'auto',      // Habilita el desplazamiento de la pantalla
+      WebkitOverflowScrolling: 'touch'
+    }}>
       
       {/* TARJETA DE ANUNCIOS */}
       <div style={{...s.card, display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px', backgroundColor: '#112233', border: '1px solid #1a3a5a'}}>
