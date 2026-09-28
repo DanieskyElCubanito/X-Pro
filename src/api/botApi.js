@@ -6,78 +6,38 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-export const botApi = {
-  verifyUser: async (user, startParam) => {
-    try {
-      const res = await api.post('', { action: 'verify', user, start_param: startParam });
-      return res.data;
-    } catch (error) {
-      console.error("Error en verifyUser:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  checkChannels: async (userId) => {
-    try {
-      const res = await api.post('', { action: 'check-channels', userId });
-      return res.data;
-    } catch (error) {
-      console.error("Error en checkChannels:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  claimBonus: async (userId) => {
-    try {
-      const res = await api.post('', { action: 'claim-bonus', userId });
-      return res.data;
-    } catch (error) {
-      console.error("Error en claimBonus:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  verifyHuman: async (userId, method) => {
-    try {
-      const res = await api.post('', { action: 'verify-human', userId, method });
-      return res.data;
-    } catch (error) {
-      console.error("Error en verifyHuman:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  publishPost: async (userId, text, link, photoUrl, chatId) => {
-    try {
-      const res = await api.post('', {
-        action: 'publish-post',
-        userId,
-        text,
-        link,
-        photoUrl,
-        chatId
-      });
-      return res.data;
-    } catch (error) {
-      console.error("Error en publishPost:", error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // NUEVO: Reclamar recompensa diaria por canal (0.1 PT)
-  claimDailyChannel: async (userId, channelId) => {
-    try {
-      const res = await api.post('', {
-        action: 'claim-daily-channel',
-        userId,
-        channelId
-      });
-      return res.data;
-    } catch (error) {
-      console.error("Error en claimDailyChannel:", error.response?.data || error.message);
-      throw error;
-    }
+/**
+ * Función auxiliar para centralizar las peticiones y el manejo de errores.
+ */
+const postAction = async (action, payload = {}) => {
+  try {
+    const res = await api.post('', { action, ...payload });
+    return res.data;
+  } catch (error) {
+    console.error(`Error en la acción '${action}':`, error.response?.data || error.message);
+    throw error;
   }
+};
+
+export const botApi = {
+  verifyUser: (user, startParam) => 
+    postAction('verify', { user, start_param: startParam }),
+
+  checkChannels: (userId) => 
+    postAction('check-channels', { userId }),
+
+  claimBonus: (userId) => 
+    postAction('claim-bonus', { userId }),
+
+  verifyHuman: (userId, method) => 
+    postAction('verify-human', { userId, method }),
+
+  publishPost: (userId, text, link, photoUrl, chatId) => 
+    postAction('publish-post', { userId, text, link, photoUrl, chatId }),
+
+  // Reclamar recompensa diaria por canal (0.1 PT)
+  claimDailyChannel: (userId, channelId) => 
+    postAction('claim-daily-channel', { userId, channelId })
 };
 
 export default botApi;
