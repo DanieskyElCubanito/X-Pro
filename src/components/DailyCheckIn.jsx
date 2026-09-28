@@ -10,8 +10,8 @@ export default function DailyCheckIn({ userData, setUserData }) {
   const today = new Date().toISOString().split('T')[0];
 
   const channels = [
-    { id: "-1004308461940", name: "Crypto News", username: "Cryptotio", dbCol: "last_claim_cryptotio" },
-    { id: "-1003928890953", name: "Payment Offers", username: "InstantPaymentOffers", dbCol: "last_claim_paymentoffers" }
+    { id: "-1004362492963", name: "Crypto Web3", username: "CryptoWeb3Pay", dbCol: "last_claim_cryptotio" },
+    { id: "-1004490423840", name: "The Danny Dev", username: "TheDannyDev", dbCol: "last_claim_paymentoffers" }
   ];
 
   // --- LÓGICA DE ANUNCIOS ---
