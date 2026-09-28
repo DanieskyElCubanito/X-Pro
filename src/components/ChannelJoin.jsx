@@ -34,7 +34,7 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
         {!channelStatus.c1 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
             <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff 360</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/Reff360')}>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/AirdropsCriptoES')}>
               Unirme al Grupo 1
             </button>
           </div>
@@ -44,7 +44,7 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
         {!channelStatus.c2 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
             <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff Free</p>
-            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/ReffFre')}>
+            <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/TONAirdropsES')}>
               Unirme al Grupo 2
             </button>
           </div>
