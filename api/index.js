@@ -189,8 +189,8 @@ export default async function handler(req, res) {
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
-    const isMember1 = await checkMembership(targetId, "-1003970608283");
-    const isMember2 = await checkMembership(targetId, "-1004472305328");
+    const isMember1 = await checkMembership(targetId, "-1003685621367");
+    const isMember2 = await checkMembership(targetId, "-1004377164928");
 
     return res.status(200).json({
       success: true,
