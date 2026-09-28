@@ -63,19 +63,23 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
     if (newSelection.length === 3) {
       const isCorrect = newSelection.every((val, index) => val === targetIcons[index]);
       
-      if (isCorrect) {
-        const tid = toast.loading("Verificando seguridad...");
-        try {
-          const res = await botApi.verifyHuman(userData.id, 'app-verified-3step');
-          if (res.success) {
-            setIsHuman(true);
-            toast.success("¡Verificación exitosa!", { id: tid });
-          }
-        } catch (e) {
-          toast.error("Error en el servidor.", { id: tid });
-          resetStep3();
-        }
-      } else {
+      // En handleIconSelect dentro de CaptchaVerification.jsx:
+if (isCorrect) {
+  const tid = toast.loading("Verificando seguridad...");
+  try {
+    const res = await botApi.verifyHuman(userData.id, 'app-verified-3step');
+    if (res.success) {
+      setIsHuman(true);
+      toast.success("¡Verificación exitosa!", { id: tid });
+    } else {
+      toast.error(res.error || "Falló la verificación en servidor.", { id: tid });
+      resetStep3();
+    }
+  } catch (e) {
+    toast.error("Error en el servidor.", { id: tid });
+    resetStep3();
+  }
+} else {
         toast.error("Orden incorrecto.");
         resetStep3();
       }
