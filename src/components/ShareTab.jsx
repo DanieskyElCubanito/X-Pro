@@ -15,7 +15,7 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
       toast.error("Error: ID de usuario no encontrado.");
       return;
     }
-    const link = `https://t.me/Referidos_Gratis_bot/app?startapp=${userId}`;
+    const link = `https://t.me/ReffRobot/app?startapp=${userId}`;
     navigator.clipboard.writeText(link)
       .then(() => toast.success("¡Enlace copiado al portapapeles!"))
       .catch(() => toast.error("Error al copiar el enlace"));
