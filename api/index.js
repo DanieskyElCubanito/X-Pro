@@ -27,7 +27,6 @@ async function checkMembership(userId, chatId) {
   }
 }
 
-// Función para enviar mensajes o fotos a los grupos de Telegram
 async function publishToTelegramGroup(chatId, text, photoUrl, userLink, username) {
   try {
     const formattedText = `${text}\n\n🔗 Enlace: ${userLink}\n👤 Publicado por: @${username || 'Usuario'}`;
@@ -63,7 +62,18 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, start_param, method } = req.body; 
+    const { user, action, userId, start_param, deviceId, previousAccountDetected } = req.body; 
+
+    // --- ACCIÓN: MARCAR COMO HUMANO TRAS PASAR CAPTCHA ---
+    if (action === 'verify-human') {
+      const targetId = String(userId || user?.id);
+      if (!targetId) return res.status(400).json({ success: false, error: 'User ID missing' });
+
+      const { error } = await supabase.from('users').update({ is_human: true }).eq('id', targetId);
+      if (error) return res.status(500).json({ success: false, error: error.message });
+
+      return res.status(200).json({ success: true, is_human: true });
+    }
 
     // --- ACCIÓN: PUBLICAR EN GRUPO (COSTO 1 PT) ---
     if (action === 'publish-post') {
@@ -103,16 +113,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2 });
     }
 
-    // --- ACCIÓN: RECOMPENSA POR VER ANUNCIO (0.1 PT SIN LÍMITE) ---
+    // --- ACCIÓN: RECOMPENSA POR VER ANUNCIO (0.1 PT) ---
     if (action === 'claim-bonus') {
       const { data: u, error: uErr } = await supabase.from('users').select('*').eq('id', String(userId)).single();
       if (uErr || !u) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
 
       const rewardPoints = 0.1; 
       const currentBalance = Number(u.balance || 0);
-      const newBalance = Number((currentBalance + rewardPoints).toFixed(2));
+      const currentTotal = Number(u.ganancias_totales || 0);
 
-      await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
+      const newBalance = Number((currentBalance + rewardPoints).toFixed(2));
+      const newTotal = Number((currentTotal + rewardPoints).toFixed(2));
+
+      await supabase.from('users').update({ 
+        balance: newBalance,
+        ganancias_totales: newTotal
+      }).eq('id', String(userId));
 
       return res.status(200).json({ success: true, balance: newBalance });
     }
@@ -120,7 +136,7 @@ export default async function handler(req, res) {
     // --- ACCIÓN: RECOMPENSA DIARIA POR UNIRSE A CANALES (0.1 PT) ---
     if (action === 'claim-daily-channel') {
       const { channelId } = req.body;
-      
+
       const allowedDailyChannels = {
         "-1004308461940": "last_claim_cryptotio",
         "-1003928890953": "last_claim_paymentoffers"
@@ -146,39 +162,89 @@ export default async function handler(req, res) {
       }
 
       const currentBalance = Number(u.balance || 0);
+      const currentTotal = Number(u.ganancias_totales || 0);
+
       const newBalance = Number((currentBalance + 0.1).toFixed(2));
-      
+      const newTotal = Number((currentTotal + 0.1).toFixed(2));
+
       await supabase.from('users').update({ 
         balance: newBalance,
+        ganancias_totales: newTotal,
         [columnToUpdate]: today
       }).eq('id', String(userId));
-      
+
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: REGISTRO / LOGIN (REFERIDOS 1 SOLO NIVEL = 1 PT) ---
+    // --- ACCIÓN: REGISTRO / LOGIN (ANTIFRAUDE + REFERIDOS) ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
 
+    // Detección de Multicuentas y Granjas por Device Fingerprint
+    const currentDeviceId = deviceId || targetUser.deviceId;
+    
+    if (currentDeviceId) {
+      const { data: existingDeviceOwner } = await supabase
+        .from('users')
+        .select('id, is_banned')
+        .eq('device_id', currentDeviceId)
+        .neq('id', targetId)
+        .maybeSingle();
+
+      if (existingDeviceOwner) {
+        // Bloquear si el mismo dispositivo intenta crear o usar otra cuenta
+        await supabase.from('users').update({ is_banned: true }).eq('id', targetId);
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Acceso denegado: Se ha detectado múltiple uso de cuentas en este mismo dispositivo.' 
+        });
+      }
+    }
+
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
-    if (dbUser && dbUser.is_banned) return res.status(403).json({ error: 'Esta cuenta ha sido baneada.' });
+    if (dbUser && dbUser.is_banned) return res.status(403).json({ success: false, error: 'Esta cuenta ha sido baneada por incumplir las reglas.' });
 
+    // Actualizar device_id en caso de que aún no lo tenga registrado
+    if (dbUser && currentDeviceId && !dbUser.device_id) {
+      await supabase.from('users').update({ device_id: currentDeviceId }).eq('id', targetId);
+      dbUser.device_id = currentDeviceId;
+    }
+
+    // REGISTRO DE NUEVO USUARIO
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
         username: targetUser.username || 'Usuario', 
         balance: 0, 
+        ganancias_totales: 0,
+        ganancias_referidos: 0,
+        device_id: currentDeviceId || null,
         is_human: false
       };
 
+      // Control de Referidos
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
-        const { data: referrer } = await supabase.from('users').select('balance').eq('id', String(start_param)).single();
+
+        const { data: referrer } = await supabase
+          .from('users')
+          .select('id, balance, ganancias_referidos, ganancias_totales')
+          .eq('id', String(start_param))
+          .single();
+
         if (referrer) {
-          const refNewBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
-          await supabase.from('users').update({ balance: refNewBalance }).eq('id', String(start_param));
+          const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
+          const refEarnings = Number((Number(referrer.ganancias_referidos || 0) + 1).toFixed(2));
+          const refTotal = Number((Number(referrer.ganancias_totales || 0) + 1).toFixed(2));
+
+          // Acredita 1 PT al referidor y actualiza sus métricas
+          await supabase.from('users').update({ 
+            balance: refBalance,
+            ganancias_referidos: refEarnings,
+            ganancias_totales: refTotal
+          }).eq('id', String(start_param));
         }
       }
 
@@ -186,6 +252,7 @@ export default async function handler(req, res) {
       dbUser = newUser || await supabase.from('users').select('*').eq('id', targetId).single().then(res => res.data);
     }
 
+    // Obtener la lista y conteo de referidos actualizados
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
@@ -195,11 +262,11 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, referralsList: lv1 || [] }, 
+      stats: { n1, referralsList: lv1 || [], c1: String(dbUser?.ganancias_referidos || 0) }, 
       channels: { c1: isMember1, c2: isMember2 }
     });
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
