@@ -23,19 +23,17 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
 
     const allIcons = ['⭐', '🛒', '📅', '🍎', '🚀', '🍕', '⚽', '🚗'];
     const shuffledAll = [...allIcons].sort(() => 0.5 - Math.random());
-    
+
     const targets = shuffledAll.slice(0, 3);
     setTargetIcons(targets);
-    
+
     const displayIcons = shuffledAll.slice(0, 6).sort(() => 0.5 - Math.random());
     setShuffledIcons(displayIcons);
   }, []);
 
   // --- LÓGICA PASO 1 ---
   const handleCheckboxClick = () => {
-    // Marcamos la casilla visualmente
     setIsChecked(true);
-    // Esperamos medio segundo para que el usuario vea el check antes de cambiar de pantalla
     setTimeout(() => {
       setStep(2);
     }, 500);
@@ -62,24 +60,23 @@ export default function CaptchaVerification({ userData, setIsHuman }) {
 
     if (newSelection.length === 3) {
       const isCorrect = newSelection.every((val, index) => val === targetIcons[index]);
-      
-      // En handleIconSelect dentro de CaptchaVerification.jsx:
-if (isCorrect) {
-  const tid = toast.loading("Verificando seguridad...");
-  try {
-    const res = await botApi.verifyHuman(userData.id, 'app-verified-3step');
-    if (res.success) {
-      setIsHuman(true);
-      toast.success("¡Verificación exitosa!", { id: tid });
-    } else {
-      toast.error(res.error || "Falló la verificación en servidor.", { id: tid });
-      resetStep3();
-    }
-  } catch (e) {
-    toast.error("Error en el servidor.", { id: tid });
-    resetStep3();
-  }
-} else {
+
+      if (isCorrect) {
+        const tid = toast.loading("Verificando seguridad...");
+        try {
+          const res = await botApi.verifyHuman(userData?.id, 'app-verified-3step');
+          if (res?.success) {
+            setIsHuman(true);
+            toast.success("¡Verificación exitosa!", { id: tid });
+          } else {
+            toast.error(res?.error || "Falló la verificación en servidor.", { id: tid });
+            resetStep3();
+          }
+        } catch (e) {
+          toast.error("Error en el servidor.", { id: tid });
+          resetStep3();
+        }
+      } else {
         toast.error("Orden incorrecto.");
         resetStep3();
       }
@@ -89,39 +86,38 @@ if (isCorrect) {
   const resetStep3 = () => {
     setTimeout(() => {
       setSelectedIcons([]);
-      setShuffledIcons([...shuffledIcons].sort(() => 0.5 - Math.random()));
+      setShuffledIcons((prev) => [...prev].sort(() => 0.5 - Math.random()));
     }, 1000);
   };
 
   return (
-    <div style={{...s.container, padding: '40px 20px', textAlign: 'center'}}>
+    <div style={{ ...s.container, padding: '40px 20px', textAlign: 'center' }}>
       <Toaster position="top-center" />
-      <h2 style={{color: '#fff', marginBottom: '30px'}}>Verificación de Seguridad</h2>
+      <h2 style={{ color: '#fff', marginBottom: '30px' }}>Verificación de Seguridad</h2>
 
       {/* --- PASO 1: CHECKBOX --- */}
       {step === 1 && (
         <div className="fade-in" style={{ display: 'flex', justifyContent: 'center' }}>
-          <div style={{
+          <div 
+            onClick={handleCheckboxClick}
+            style={{
               display: 'flex', alignItems: 'center', gap: '15px', 
               padding: '20px', background: '#1a1a1a', borderRadius: '8px', 
-              border: '1px solid #333', width: '250px'
+              border: '1px solid #333', width: '250px', cursor: 'pointer'
             }}
           >
-            {/* Solo esta pequeña casilla tiene el evento onClick ahora */}
             <div 
-              onClick={handleCheckboxClick}
               style={{ 
                 width: '28px', height: '28px', border: '2px solid #888', borderRadius: '4px',
                 display: 'flex', justifyContent: 'center', alignItems: 'center',
-                cursor: 'pointer', background: isChecked ? '#00ccff' : 'transparent',
+                background: isChecked ? '#00ccff' : 'transparent',
                 transition: 'background 0.2s'
               }}
             >
               {isChecked && <span style={{ color: '#000', fontWeight: 'bold', fontSize: '18px' }}>✓</span>}
             </div>
-            
-            {/* Si quieres que el texto también sea clickeable, puedes agregarle el onClick también al span */}
-            <span style={{ color: '#fff', fontSize: '16px' }}>Soy humano</span>
+
+            <span style={{ color: '#fff', fontSize: '16px', userSelect: 'none' }}>Soy humano</span>
           </div>
         </div>
       )}
@@ -129,8 +125,8 @@ if (isCorrect) {
       {/* --- PASO 2: PUZZLE SLIDER --- */}
       {step === 2 && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <p style={{color: '#aaa'}}>Desliza para completar la imagen</p>
-          
+          <p style={{ color: '#aaa' }}>Desliza para completar la imagen</p>
+
           <div style={{ 
             width: '280px', height: '150px', background: 'linear-gradient(45deg, #2a3b4c, #112233)', 
             borderRadius: '10px', position: 'relative', overflow: 'hidden', border: '2px solid #333'
@@ -151,9 +147,10 @@ if (isCorrect) {
 
           <input 
             type="range" 
-            min="0" max="85" 
+            min="0" 
+            max="85" 
             value={sliderValue} 
-            onChange={(e) => setSliderValue(e.target.value)}
+            onChange={(e) => setSliderValue(Number(e.target.value))}
             onMouseUp={handleSliderRelease}
             onTouchEnd={handleSliderRelease}
             style={{ width: '280px', marginTop: '10px' }}
@@ -165,7 +162,7 @@ if (isCorrect) {
       {step === 3 && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ background: '#111', padding: '15px', borderRadius: '10px', width: '280px', border: '1px solid #333' }}>
-            <p style={{color: '#888', margin: '0 0 10px 0'}}>Selecciona en este orden:</p>
+            <p style={{ color: '#888', margin: '0 0 10px 0' }}>Selecciona en este orden:</p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '24px' }}>
               {targetIcons.map((icon, i) => (
                 <span key={i} style={{ opacity: selectedIcons.length > i ? 0.3 : 1 }}>{icon}</span>
@@ -188,7 +185,7 @@ if (isCorrect) {
                     fontSize: '30px', padding: '15px 0', borderRadius: '10px',
                     background: isSelected ? '#004466' : '#1a1a1a',
                     border: isSelected ? '2px solid #00ccff' : '2px solid #333',
-                    opacity: isSelected ? 0.5 : 1, cursor: 'pointer', transition: 'all 0.2s',
+                    opacity: isSelected ? 0.5 : 1, cursor: isSelected ? 'default' : 'pointer', transition: 'all 0.2s',
                     position: 'relative'
                   }}
                 >
@@ -203,12 +200,11 @@ if (isCorrect) {
                     </div>
                   )}
                 </button>
-              )
+              );
             })}
           </div>
         </div>
       )}
-
     </div>
   );
 }
