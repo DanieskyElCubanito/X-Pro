@@ -120,14 +120,14 @@ export default async function handler(req, res) {
 
       const rewardPoints = 0.1; 
       const currentBalance = Number(u.balance || 0);
-      const currentTotal = Number(u.ganancias_totales || 0);
+      const currentTotal = Number(u.total_earnings || 0);
 
       const newBalance = Number((currentBalance + rewardPoints).toFixed(2));
       const newTotal = Number((currentTotal + rewardPoints).toFixed(2));
 
       await supabase.from('users').update({ 
         balance: newBalance,
-        ganancias_totales: newTotal
+        total_earnings: newTotal
       }).eq('id', String(userId));
 
       return res.status(200).json({ success: true, balance: newBalance });
@@ -162,14 +162,14 @@ export default async function handler(req, res) {
       }
 
       const currentBalance = Number(u.balance || 0);
-      const currentTotal = Number(u.ganancias_totales || 0);
+      const currentTotal = Number(u.total_earnings || 0);
 
       const newBalance = Number((currentBalance + 0.1).toFixed(2));
       const newTotal = Number((currentTotal + 0.1).toFixed(2));
 
       await supabase.from('users').update({ 
         balance: newBalance,
-        ganancias_totales: newTotal,
+        total_earnings: newTotal,
         [columnToUpdate]: today
       }).eq('id', String(userId));
 
@@ -183,7 +183,6 @@ export default async function handler(req, res) {
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     
-    // Detección de multicuentas
     if (currentDeviceId) {
       const { data: existingDeviceOwner } = await supabase
         .from('users')
@@ -212,14 +211,13 @@ export default async function handler(req, res) {
       dbUser.device_id = currentDeviceId;
     }
 
-    // Si el usuario no existe, crearlo
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
         username: targetUser.username || 'Usuario', 
         balance: 0, 
-        ganancias_totales: 0,
-        ganancias_referidos: 0,
+        total_earnings: 0,
+        referral_earnings: 0,
         device_id: currentDeviceId || null,
         is_human: false
       };
@@ -229,19 +227,19 @@ export default async function handler(req, res) {
 
         const { data: referrer } = await supabase
           .from('users')
-          .select('id, balance, ganancias_referidos, ganancias_totales')
+          .select('id, balance, referral_earnings, total_earnings')
           .eq('id', String(start_param))
           .single();
 
         if (referrer) {
           const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
-          const refEarnings = Number((Number(referrer.ganancias_referidos || 0) + 1).toFixed(2));
-          const refTotal = Number((Number(referrer.ganancias_totales || 0) + 1).toFixed(2));
+          const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
+          const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
 
           await supabase.from('users').update({ 
             balance: refBalance,
-            ganancias_referidos: refEarnings,
-            ganancias_totales: refTotal
+            referral_earnings: refEarnings,
+            total_earnings: refTotal
           }).eq('id', String(start_param));
         }
       }
@@ -262,7 +260,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       user: dbUser,
-      stats: { n1, referralsList: lv1 || [], c1: String(dbUser?.ganancias_referidos || 0) }, 
+      stats: { n1, referralsList: lv1 || [], c1: String(dbUser?.referral_earnings || 0) }, 
       channels: { c1: isMember1, c2: isMember2 }
     });
 
