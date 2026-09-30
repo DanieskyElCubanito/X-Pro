@@ -64,6 +64,12 @@ export default async function handler(req, res) {
   try {
     const { user, action, userId, start_param } = req.body; 
 
+    // Obtener la IP real del cliente desde las cabeceras de red (Vercel)
+    const forwarded = req.headers['x-forwarded-for'];
+    const clientIp = forwarded 
+      ? forwarded.split(',')[0].trim() 
+      : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
+
     // --- ACCIÓN: MARCAR COMO HUMANO TRAS PASAR CAPTCHA ---
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
@@ -158,7 +164,7 @@ export default async function handler(req, res) {
       const columnToUpdate = allowedDailyChannels[channelId];
 
       if (u[columnToUpdate] === today) {
-        return res.status(400).json({ success: false, error: 'Ya reclamaste la recompensa de este canal hoy.' });
+        return res.status(400).json({ success: false, error: 'Ya reclamaste la recompensa de este canal hoy. Vuelve mañana.' });
       }
 
       const currentBalance = Number(u.balance || 0);
@@ -183,6 +189,7 @@ export default async function handler(req, res) {
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     
+    // Detección de multicuentas por Device ID
     if (currentDeviceId) {
       const { data: existingDeviceOwner } = await supabase
         .from('users')
@@ -206,11 +213,17 @@ export default async function handler(req, res) {
       return res.status(403).json({ success: false, error: 'Esta cuenta ha sido baneada.' });
     }
 
-    if (dbUser && currentDeviceId && !dbUser.device_id) {
-      await supabase.from('users').update({ device_id: currentDeviceId }).eq('id', targetId);
-      dbUser.device_id = currentDeviceId;
+    // Actualizar device_id o ip_address si no están guardados
+    const updates = {};
+    if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
+    if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
+
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('users').update(updates).eq('id', targetId);
+      dbUser = { ...dbUser, ...updates };
     }
 
+    // Registro de nuevo usuario
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
@@ -219,6 +232,7 @@ export default async function handler(req, res) {
         total_earnings: 0,
         referral_earnings: 0,
         device_id: currentDeviceId || null,
+        ip_address: clientIp || null,
         is_human: false
       };
 
