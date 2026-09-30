@@ -47,9 +47,9 @@ function App() {
 
       const data = await botApi.verifyUser(userPayload, startParam);
 
-      if (data.success) {
+      if (data && data.success && data.user) {
         setUserData(data.user);
-        setStats(data.stats);
+        setStats(data.stats || { n1: 0, c1: "0.000" });
 
         let needsToJoin = false;
         if (data.channels) {
@@ -59,9 +59,9 @@ function App() {
 
         setMustJoin(needsToJoin || data.mustJoin === true); 
         setStatus('member');
-        if (data.user.is_human) setIsHuman(true);
+        if (data.user?.is_human) setIsHuman(true);
       } else {
-        setErrorMessage(data.message || data.error || "Tu cuenta ha sido restringida por seguridad.");
+        setErrorMessage(data?.message || data?.error || "Error al verificar la cuenta.");
         setStatus('error');
       }
     } catch (err) {
