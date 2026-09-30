@@ -62,7 +62,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, start_param, deviceId, previousAccountDetected } = req.body; 
+    const { user, action, userId, start_param } = req.body; 
 
     // --- ACCIÓN: MARCAR COMO HUMANO TRAS PASAR CAPTCHA ---
     if (action === 'verify-human') {
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
     if (action === 'publish-post') {
       const { text, link, photoUrl, chatId } = req.body;
       if (!text || !link || !chatId) {
-        return res.status(400).json({ success: false, error: 'Faltan datos obligatorios (texto, enlace o grupo).' });
+        return res.status(400).json({ success: false, error: 'Faltan datos obligatorios.' });
       }
 
       const allowedGroups = ["-1002228067712", "-1004472305328"];
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
 
       const published = await publishToTelegramGroup(chatId, text, photoUrl, link, dbUser.username);
       if (!published) {
-        return res.status(500).json({ success: false, error: 'El bot no pudo publicar en el grupo. Asegúrate de que sea administrador.' });
+        return res.status(500).json({ success: false, error: 'El bot no pudo publicar en el grupo.' });
       }
 
       const newBalance = Number((currentBalance - 1).toFixed(2));
@@ -158,7 +158,7 @@ export default async function handler(req, res) {
       const columnToUpdate = allowedDailyChannels[channelId];
 
       if (u[columnToUpdate] === today) {
-        return res.status(400).json({ success: false, error: 'Ya reclamaste la recompensa de este canal hoy. Vuelve mañana.' });
+        return res.status(400).json({ success: false, error: 'Ya reclamaste la recompensa de este canal hoy.' });
       }
 
       const currentBalance = Number(u.balance || 0);
@@ -176,14 +176,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: REGISTRO / LOGIN (ANTIFRAUDE + REFERIDOS) ---
+    // --- ACCIÓN: REGISTRO / LOGIN / VERIFY ---
     const targetUser = user || { id: userId };
-    const targetId = String(targetUser.id);
-    if (!targetId || targetId === 'undefined') return res.status(400).json({ error: 'No user id' });
+    const targetId = String(targetUser?.id);
+    if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
 
-    // Detección de Multicuentas y Granjas por Device Fingerprint
-    const currentDeviceId = deviceId || targetUser.deviceId;
+    const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     
+    // Detección de multicuentas
     if (currentDeviceId) {
       const { data: existingDeviceOwner } = await supabase
         .from('users')
@@ -193,26 +193,26 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       if (existingDeviceOwner) {
-        // Bloquear si el mismo dispositivo intenta crear o usar otra cuenta
         await supabase.from('users').update({ is_banned: true }).eq('id', targetId);
         return res.status(403).json({ 
           success: false, 
-          error: 'Acceso denegado: Se ha detectado múltiple uso de cuentas en este mismo dispositivo.' 
+          error: 'Acceso denegado: Múltiples cuentas detectadas en este dispositivo.' 
         });
       }
     }
 
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
 
-    if (dbUser && dbUser.is_banned) return res.status(403).json({ success: false, error: 'Esta cuenta ha sido baneada por incumplir las reglas.' });
+    if (dbUser && dbUser.is_banned) {
+      return res.status(403).json({ success: false, error: 'Esta cuenta ha sido baneada.' });
+    }
 
-    // Actualizar device_id en caso de que aún no lo tenga registrado
     if (dbUser && currentDeviceId && !dbUser.device_id) {
       await supabase.from('users').update({ device_id: currentDeviceId }).eq('id', targetId);
       dbUser.device_id = currentDeviceId;
     }
 
-    // REGISTRO DE NUEVO USUARIO
+    // Si el usuario no existe, crearlo
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
@@ -224,7 +224,6 @@ export default async function handler(req, res) {
         is_human: false
       };
 
-      // Control de Referidos
       if (start_param && String(start_param) !== targetId) {
         newUserObj.referred_by = String(start_param);
 
@@ -239,7 +238,6 @@ export default async function handler(req, res) {
           const refEarnings = Number((Number(referrer.ganancias_referidos || 0) + 1).toFixed(2));
           const refTotal = Number((Number(referrer.ganancias_totales || 0) + 1).toFixed(2));
 
-          // Acredita 1 PT al referidor y actualiza sus métricas
           await supabase.from('users').update({ 
             balance: refBalance,
             ganancias_referidos: refEarnings,
@@ -248,11 +246,13 @@ export default async function handler(req, res) {
         }
       }
 
-      const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
-      dbUser = newUser || await supabase.from('users').select('*').eq('id', targetId).single().then(res => res.data);
+      const { data: newUser, error: insertErr } = await supabase.from('users').insert([newUserObj]).select().single();
+      if (insertErr) {
+        return res.status(500).json({ success: false, error: insertErr.message });
+      }
+      dbUser = newUser;
     }
 
-    // Obtener la lista y conteo de referidos actualizados
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
