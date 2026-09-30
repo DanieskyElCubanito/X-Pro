@@ -62,7 +62,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { user, action, userId, start_param } = req.body; 
+    const { user, action, userId, start_param, previousAccountDetected } = req.body; 
 
     // Obtener la IP real del cliente desde las cabeceras de red (Vercel)
     const forwarded = req.headers['x-forwarded-for'];
@@ -188,21 +188,64 @@ export default async function handler(req, res) {
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
-    
-    // Detección de multicuentas por Device ID
+
+    // 1. Detección por Device ID (protege al usuario legítimo original)
     if (currentDeviceId) {
-      const { data: existingDeviceOwner } = await supabase
+      const { data: firstOwner } = await supabase
         .from('users')
         .select('id, is_banned')
         .eq('device_id', currentDeviceId)
         .neq('id', targetId)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
-      if (existingDeviceOwner) {
-        await supabase.from('users').update({ is_banned: true }).eq('id', targetId);
+      if (firstOwner) {
+        // Se banea únicamente a la cuenta clon/multicuenta
+        await supabase.from('users').upsert({
+          id: targetId,
+          username: targetUser.username || 'Usuario',
+          device_id: currentDeviceId,
+          ip_address: clientIp || null,
+          is_banned: true
+        });
+
         return res.status(403).json({ 
           success: false, 
-          error: 'Acceso denegado: Múltiples cuentas detectadas en este dispositivo.' 
+          error: 'Acceso denegado: Este dispositivo ya tiene una cuenta activa registrada.' 
+        });
+      }
+    }
+
+    // 2. Detección por navegador previo (LocalStorage)
+    const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
+    if (detectedPrev && String(detectedPrev) !== targetId) {
+      await supabase.from('users').upsert({
+        id: targetId,
+        username: targetUser.username || 'Usuario',
+        device_id: currentDeviceId || null,
+        ip_address: clientIp || null,
+        is_banned: true
+      });
+
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Acceso denegado: Se detectó otra cuenta asociada a este navegador.' 
+      });
+    }
+
+    // 3. Detección de granjas por IP (máximo 2 cuentas por IP)
+    if (clientIp) {
+      const { count: accountsOnThisIp } = await supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('ip_address', clientIp)
+        .neq('id', targetId);
+
+      if (accountsOnThisIp && accountsOnThisIp >= 2) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Límite de cuentas alcanzado para esta conexión de red.' 
         });
       }
     }
@@ -213,7 +256,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ success: false, error: 'Esta cuenta ha sido baneada.' });
     }
 
-    // Actualizar device_id o ip_address si no están guardados
+    // Actualizar device_id o IP si están pendientes
     const updates = {};
     if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
     if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
@@ -223,7 +266,7 @@ export default async function handler(req, res) {
       dbUser = { ...dbUser, ...updates };
     }
 
-    // Registro de nuevo usuario
+    // 4. Registro de nuevo usuario y recompensa a referidor seguro
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
@@ -237,15 +280,21 @@ export default async function handler(req, res) {
       };
 
       if (start_param && String(start_param) !== targetId) {
-        newUserObj.referred_by = String(start_param);
-
         const { data: referrer } = await supabase
           .from('users')
-          .select('id, balance, referral_earnings, total_earnings')
+          .select('id, balance, referral_earnings, total_earnings, ip_address, device_id')
           .eq('id', String(start_param))
           .single();
 
-        if (referrer) {
+        // Comprobar que no sea autoreferido (mismo dispositivo o misma IP)
+        const isSelfReferral = referrer && (
+          (referrer.device_id && currentDeviceId && referrer.device_id === currentDeviceId) ||
+          (referrer.ip_address && clientIp && referrer.ip_address === clientIp)
+        );
+
+        if (referrer && !isSelfReferral) {
+          newUserObj.referred_by = String(start_param);
+
           const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
           const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
           const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
