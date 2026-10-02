@@ -7,7 +7,7 @@ function PublishTab({ userData, setUserData }) {
   const [text, setText] = useState('');
   const [link, setLink] = useState('');
   const [photo, setPhoto] = useState('');
-  const [group, setGroup] = useState('Reff Free');
+  const [group, setGroup] = useState('Airdrops TON');
   const [isPublishing, setIsPublishing] = useState(false);
 
   const handlePublish = async () => {
