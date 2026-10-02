@@ -112,7 +112,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: VERIFICAR CANALES ---
+    // --- ACCIÓN: VERIFICAR CANALES OBLIGATORIOS AL INICIO ---
     if (action === 'check-channels') {
       const isMember1 = await checkMembership(userId, "-1004362492963");
       const isMember2 = await checkMembership(userId, "-1004490423840");
@@ -142,17 +142,19 @@ export default async function handler(req, res) {
     // --- ACCIÓN: RECOMPENSA DIARIA POR UNIRSE A CANALES (0.1 PT) ---
     if (action === 'claim-daily-channel') {
       const { channelId } = req.body;
+      const targetChannelKey = String(channelId);
 
+      // CORREGIDO: IDs idénticos a DailyCheckIn.jsx
       const allowedDailyChannels = {
-        "-1003685621367": "last_claim_cryptotio",
-        "-1004377164928": "last_claim_paymentoffers"
+        "-1004362492963": "last_claim_cryptotio",
+        "-1004490423840": "last_claim_paymentoffers"
       };
 
-      if (!allowedDailyChannels[channelId]) {
+      if (!allowedDailyChannels[targetChannelKey]) {
         return res.status(400).json({ success: false, error: 'Canal no válido.' });
       }
 
-      const isMember = await checkMembership(userId, channelId);
+      const isMember = await checkMembership(userId, targetChannelKey);
       if (!isMember) {
         return res.status(400).json({ success: false, error: 'Debes unirte al canal primero para reclamar.' });
       }
@@ -161,7 +163,7 @@ export default async function handler(req, res) {
       if (uErr || !u) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
 
       const today = new Date().toISOString().split('T')[0];
-      const columnToUpdate = allowedDailyChannels[channelId];
+      const columnToUpdate = allowedDailyChannels[targetChannelKey];
 
       if (u[columnToUpdate] === today) {
         return res.status(400).json({ success: false, error: 'Ya reclamaste la recompensa de este canal hoy. Vuelve mañana.' });
@@ -192,7 +194,6 @@ export default async function handler(req, res) {
     // --- 1. DETECCIÓN POR NAVEGADOR (LocalStorage) ---
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
     if (detectedPrev && String(detectedPrev) !== targetId) {
-      // Bloquear únicamente a la cuenta secundaria/intrusa
       await supabase.from('users').upsert({
         id: targetId,
         username: targetUser.username || 'Usuario',
@@ -209,7 +210,6 @@ export default async function handler(req, res) {
 
     // --- 2. DETECCIÓN POR DEVICE ID (1 cuenta por dispositivo) ---
     if (currentDeviceId) {
-      // Buscar la primera cuenta creada en este dispositivo
       const { data: firstOwner } = await supabase
         .from('users')
         .select('id, is_banned')
@@ -218,7 +218,6 @@ export default async function handler(req, res) {
         .limit(1)
         .maybeSingle();
 
-      // Si existe un dueño previo y NO es el usuario actual, este usuario es una multicuenta
       if (firstOwner && String(firstOwner.id) !== targetId) {
         await supabase.from('users').upsert({
           id: targetId,
@@ -257,7 +256,6 @@ export default async function handler(req, res) {
       return res.status(403).json({ success: false, error: 'Esta cuenta ha sido baneada.' });
     }
 
-    // Actualizar device_id o IP si están pendientes
     const updates = {};
     if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
     if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
@@ -287,7 +285,6 @@ export default async function handler(req, res) {
           .eq('id', String(start_param))
           .single();
 
-        // Comprobar que no sea autoreferido (mismo dispositivo o misma IP)
         const isSelfReferral = referrer && (
           (referrer.device_id && currentDeviceId && referrer.device_id === currentDeviceId) ||
           (referrer.ip_address && clientIp && referrer.ip_address === clientIp)
@@ -318,8 +315,8 @@ export default async function handler(req, res) {
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
-    const isMember1 = await checkMembership(targetId, "-1003685621367");
-    const isMember2 = await checkMembership(targetId, "-1004377164928");
+    const isMember1 = await checkMembership(targetId, "-1004362492963");
+    const isMember2 = await checkMembership(targetId, "-1004490423840");
 
     return res.status(200).json({
       success: true,
