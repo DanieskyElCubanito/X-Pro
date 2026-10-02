@@ -64,7 +64,7 @@ function PublishTab({ userData, setUserData }) {
             style={{ padding: '10px', borderRadius: '8px', backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333' }}
           >
             <option value="Reff Free">Grupo: Airdrops Crypto</option>
-            <option value="Reff 360">Grupo: Airdrops TON</option>
+            <option value="Airdrops Crypto">Grupo: Airdrops TON</option>
           </select>
 
           <textarea 
