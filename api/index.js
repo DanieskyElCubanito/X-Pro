@@ -189,19 +189,37 @@ export default async function handler(req, res) {
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
 
-    // 1. Detección por Device ID (protege al usuario legítimo original)
+    // --- 1. DETECCIÓN POR NAVEGADOR (LocalStorage) ---
+    const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
+    if (detectedPrev && String(detectedPrev) !== targetId) {
+      // Bloquear únicamente a la cuenta secundaria/intrusa
+      await supabase.from('users').upsert({
+        id: targetId,
+        username: targetUser.username || 'Usuario',
+        device_id: currentDeviceId || null,
+        ip_address: clientIp || null,
+        is_banned: true
+      });
+
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Acceso denegado: Este navegador ya tiene otra cuenta vinculada.' 
+      });
+    }
+
+    // --- 2. DETECCIÓN POR DEVICE ID (1 cuenta por dispositivo) ---
     if (currentDeviceId) {
+      // Buscar la primera cuenta creada en este dispositivo
       const { data: firstOwner } = await supabase
         .from('users')
         .select('id, is_banned')
         .eq('device_id', currentDeviceId)
-        .neq('id', targetId)
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
 
-      if (firstOwner) {
-        // Se banea únicamente a la cuenta clon/multicuenta
+      // Si existe un dueño previo y NO es el usuario actual, este usuario es una multicuenta
+      if (firstOwner && String(firstOwner.id) !== targetId) {
         await supabase.from('users').upsert({
           id: targetId,
           username: targetUser.username || 'Usuario',
@@ -217,24 +235,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. Detección por navegador previo (LocalStorage)
-    const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
-    if (detectedPrev && String(detectedPrev) !== targetId) {
-      await supabase.from('users').upsert({
-        id: targetId,
-        username: targetUser.username || 'Usuario',
-        device_id: currentDeviceId || null,
-        ip_address: clientIp || null,
-        is_banned: true
-      });
-
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Acceso denegado: Se detectó otra cuenta asociada a este navegador.' 
-      });
-    }
-
-    // 3. Detección de granjas por IP (máximo 2 cuentas por IP)
+    // --- 3. DETECCIÓN DE GRANJAS POR IP (Máximo 2 cuentas por IP) ---
     if (clientIp) {
       const { count: accountsOnThisIp } = await supabase
         .from('users')
@@ -245,7 +246,7 @@ export default async function handler(req, res) {
       if (accountsOnThisIp && accountsOnThisIp >= 2) {
         return res.status(403).json({ 
           success: false, 
-          error: 'Límite de cuentas alcanzado para esta conexión de red.' 
+          error: 'Límite de cuentas alcanzado: Máximo 2 cuentas permitidas por conexión de red (IP).' 
         });
       }
     }
@@ -266,7 +267,7 @@ export default async function handler(req, res) {
       dbUser = { ...dbUser, ...updates };
     }
 
-    // 4. Registro de nuevo usuario y recompensa a referidor seguro
+    // --- 4. REGISTRO DE NUEVO USUARIO Y CONTROL DE REFERIDOS ---
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
