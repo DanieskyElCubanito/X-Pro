@@ -144,8 +144,8 @@ export default async function handler(req, res) {
       const { channelId } = req.body;
 
       const allowedDailyChannels = {
-        "-1004308461940": "last_claim_cryptotio",
-        "-1003928890953": "last_claim_paymentoffers"
+        "-1003685621367": "last_claim_cryptotio",
+        "-1004377164928": "last_claim_paymentoffers"
       };
 
       if (!allowedDailyChannels[channelId]) {
