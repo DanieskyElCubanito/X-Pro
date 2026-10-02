@@ -33,7 +33,7 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
         {/* SE INVIRTIÓ PARA COINCIDIR CON EL BACKEND */}
         {!channelStatus.c1 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff 360</p>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Airdrops Crypto</p>
             <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/AirdropsCriptoES')}>
               Unirme al Grupo 1
             </button>
@@ -43,7 +43,7 @@ export default function ChannelJoin({ channelStatus, setChannelStatus, userData,
         {/* SE INVIRTIÓ PARA COINCIDIR CON EL BACKEND */}
         {!channelStatus.c2 && (
           <div style={{...s.card, border: '1px solid #0088cc'}}>
-            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Reff Free</p>
+            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>Airdrops TON</p>
             <button style={s.btnGreen} onClick={() => WebApp.openTelegramLink('https://t.me/TONAirdropsES')}>
               Unirme al Grupo 2
             </button>
