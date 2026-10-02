@@ -88,7 +88,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Faltan datos obligatorios.' });
       }
 
-      const allowedGroups = ["-1002228067712", "-1004472305328"];
+      const allowedGroups = ["-1003685621367", "-1004377164928"];
       if (!allowedGroups.includes(String(chatId))) {
         return res.status(400).json({ success: false, error: 'Grupo no válido.' });
       }
