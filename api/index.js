@@ -114,8 +114,8 @@ export default async function handler(req, res) {
 
     // --- ACCIÓN: VERIFICAR CANALES OBLIGATORIOS AL INICIO ---
     if (action === 'check-channels') {
-      const isMember1 = await checkMembership(userId, "-1004362492963");
-      const isMember2 = await checkMembership(userId, "-1004490423840");
+      const isMember1 = await checkMembership(userId, "-1003685621367");
+      const isMember2 = await checkMembership(userId, "-1004377164928");
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2 });
     }
 
