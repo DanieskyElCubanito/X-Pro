@@ -34,10 +34,17 @@ function App() {
       const result = await fp.get();
       const generatedDeviceId = result.visitorId;
 
-      const storedUserId = localStorage.getItem('xpro_linked_user');
-      const previousAccount = storedUserId && storedUserId !== String(teleUser.id) ? storedUserId : null;
-
-      localStorage.setItem('xpro_linked_user', String(teleUser.id));
+      // Obtener la cuenta originalmente vinculada a este navegador
+      const storedFirstUser = localStorage.getItem('xpro_linked_user');
+      
+      let previousAccount = null;
+      if (!storedFirstUser) {
+        // Primera cuenta legítima detectada en este dispositivo/navegador
+        localStorage.setItem('xpro_linked_user', String(teleUser.id));
+      } else if (storedFirstUser !== String(teleUser.id)) {
+        // Se detecta un intento de cuenta secundaria sin sobreescribir la cuenta original
+        previousAccount = storedFirstUser;
+      }
 
       const userPayload = {
         ...teleUser,
@@ -141,7 +148,7 @@ function App() {
             stats={stats} 
             handleShare={handleShare} 
             userId={userData?.id} 
-            totalReferralEarnings={userData?.ganancias_referidos} 
+            totalReferralEarnings={userData?.referral_earnings} 
           />
         )}
       </div>
