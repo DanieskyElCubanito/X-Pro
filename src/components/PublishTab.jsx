@@ -19,7 +19,7 @@ function PublishTab({ userData, setUserData }) {
     }
 
     // Asignar el ID del grupo según la selección
-    const chatId = group === 'Reff Free' ? "-1003685621367" : "-1004377164928";
+    const chatId = group === 'Airdrops Cripto' ? "-1003685621367" : "-1004377164928";
 
     setIsPublishing(true);
     const tid = toast.loading("Enviando al grupo de Telegram...");
@@ -63,8 +63,8 @@ function PublishTab({ userData, setUserData }) {
             onChange={(e) => setGroup(e.target.value)}
             style={{ padding: '10px', borderRadius: '8px', backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333' }}
           >
-            <option value="Reff Free">Grupo: Reff Free</option>
-            <option value="Reff 360">Grupo: Reff 360</option>
+            <option value="Reff Free">Grupo: Airdrops Crypto</option>
+            <option value="Reff 360">Grupo: Airdrops TON</option>
           </select>
 
           <textarea 
