@@ -113,9 +113,10 @@ export default async function handler(req, res) {
     }
 
     // --- ACCIÓN: VERIFICAR CANALES OBLIGATORIOS AL INICIO ---
+    // Canales obligatorios: Airdrops Cripto (-1003685621367) y Airdrops TON (-1004377164928)
     if (action === 'check-channels') {
-      const isMember1 = await checkMembership(userId, "-1003685621367");
-      const isMember2 = await checkMembership(userId, "-1004377164928");
+      const isMember1 = await checkMembership(userId, "-1003685621367"); // @AirdropsCriptoES
+      const isMember2 = await checkMembership(userId, "-1004377164928"); // @TONAirdropsES
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2 });
     }
 
@@ -140,14 +141,14 @@ export default async function handler(req, res) {
     }
 
     // --- ACCIÓN: RECOMPENSA DIARIA POR UNIRSE A CANALES (0.1 PT) ---
+    // Canales de Check Diario: Crypto Web3 (-1004362492963) y The Danny Dev (-1004490423840)
     if (action === 'claim-daily-channel') {
       const { channelId } = req.body;
       const targetChannelKey = String(channelId);
 
-      // CORREGIDO: IDs idénticos a DailyCheckIn.jsx
       const allowedDailyChannels = {
-        "-1004362492963": "last_claim_cryptotio",
-        "-1004490423840": "last_claim_paymentoffers"
+        "-1004362492963": "last_claim_cryptotio",    // @CryptoWeb3Pay
+        "-1004490423840": "last_claim_paymentoffers" // @TheDannyDev
       };
 
       if (!allowedDailyChannels[targetChannelKey]) {
@@ -315,8 +316,9 @@ export default async function handler(req, res) {
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
-    const isMember1 = await checkMembership(targetId, "-1004362492963");
-    const isMember2 = await checkMembership(targetId, "-1004490423840");
+    // CORREGIDO: Verificamos los canales obligatorios al entrar
+    const isMember1 = await checkMembership(targetId, "-1003685621367"); // @AirdropsCriptoES
+    const isMember2 = await checkMembership(targetId, "-1004377164928"); // @TONAirdropsES
 
     return res.status(200).json({
       success: true,
