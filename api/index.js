@@ -64,7 +64,7 @@ export default async function handler(req, res) {
   try {
     const { user, action, userId, start_param, previousAccountDetected } = req.body; 
 
-    // Obtener la IP real del cliente desde las cabeceras de red (Vercel)
+    // Obtener la IP real del cliente desde Vercel
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded 
       ? forwarded.split(',')[0].trim() 
@@ -112,12 +112,46 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: VERIFICAR CANALES OBLIGATORIOS AL INICIO ---
-    // Canales obligatorios: Airdrops Cripto (-1003685621367) y Airdrops TON (-1004377164928)
+    // --- ACCIÓN: VERIFICAR CANALES OBLIGATORIOS Y LIBERAR BONO DE REFERIDO ---
     if (action === 'check-channels') {
-      const isMember1 = await checkMembership(userId, "-1003685621367"); // @AirdropsCriptoES
-      const isMember2 = await checkMembership(userId, "-1004377164928"); // @TONAirdropsES
-      return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined: isMember1 && isMember2 });
+      const targetId = String(userId);
+      const isMember1 = await checkMembership(targetId, "-1003685621367"); // @AirdropsCriptoES
+      const isMember2 = await checkMembership(targetId, "-1004377164928"); // @TONAirdropsES
+      const allJoined = isMember1 && isMember2;
+
+      if (allJoined) {
+        const { data: currentUser } = await supabase
+          .from('users')
+          .select('id, referred_by, is_human, referral_reward_granted')
+          .eq('id', targetId)
+          .single();
+
+        // PAGA SOLO SI: pasó captcha, tiene referidor válido y aún no se cobró el bono
+        if (currentUser && currentUser.is_human && currentUser.referred_by && !currentUser.referral_reward_granted) {
+          const { data: referrer } = await supabase
+            .from('users')
+            .select('id, balance, referral_earnings, total_earnings')
+            .eq('id', currentUser.referred_by)
+            .single();
+
+          if (referrer) {
+            const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
+            const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
+            const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
+
+            await supabase.from('users').update({ 
+              balance: refBalance,
+              referral_earnings: refEarnings,
+              total_earnings: refTotal
+            }).eq('id', referrer.id);
+
+            // Marcar bono como entregado
+            await supabase.from('users').update({ referral_reward_granted: true }).eq('id', targetId);
+          }
+        }
+      }
+
+      return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined });
     }
 
     // --- ACCIÓN: RECOMPENSA POR VER ANUNCIO (0.1 PT) ---
@@ -141,7 +175,6 @@ export default async function handler(req, res) {
     }
 
     // --- ACCIÓN: RECOMPENSA DIARIA POR UNIRSE A CANALES (0.1 PT) ---
-    // Canales de Check Diario: Crypto Web3 (-1004362492963) y The Danny Dev (-1004490423840)
     if (action === 'claim-daily-channel') {
       const { channelId } = req.body;
       const targetChannelKey = String(channelId);
@@ -266,7 +299,7 @@ export default async function handler(req, res) {
       dbUser = { ...dbUser, ...updates };
     }
 
-    // --- 4. REGISTRO DE NUEVO USUARIO Y CONTROL DE REFERIDOS ---
+    // --- 4. REGISTRO DE NUEVO USUARIO (SIN PAGAR BONO AQUÍ) ---
     if (!dbUser) {
       const newUserObj = { 
         id: targetId, 
@@ -276,13 +309,14 @@ export default async function handler(req, res) {
         referral_earnings: 0,
         device_id: currentDeviceId || null,
         ip_address: clientIp || null,
-        is_human: false
+        is_human: false,
+        referral_reward_granted: false
       };
 
       if (start_param && String(start_param) !== targetId) {
         const { data: referrer } = await supabase
           .from('users')
-          .select('id, balance, referral_earnings, total_earnings, ip_address, device_id')
+          .select('id, ip_address, device_id')
           .eq('id', String(start_param))
           .single();
 
@@ -291,18 +325,9 @@ export default async function handler(req, res) {
           (referrer.ip_address && clientIp && referrer.ip_address === clientIp)
         );
 
+        // Si no es autoreferido, lo vinculamos pero NO le pagamos todavía
         if (referrer && !isSelfReferral) {
           newUserObj.referred_by = String(start_param);
-
-          const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
-          const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
-          const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
-
-          await supabase.from('users').update({ 
-            balance: refBalance,
-            referral_earnings: refEarnings,
-            total_earnings: refTotal
-          }).eq('id', String(start_param));
         }
       }
 
@@ -316,7 +341,7 @@ export default async function handler(req, res) {
     const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
 
-    // CORREGIDO: Verificamos los canales obligatorios al entrar
+    // Verificación inicial de canales obligatorios
     const isMember1 = await checkMembership(targetId, "-1003685621367"); // @AirdropsCriptoES
     const isMember2 = await checkMembership(targetId, "-1004377164928"); // @TONAirdropsES
 
