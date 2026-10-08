@@ -36,13 +36,11 @@ function App() {
 
       // Obtener la cuenta originalmente vinculada a este navegador
       const storedFirstUser = localStorage.getItem('xpro_linked_user');
-      
+
       let previousAccount = null;
       if (!storedFirstUser) {
-        // Primera cuenta legítima detectada en este dispositivo/navegador
         localStorage.setItem('xpro_linked_user', String(teleUser.id));
       } else if (storedFirstUser !== String(teleUser.id)) {
-        // Se detecta un intento de cuenta secundaria sin sobreescribir la cuenta original
         previousAccount = storedFirstUser;
       }
 
@@ -123,36 +121,57 @@ function App() {
   if (!isHuman && status === 'member') return <CaptchaVerification userData={userData} setIsHuman={setIsHuman} />;
 
   return (
-    <div style={s.container}>
+    <div style={{ ...s.container, paddingBottom: '85px' }}>
       <Toaster position="top-center" reverseOrder={false} />
 
       <div style={s.main}>
         <ProfileHeader userData={userData} />
 
+        {/* 1. INICIO */}
         {activeTab === 'home' && (
           <div className="fade-in">
             <HomeTab userData={userData} setUserData={setUserData} />
           </div>
         )}
 
+        {/* 2. TAREAS / ANUNCIOS */}
+        {activeTab === 'tasks' && (
+          <div className="fade-in">
+            <AdsTab userData={userData} setUserData={setUserData} />
+          </div>
+        )}
+
+        {/* 3. PUBLICAR */}
         {activeTab === 'publish' && (
-          <PublishTab userData={userData} setUserData={setUserData} />
+          <div className="fade-in">
+            <PublishTab userData={userData} setUserData={setUserData} />
+          </div>
         )}
 
-        {activeTab === 'ads' && (
-          <AdsTab userData={userData} setUserData={setUserData} />
+        {/* 4. TOP RANKING */}
+        {activeTab === 'top' && (
+          <div className="fade-in" style={{ padding: '20px', textAlign: 'center', color: '#fff' }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>🏆 Top Usuarios</h3>
+            <p style={{ fontSize: '13px', color: '#888' }}>
+              La tabla de clasificación semanal estará disponible muy pronto.
+            </p>
+          </div>
         )}
 
-        {activeTab === 'share' && (
-          <ShareTab 
-            stats={stats} 
-            handleShare={handleShare} 
-            userId={userData?.id} 
-            totalReferralEarnings={userData?.referral_earnings} 
-          />
+        {/* 5. REFERIDOS */}
+        {activeTab === 'referrals' && (
+          <div className="fade-in">
+            <ShareTab 
+              stats={stats} 
+              handleShare={handleShare} 
+              userId={userData?.id} 
+              totalReferralEarnings={userData?.referral_earnings} 
+            />
+          </div>
         )}
       </div>
 
+      {/* Barra de navegación inferior */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
