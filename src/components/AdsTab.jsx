@@ -171,11 +171,11 @@ export default function AdsTab({ userData, setUserData }) {
   // Realizar y cobrar una tarea disponible
   const handleDoTask = async (task) => {
     try {
-      // 1. Abrir el enlace de la tarea
-      if (task.url.includes('t.me')) {
-        WebApp.openTelegramLink(task.url);
+      // 1. Abrir el enlace usando SOLO métodos internos de Telegram
+      if (task.url.includes('t.me') || task.url.includes('telegram.me')) {
+        WebApp.openTelegramLink(task.url); // Abre internamente links de Telegram (Bots, Grupos, Canales, Mini Apps)
       } else {
-        window.open(task.url, '_blank');
+        WebApp.openLink(task.url); // Abre links externos en el navegador IN-APP de Telegram, sin sacarte de la app
       }
 
       setCompletingTaskId(task.id);
@@ -254,7 +254,7 @@ export default function AdsTab({ userData, setUserData }) {
             <div style={neon.card}>
               <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4' }}>
                 {taskType === 'link' || taskType === 'bot' 
-                  ? 'Pega cualquier enlace válido (https:// o t.me/).' 
+                  ? 'Pega un enlace válido. Para bots o Mini Apps, usa tu enlace de Telegram (https://t.me/...).' 
                   : 'Ingresa el enlace público de tu grupo/canal (ej. https://t.me/MiGrupo).'}
               </p>
               
