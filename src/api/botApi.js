@@ -17,36 +17,19 @@ const postAction = async (action, payload = {}) => {
 };
 
 export const botApi = {
-  verifyUser: (user, startParam) => 
-    postAction('verify', { user, start_param: startParam }),
-
-  checkChannels: (userId) => 
-    postAction('check-channels', { userId }),
-
-  claimBonus: (userId) => 
-    postAction('claim-bonus', { userId }),
-
-  verifyHuman: (userId, method) => 
-    postAction('verify-human', { userId, method }),
-
-  publishPost: (userId, text, link, photoData, chatId, buttonConfig) => 
-    postAction('publish-post', { userId, text, link, photoData, chatId, buttonConfig }),
-
-  claimDailyChannel: (userId, channelId) => 
-    postAction('claim-daily-channel', { userId, channelId }),
-
-  getReferrals: (userId) => 
-    postAction('get-referrals', { userId }),
-
-  // --- NUEVAS FUNCIONES DE TAREAS ---
-  createTask: (payload) => 
-    postAction('create-task', payload),
-
-  getTasks: (userId) => 
-    postAction('get-tasks', { userId }),
-
-  completeTask: (userId, taskId) => 
-    postAction('complete-task', { userId, taskId })
+  verifyUser: (user, startParam) => postAction('verify', { user, start_param: startParam }),
+  checkChannels: (userId) => postAction('check-channels', { userId }),
+  claimBonus: (userId) => postAction('claim-bonus', { userId }),
+  verifyHuman: (userId, method) => postAction('verify-human', { userId, method }),
+  publishPost: (userId, text, link, photoData, chatId, buttonConfig) => postAction('publish-post', { userId, text, link, photoData, chatId, buttonConfig }),
+  claimDailyChannel: (userId, channelId) => postAction('claim-daily-channel', { userId, channelId }),
+  getReferrals: (userId) => postAction('get-referrals', { userId }),
+  
+  // Tareas
+  verifyBotAdmin: (url) => postAction('verify-admin', { url }),
+  createTask: (payload) => postAction('create-task', payload),
+  getTasks: (userId) => postAction('get-tasks', { userId }),
+  completeTask: (userId, taskId) => postAction('complete-task', { userId, taskId })
 };
 
 export default botApi;
