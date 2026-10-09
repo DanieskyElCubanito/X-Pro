@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
-import { s } from './styles/appStyles.js'; 
 import { botApi } from './api/botApi';
 
 // Subcomponentes importados
@@ -14,6 +13,74 @@ import ShareTab from './components/ShareTab';
 import BottomNav from './components/BottomNav';
 import ChannelJoin from './components/ChannelJoin';
 import CaptchaVerification from './components/CaptchaVerification';
+
+// Estilos globales Candy Cyberpunk para App
+const candyTheme = {
+  container: {
+    backgroundColor: '#0a0314',
+    backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)',
+    minHeight: '100vh',
+    color: '#ffffff',
+    fontFamily: "'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif",
+    paddingBottom: '90px',
+    boxSizing: 'border-box'
+  },
+  main: {
+    maxWidth: '520px',
+    margin: '0 auto',
+    padding: '16px 14px'
+  },
+  center: {
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0a0314',
+    backgroundImage: 'radial-gradient(circle at center, #260b3f 0%, #0a0314 85%)',
+    padding: '24px',
+    textAlign: 'center'
+  },
+  loaderGlow: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '50%',
+    border: '4px solid rgba(255, 65, 180, 0.2)',
+    borderTopColor: '#00f0ff',
+    borderRightColor: '#ff1493',
+    animation: 'spin 0.9s linear infinite',
+    boxShadow: '0 0 25px rgba(0, 240, 255, 0.45)'
+  },
+  errorCard: {
+    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.9), rgba(20, 8, 38, 0.95))',
+    border: '2px solid #ff41b4',
+    borderRadius: '24px',
+    padding: '28px 20px',
+    maxWidth: '340px',
+    boxShadow: '0 0 25px rgba(255, 65, 180, 0.35)'
+  },
+  btnRetry: {
+    marginTop: '20px',
+    padding: '12px 28px',
+    background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)',
+    color: '#050214',
+    border: 'none',
+    borderRadius: '16px',
+    fontWeight: '900',
+    fontSize: '14px',
+    letterSpacing: '0.5px',
+    cursor: 'pointer',
+    boxShadow: '0 4px 0 #0066aa, 0 8px 18px rgba(0, 240, 255, 0.45)'
+  },
+  tabPlaceholder: {
+    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))',
+    border: '2px solid #8a2be2',
+    borderRadius: '24px',
+    padding: '30px 20px',
+    textAlign: 'center',
+    boxShadow: '0 8px 24px rgba(138, 43, 226, 0.3)'
+  }
+};
 
 function App() {
   const [status, setStatus] = useState('loading'); 
@@ -34,7 +101,6 @@ function App() {
       const result = await fp.get();
       const generatedDeviceId = result.visitorId;
 
-      // Obtener la cuenta originalmente vinculada a este navegador
       const storedFirstUser = localStorage.getItem('xpro_linked_user');
 
       let previousAccount = null;
@@ -102,17 +168,44 @@ function App() {
 
   const handleShare = () => {
     const inviteLink = `https://t.me/ReffRobot/app?startapp=${userData?.id}`;
-    const text = "🚀 ¡Únete, publica en grupos y acumula Puntos (PT)! 🪙";
+    const text = "🍬 ¡Entra al juego, publica en grupos y gana Puntos (PT) gratis! 🚀";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
 
-  if (status === 'loading') return <div style={s.center}><div style={s.loader}></div></div>;
+  // PANTALLA DE CARGA (Loader Neón)
+  if (status === 'loading') {
+    return (
+      <div style={candyTheme.center}>
+        <style>{`
+          @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+          }
+        `}</style>
+        <div style={candyTheme.loaderGlow}></div>
+        <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>
+          CARGANDO MUNDO CANDY...
+        </p>
+      </div>
+    );
+  }
+
+  // PANTALLA DE ERROR
   if (status === 'error') {
     return (
-      <div style={s.center}>
-        <h2 style={{color: '#ffcc00'}}>⚠️ Error de acceso</h2>
-        <p style={{color: '#fff'}}>{errorMessage}</p>
-        <button style={{...s.btnOutline, marginTop: '20px', fontSize: '12px'}} onClick={() => window.location.reload()}>🔄 REINTENTAR</button>
+      <div style={candyTheme.center}>
+        <div style={candyTheme.errorCard}>
+          <div style={{ fontSize: '42px', marginBottom: '8px' }}>⚠️</div>
+          <h2 style={{ color: '#ffe600', margin: '0 0 10px 0', fontSize: '20px', fontWeight: '900' }}>
+            Acceso Interrumpido
+          </h2>
+          <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>
+            {errorMessage}
+          </p>
+          <button style={candyTheme.btnRetry} onClick={() => window.location.reload()}>
+            🔄 REINTENTAR
+          </button>
+        </div>
       </div>
     );
   }
@@ -121,10 +214,24 @@ function App() {
   if (!isHuman && status === 'member') return <CaptchaVerification userData={userData} setIsHuman={setIsHuman} />;
 
   return (
-    <div style={{ ...s.container, paddingBottom: '85px' }}>
-      <Toaster position="top-center" reverseOrder={false} />
+    <div style={candyTheme.container}>
+      {/* Notificaciones Toaster con estilo Candy */}
+      <Toaster 
+        position="top-center" 
+        reverseOrder={false}
+        toastOptions={{
+          style: {
+            background: '#1d0833',
+            color: '#fff',
+            border: '2px solid #00f0ff',
+            boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)',
+            fontWeight: '800',
+            fontSize: '13px'
+          }
+        }} 
+      />
 
-      <div style={s.main}>
+      <div style={candyTheme.main}>
         <ProfileHeader userData={userData} />
 
         {/* 1. INICIO */}
@@ -150,10 +257,13 @@ function App() {
 
         {/* 4. TOP RANKING */}
         {activeTab === 'top' && (
-          <div className="fade-in" style={{ padding: '20px', textAlign: 'center', color: '#fff' }}>
-            <h3 style={{ margin: '0 0 10px 0' }}>🏆 Top Usuarios</h3>
-            <p style={{ fontSize: '13px', color: '#888' }}>
-              La tabla de clasificación semanal estará disponible muy pronto.
+          <div className="fade-in" style={candyTheme.tabPlaceholder}>
+            <div style={{ fontSize: '40px', marginBottom: '8px' }}>🏆</div>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: '900', color: '#ffe600' }}>
+              Torneo Semanal
+            </h3>
+            <p style={{ fontSize: '13px', color: '#ff99dd', margin: 0 }}>
+              La tabla de clasificaciones cósmicas estará disponible muy pronto.
             </p>
           </div>
         )}
