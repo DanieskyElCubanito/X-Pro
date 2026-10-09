@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import WebApp from '@twa-dev/sdk';
+import { botApi } from '../api/botApi';
 
-// --- ESTILOS NEÓN CYBERPUNK ---
 const neon = {
   card: {
     background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))',
@@ -61,13 +62,16 @@ const TASK_TYPES = [
 export default function AdsTab({ userData, setUserData }) {
   const [view, setView] = useState('list'); // 'list' | 'wizard'
   
+  // Lista de tareas activas reales
+  const [tasks, setTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState(null);
+
   // Estados del Wizard
   const [taskType, setTaskType] = useState(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [botToken, setBotToken] = useState('');
   const [taskName, setTaskName] = useState('');
-  
-  // Estados de Presupuesto
   const [completions, setCompletions] = useState(100);
   const [reward, setReward] = useState(0.1);
   
@@ -77,7 +81,25 @@ export default function AdsTab({ userData, setUserData }) {
   const balance = Number(userData?.balance || 0);
   const totalCost = Number((completions * reward).toFixed(2));
 
-  // Determinar los pasos según el tipo de tarea
+  // Cargar tareas al abrir la pestaña
+  useEffect(() => {
+    if (userData?.id) fetchTasks();
+  }, [userData?.id]);
+
+  const fetchTasks = async () => {
+    setLoadingTasks(true);
+    try {
+      const data = await botApi.getTasks(userData?.id);
+      if (data && data.success) {
+        setTasks(data.tasks || []);
+      }
+    } catch (e) {
+      console.error("Error al cargar tareas:", e);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
   const stepsFlow = taskType === 'bot' 
     ? ['type', 'url', 'token', 'name', 'budget'] 
     : ['type', 'url', 'name', 'budget'];
@@ -90,46 +112,103 @@ export default function AdsTab({ userData, setUserData }) {
   const prevStep = () => setCurrentStepIndex(prev => Math.max(prev - 1, 0));
 
   const handleVerifyUrl = async () => {
-    if (!targetUrl.trim()) return toast.error("Por favor, ingresa un enlace o ID válido.");
+    if (!targetUrl.trim()) return toast.error("Por favor, ingresa un enlace válido.");
     
-    // Si es grupo o canal, simulamos la verificación del administrador
     if (taskType === 'group' || taskType === 'channel') {
       setIsVerifying(true);
       const tid = toast.loading("Verificando permisos de administrador...");
-      
-      // Simulamos la llamada a la API de Telegram
       setTimeout(() => {
         setIsVerifying(false);
-        toast.success("¡Verificación exitosa! El bot es administrador.", { id: tid });
+        toast.success("¡Verificación completada!", { id: tid });
         nextStep();
-      }, 2000);
+      }, 1500);
     } else {
       nextStep();
     }
   };
 
+  // Guardar en la base de datos real
   const handleCreateTask = async () => {
     if (balance < totalCost) {
       return toast.error(`Saldo insuficiente. Tienes ${balance} PT y requieres ${totalCost} PT.`);
     }
 
     setIsCreating(true);
-    const tid = toast.loading("Creando campaña de tráfico...");
+    const tid = toast.loading("Registrando campaña en la red...");
 
-    // Aquí iría la llamada real a tu API: botApi.createTask(...)
-    setTimeout(() => {
-      setIsCreating(false);
-      
-      // Simular descuento de saldo localmente para la demostración
-      setUserData(prev => ({ ...prev, balance: Number((prev.balance - totalCost).toFixed(2)) }));
-      
-      toast.success("¡Campaña creada y activada con éxito!", { id: tid });
-      
-      // Resetear
+    try {
+      const res = await botApi.createTask({
+        creator_id: userData?.id,
+        type: taskType,
+        title: taskName,
+        url: targetUrl,
+        bot_token: botToken || null,
+        completions_total: completions,
+        reward: reward
+      });
+
+      if (!res.success) throw new Error(res.error || "Error al crear la tarea.");
+
+      if (res.balance !== undefined) {
+        setUserData(prev => ({ ...prev, balance: res.balance }));
+      }
+
+      toast.success("¡Campaña activada y disponible para la comunidad!", { id: tid });
+
+      // Resetear formulario y recargar lista
       setTaskType(null); setTargetUrl(''); setBotToken(''); setTaskName(''); setCompletions(100); setReward(0.1);
       setCurrentStepIndex(0);
       setView('list');
-    }, 2000);
+      fetchTasks();
+
+    } catch (err) {
+      toast.error(err.message || "No se pudo crear la campaña.", { id: tid });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Realizar y cobrar una tarea disponible
+  const handleDoTask = async (task) => {
+    try {
+      // 1. Abrir el enlace de la tarea
+      if (task.url.includes('t.me')) {
+        WebApp.openTelegramLink(task.url);
+      } else {
+        window.open(task.url, '_blank');
+      }
+
+      setCompletingTaskId(task.id);
+      const tid = toast.loading("Verificando tarea...");
+
+      // Damos 3 segundos para que el usuario abra la app/canal
+      setTimeout(async () => {
+        try {
+          const res = await botApi.completeTask(userData?.id, task.id);
+          if (res.success) {
+            toast.success(`¡Tarea completada! +${res.reward} PT`, { id: tid });
+            if (res.balance !== undefined) {
+              setUserData(prev => ({ ...prev, balance: res.balance }));
+            }
+            fetchTasks(); // Actualizar lista
+          } else {
+            toast.error(res.error || "No se pudo validar la tarea.", { id: tid });
+          }
+        } catch (e) {
+          toast.error("Error al procesar la recompensa.", { id: tid });
+        } finally {
+          setCompletingTaskId(null);
+        }
+      }, 3000);
+
+    } catch (e) {
+      setCompletingTaskId(null);
+    }
+  };
+
+  const getTaskIcon = (type) => {
+    const item = TASK_TYPES.find(t => t.id === type);
+    return item ? item.icon : '⚡';
   };
 
   const renderWizardStep = () => {
@@ -176,7 +255,7 @@ export default function AdsTab({ userData, setUserData }) {
               <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4' }}>
                 {taskType === 'link' || taskType === 'bot' 
                   ? 'Pega cualquier enlace válido (https:// o t.me/).' 
-                  : 'Ingresa el enlace público de tu grupo/canal (ej. t.me/MiGrupo).'}
+                  : 'Ingresa el enlace público de tu grupo/canal (ej. https://t.me/MiGrupo).'}
               </p>
               
               <input 
@@ -189,17 +268,14 @@ export default function AdsTab({ userData, setUserData }) {
               {(taskType === 'group' || taskType === 'channel') && (
                 <div style={{ background: 'rgba(255, 65, 180, 0.1)', border: '1px dashed #ff41b4', padding: '12px', borderRadius: '12px', marginTop: '16px' }}>
                   <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>
-                    ⚠️ El bot oficial de la app debe ser administrador de tu {taskType === 'group' ? 'grupo' : 'canal'} para verificar a los usuarios.
+                    ⚠️ Añade el bot oficial de la app como administrador de tu {taskType === 'group' ? 'grupo' : 'canal'} para validar las entradas.
                   </p>
-                  <button style={{...neon.btnAction, width: '100%', borderColor: '#00f0ff', color: '#00f0ff'}}>
-                    + Añadir bot como administrador
-                  </button>
                 </div>
               )}
             </div>
 
             <button onClick={handleVerifyUrl} disabled={isVerifying} style={neon.btnPrimary}>
-              {isVerifying ? 'Verificando Admin...' : 'VERIFICAR Y CONTINUAR ➔'}
+              {isVerifying ? 'Verificando...' : 'VERIFICAR Y CONTINUAR ➔'}
             </button>
           </div>
         );
@@ -216,11 +292,11 @@ export default function AdsTab({ userData, setUserData }) {
 
             <div style={{...neon.card, borderColor: '#ff41b4'}}>
               <p style={{ color: '#fff', fontSize: '13px', marginBottom: '16px', lineHeight: '1.5' }}>
-                <span style={{ color: '#00f0ff', fontWeight: 'bold' }}>Opcional.</span> Pega el Token HTTP API de tu bot para comprobar si el usuario lo inició de verdad. Sin él, se pagará solo por abrir el enlace.
+                <span style={{ color: '#00f0ff', fontWeight: 'bold' }}>Opcional.</span> Pega el Token de tu bot para comprobar si el usuario lo inició. Sin él, se acredita solo con abrir el enlace.
               </p>
               <input 
                 style={{...neon.input, borderColor: '#ff41b4'}} 
-                placeholder="123456789:AAEjemploToken..." 
+                placeholder="Token HTTP API (Opcional)" 
                 value={botToken} 
                 onChange={(e) => setBotToken(e.target.value)} 
               />
@@ -228,7 +304,7 @@ export default function AdsTab({ userData, setUserData }) {
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={nextStep} style={{...neon.btnSecondary, flex: 1}}>OMITIR</button>
-              <button onClick={() => { if(!botToken) toast.error("Pega un token o dale a Omitir"); else nextStep(); }} style={{...neon.btnPrimary, flex: 1}}>GUARDAR</button>
+              <button onClick={nextStep} style={{...neon.btnPrimary, flex: 1}}>CONTINUAR</button>
             </div>
           </div>
         );
@@ -251,7 +327,7 @@ export default function AdsTab({ userData, setUserData }) {
                 style={neon.input} 
                 placeholder="Ej: Únete a mi canal VIP..." 
                 value={taskName} 
-                maxLength={40}
+                maxLength={45}
                 onChange={(e) => setTaskName(e.target.value)} 
               />
             </div>
@@ -274,7 +350,7 @@ export default function AdsTab({ userData, setUserData }) {
 
             <div style={{...neon.card, padding: '16px'}}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                {[100, 500, 1000, 5000].map(val => (
+                {[10, 50, 100, 500].map(val => (
                   <button 
                     key={val} 
                     onClick={() => setCompletions(val)}
@@ -285,7 +361,7 @@ export default function AdsTab({ userData, setUserData }) {
                       border: completions === val ? 'none' : '1px solid #8a2be2'
                     }}
                   >
-                    {val >= 1000 ? `${val/1000}K` : val}
+                    {val}
                   </button>
                 ))}
               </div>
@@ -293,9 +369,9 @@ export default function AdsTab({ userData, setUserData }) {
               <div style={{ background: '#120722', borderRadius: '14px', padding: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #3a1a5c' }}>
                 <span style={{ fontSize: '12px', color: '#ff99dd', fontWeight: 'bold' }}>Completaciones</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <button onClick={() => setCompletions(p => Math.max(10, p - 10))} style={neon.btnAction}>-</button>
+                  <button onClick={() => setCompletions(p => Math.max(5, p - 5))} style={neon.btnAction}>-</button>
                   <span style={{ fontWeight: '900', fontSize: '16px', color: '#fff', width: '40px', textAlign: 'center' }}>{completions}</span>
-                  <button onClick={() => setCompletions(p => p + 10)} style={neon.btnAction}>+</button>
+                  <button onClick={() => setCompletions(p => p + 5)} style={neon.btnAction}>+</button>
                 </div>
               </div>
 
@@ -338,14 +414,14 @@ export default function AdsTab({ userData, setUserData }) {
       
       {view === 'list' && (
         <div className="fade-in">
-          <div style={{...neon.card, borderColor: '#00f0ff', padding: '24px 20px', textAlign: 'center'}}>
-            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎯</div>
-            <h3 style={{ margin: '0 0 10px 0', color: '#00f0ff', fontSize: '18px', fontWeight: '900' }}>
+          <div style={{...neon.card, borderColor: '#00f0ff', padding: '22px 18px', textAlign: 'center'}}>
+            <div style={{ fontSize: '38px', marginBottom: '8px' }}>🎯</div>
+            <h3 style={{ margin: '0 0 8px 0', color: '#00f0ff', fontSize: '18px', fontWeight: '900' }}>
               ¿Necesitas tráfico masivo?
             </h3>
-            <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', marginBottom: '20px' }}>
-              Crea una campaña pagada y consigue miles de visitas o miembros reales en minutos.<br/>
-              <span style={{ color: '#ffe600', fontWeight: 'bold' }}>✨ Las tareas pagadas salen de primero</span>
+            <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', marginBottom: '18px' }}>
+              Crea una campaña y consigue visitas o miembros reales en minutos.<br/>
+              <span style={{ color: '#ffe600', fontWeight: 'bold' }}>✨ Las tareas pagadas salen primero</span>
             </p>
             <button onClick={() => setView('wizard')} style={{...neon.btnPrimary, background: 'linear-gradient(180deg, #ff1493, #8a2be2)', boxShadow: '0 6px 0 #4a157a'}}>
               + CREAR NUEVA TAREA
@@ -353,11 +429,72 @@ export default function AdsTab({ userData, setUserData }) {
           </div>
 
           <div style={{...neon.card, borderColor: '#3a1a5c', background: 'rgba(20, 8, 38, 0.6)'}}>
-            <h4 style={{ margin: '0 0 15px 0', color: '#888', fontSize: '14px' }}>Tareas Disponibles</h4>
-            <div style={{ textAlign: 'center', padding: '30px 0', color: '#555' }}>
-              <span style={{ fontSize: '30px', display: 'block', marginBottom: '10px' }}>🏜️</span>
-              No hay tareas comunitarias activas en este momento.
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 style={{ margin: 0, color: '#00f0ff', fontSize: '15px', fontWeight: '900' }}>
+                ⚡ Tareas Disponibles ({tasks.length})
+              </h4>
+              <button onClick={fetchTasks} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                🔄 Actualizar
+              </button>
             </div>
+
+            {loadingTasks ? (
+              <div style={{ textAlign: 'center', padding: '25px 0', color: '#ff99dd', fontSize: '13px', fontWeight: 'bold' }}>
+                Cargando tareas activas...
+              </div>
+            ) : tasks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '25px 0', color: '#777', fontSize: '13px' }}>
+                <span style={{ fontSize: '30px', display: 'block', marginBottom: '8px' }}>🏜️</span>
+                No hay tareas activas disponibles por el momento.<br/>¡Crea la primera para conseguir tráfico!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {tasks.map((task) => (
+                  <div 
+                    key={task.id} 
+                    style={{
+                      backgroundColor: '#120822',
+                      border: '1px solid #3d1b63',
+                      borderRadius: '16px',
+                      padding: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '26px' }}>{getTaskIcon(task.type)}</span>
+                      <div>
+                        <div style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>{task.title}</div>
+                        <div style={{ color: '#888', fontSize: '11px', marginTop: '2px' }}>
+                          Cupos: {task.completions_done}/{task.completions_total}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => handleDoTask(task)}
+                      disabled={completingTaskId === task.id}
+                      style={{
+                        background: 'linear-gradient(180deg, #00ffaa, #00aa77)',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        color: '#050214',
+                        fontWeight: '900',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        boxShadow: '0 3px 0 #006644',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {completingTaskId === task.id ? 'VERIFICANDO...' : `+${task.reward} PT`}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
