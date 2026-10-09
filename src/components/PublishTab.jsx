@@ -47,8 +47,8 @@ const neonStyles = {
 
 const TEMPLATES = [
   { title: 'Airdrop Boom', icon: '🚀', accent: '#ff007f', text: '🚀 Nuevo Airdrop confirmado. Participa gratis completando las tareas y asegura tus tokens.' },
-  { title: 'Sorteo Neón', icon: '💎', accent: '#00f0ff', text: '💎 Gran recompensa activa para la comunidad. Entra al enlace y participa.' },
-  { title: 'Red Inteligente', icon: '⚡', accent: '#ffe600', text: '⚡ Gana saldo en Telegram todos los días. Prueba la App oficial y comparte tu enlace.' }
+  { title: 'Sorteo Neón', icon: '💎', accent: '#00f0ff', text: '💎 Gran recompensa activa para la comunidad. Entra al enlace y participa ahora mismo.' },
+  { title: 'Red de Tráfico', icon: '⚡', accent: '#ffe600', text: '⚡ Únete a nuestra red. Gana CLICK gratis todos los días completando tareas simples.' }
 ];
 
 const AVAILABLE_GROUPS = [
@@ -70,7 +70,10 @@ export default function PublishTab({ userData, setUserData }) {
   const fileInputRef = useRef(null);
 
   const balance = Number(userData?.balance || 0);
-  const totalCost = selectedGroups.length * 1;
+  
+  // Costo ajustado a 10 CLICK por publicación para balancear la economía de la app.
+  const COST_PER_GROUP = 10;
+  const totalCost = selectedGroups.length * COST_PER_GROUP;
 
   const handleToggleGroup = (groupId) => {
     setSelectedGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
@@ -89,8 +92,8 @@ export default function PublishTab({ userData, setUserData }) {
   const handleNextStep1 = () => { if (!postText.trim()) return toast.error("Escribe un mensaje para continuar."); setStep(2); };
   const handleNextStep2 = () => setStep(3);
   const handleNextStep3 = () => {
-    if (selectedGroups.length === 0) return toast.error("Selecciona al menos un grupo.");
-    if (balance < totalCost) return toast.error(`Saldo insuficiente. Tienes ${balance} PT y necesitas ${totalCost} PT.`);
+    if (selectedGroups.length === 0) return toast.error("Selecciona al menos un grupo o canal destino.");
+    if (balance < totalCost) return toast.error(`Saldo insuficiente. Tienes ${balance} CLICK y necesitas ${totalCost} CLICK.`);
     setStep(4);
   };
 
@@ -119,7 +122,7 @@ export default function PublishTab({ userData, setUserData }) {
         if (data.balance !== undefined) setUserData((prev) => ({ ...prev, balance: data.balance }));
       }
 
-      toast.success("¡Transmisión Exitosa!", { id: tid });
+      toast.success("¡Campaña Transmitida con Éxito!", { id: tid });
       setPostText(''); setImageUrl(''); setButtonConfig({ text: 'Abrir App', url: '', color: 'default' }); setSelectedGroups([]); setStep(1);
     } catch (err) {
       toast.error(err.message || "Error de red", { id: tid });
@@ -131,14 +134,14 @@ export default function PublishTab({ userData, setUserData }) {
   return (
     <div style={neonStyles.container}>
       <Toaster position="top-center" />
-      <h2 style={neonStyles.title}>PUBLICAR POST</h2>
+      <h2 style={neonStyles.title}>CREAR CAMPAÑA</h2>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <button onClick={() => setActiveTab('create')} style={activeTab === 'create' ? { ...neonStyles.btnDark, flex: 1 } : { ...neonStyles.btnLight, flex: 1 }}>
-          🚀 Crear post
+          🚀 Nueva Campaña
         </button>
         <button onClick={() => setActiveTab('history')} style={activeTab === 'history' ? { ...neonStyles.btnDark, flex: 1 } : { ...neonStyles.btnLight, flex: 1 }}>
-          📋 Mis posts
+          📋 Mis Anuncios
         </button>
       </div>
 
@@ -154,7 +157,7 @@ export default function PublishTab({ userData, setUserData }) {
 
           {step === 1 && (
             <div className="fade-in">
-              <h3 style={{ fontSize: '17px', fontWeight: '900', marginBottom: '10px', color: '#ffe600' }}>¿Qué anuncio quieres lanzar?</h3>
+              <h3 style={{ fontSize: '17px', fontWeight: '900', marginBottom: '10px', color: '#ffe600' }}>¿Qué quieres promocionar?</h3>
               <div style={neonStyles.card}>
                 <textarea
                   style={{ ...neonStyles.input, height: '115px', resize: 'none', border: 'none', background: 'transparent', padding: 0, fontSize: '15px' }}
@@ -227,7 +230,7 @@ export default function PublishTab({ userData, setUserData }) {
                       <div style={{ fontWeight: '900', fontSize: '15px', color: '#ffffff' }}>{grp.name}</div>
                       <div style={{ fontSize: '12px', color: '#ff99dd' }}>{grp.members}</div>
                     </div>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isSelected ? '#00f0ff' : 'transparent', border: '2px solid #00f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: '900', fontSize: '14px' }}>
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isSelected ? '#00f0ff' : 'transparent', border: '2px solid #00f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#050214', fontWeight: '900', fontSize: '14px' }}>
                       {isSelected ? '✓' : ''}
                     </div>
                   </div>
@@ -236,7 +239,7 @@ export default function PublishTab({ userData, setUserData }) {
 
               <div style={{ background: 'linear-gradient(90deg, #ff1493, #8a2be2)', borderRadius: '18px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '14px', marginBottom: '14px', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.3)' }}>
                 <span>🎯 {selectedGroups.length} seleccionados</span>
-                <span>Costo: {totalCost} PT</span>
+                <span>Costo: {totalCost} CLICK</span>
               </div>
               <button onClick={handleNextStep3} style={neonStyles.btnPrimary}>REVISAR PUBLICACIÓN ➔</button>
             </div>
@@ -253,7 +256,7 @@ export default function PublishTab({ userData, setUserData }) {
                 <div style={{ fontSize: '11px', color: '#00f0ff', fontWeight: '900', marginBottom: '8px' }}>TU ANUNCIO:</div>
                 <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', marginBottom: '12px', color: '#fff', lineHeight: '1.4' }}>{postText}</div>
                 {imageUrl && <div style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '8px' }}>🖼️ Imagen cargada desde dispositivo</div>}
-                
+
                 {buttonConfig.url && (
                   <div style={{
                     display: 'inline-block', padding: '8px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: '900',
@@ -267,9 +270,9 @@ export default function PublishTab({ userData, setUserData }) {
               </div>
 
               <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px 16px', fontSize: '13px', marginBottom: '16px', color: '#fff', lineHeight: '1.7' }}>
-                • Saldo actual: <strong style={{ color: '#00f0ff' }}>{balance} PT</strong><br />
-                • Costo de operación: <strong style={{ color: '#ff41b4' }}>-{totalCost} PT</strong><br />
-                • Saldo restante: <strong style={{ color: '#ffe600' }}>{(balance - totalCost).toFixed(2)} PT</strong>
+                • Saldo actual: <strong style={{ color: '#00f0ff' }}>{balance} CLICK</strong><br />
+                • Costo de operación: <strong style={{ color: '#ff41b4' }}>-{totalCost} CLICK</strong><br />
+                • Saldo restante: <strong style={{ color: '#ffe600' }}>{(balance - totalCost).toFixed(2)} CLICK</strong>
               </div>
 
               <button onClick={handlePublish} disabled={isPublishing} style={{ ...neonStyles.btnPrimary, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', boxShadow: '0 6px 0 #007744, 0 10px 20px rgba(0, 255, 170, 0.4)' }}>
@@ -281,9 +284,10 @@ export default function PublishTab({ userData, setUserData }) {
       )}
 
       {activeTab === 'history' && (
-        <div style={neonStyles.card}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#ffe600' }}>Historial</h4>
-          <p style={{ fontSize: '13px', color: '#ff99dd' }}>Aquí verás el registro de tus campañas recientes.</p>
+        <div className="fade-in" style={neonStyles.card}>
+          <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '10px' }}>📜</div>
+          <h4 style={{ margin: '0 0 8px 0', color: '#ffe600', textAlign: 'center', fontSize: '18px' }}>Historial Vacío</h4>
+          <p style={{ fontSize: '13px', color: '#ff99dd', textAlign: 'center', lineHeight: '1.5' }}>Aquí verás el registro de tus campañas cuando realices tu primera publicación.</p>
         </div>
       )}
 
@@ -307,13 +311,13 @@ export default function PublishTab({ userData, setUserData }) {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>COLOR EN TELEGRAM</label>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>COLOR DEL BOTÓN</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
                 {[
-                  { id: 'default', label: 'Neutro', bg: '#262626' },
-                  { id: 'primary', label: 'Azul', bg: '#00f0ff' },
-                  { id: 'success', label: 'Verde', bg: '#00ffaa' },
-                  { id: 'danger', label: 'Rojo', bg: '#ff1493' }
+                  { id: 'default', label: 'Gris', bg: '#262626' },
+                  { id: 'primary', label: 'Cian', bg: '#00f0ff' },
+                  { id: 'success', label: 'Neón', bg: '#00ffaa' },
+                  { id: 'danger', label: 'Rosa', bg: '#ff1493' }
                 ].map((c) => (
                   <button
                     key={c.id} onClick={() => setButtonConfig({ ...buttonConfig, color: c.id })}
@@ -321,7 +325,8 @@ export default function PublishTab({ userData, setUserData }) {
                       padding: '8px 2px', fontSize: '10px', fontWeight: '900',
                       backgroundColor: c.bg, color: c.id === 'default' ? '#fff' : '#050214',
                       border: buttonConfig.color === c.id ? '2px solid #ffffff' : '2px solid transparent',
-                      borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+                      borderRadius: '10px', cursor: 'pointer', boxShadow: buttonConfig.color === c.id ? `0 0 10px ${c.bg}` : 'none',
+                      transition: 'all 0.2s'
                     }}
                   >
                     {c.label}
