@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- Evita parpadeos blancos en la barra de estado del celular -->
+    <meta name="theme-color" content="#0a0314" />
+    
     <title>Red Neón ⚡</title>
 
     <!-- 1. Telegram Web App SDK (Carga prioritaria) -->
@@ -15,15 +19,15 @@
     <script src="https://ad.gigapub.tech/script?id=6215" async></script>
 
     <style>
-      /* FONDO NEÓN Y SCROLL DESBLOQUEADO (Solución al atasco) */
+      /* FONDO NEÓN Y SCROLL DESBLOQUEADO */
       body, html {
         margin: 0;
         padding: 0;
         height: 100%;
-        background-color: #0a0314; /* Color base Neón */
+        background-color: #0a0314;
         color: #ffffff;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        
+
         /* Bloqueamos el rebote nativo de iOS/Android pero PERMITIMOS el deslizamiento táctil */
         overflow: hidden; 
         touch-action: pan-y; 
