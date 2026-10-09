@@ -6,9 +6,6 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-/**
- * Función auxiliar para centralizar las peticiones y el manejo de errores.
- */
 const postAction = async (action, payload = {}) => {
   try {
     const res = await api.post('', { action, ...payload });
@@ -32,12 +29,15 @@ export const botApi = {
   verifyHuman: (userId, method) => 
     postAction('verify-human', { userId, method }),
 
-  publishPost: (userId, text, link, photoUrl, chatId) => 
-    postAction('publish-post', { userId, text, link, photoUrl, chatId }),
+  publishPost: (userId, text, link, photoData, chatId, buttonConfig) => 
+    postAction('publish-post', { userId, text, link, photoData, chatId, buttonConfig }),
 
-  // Reclamar recompensa diaria por canal (0.1 PT)
   claimDailyChannel: (userId, channelId) => 
-    postAction('claim-daily-channel', { userId, channelId })
+    postAction('claim-daily-channel', { userId, channelId }),
+
+  // NUEVA FUNCIÓN: Obtiene la lista de referidos actualizada al instante
+  getReferrals: (userId) => 
+    postAction('get-referrals', { userId })
 };
 
 export default botApi;
