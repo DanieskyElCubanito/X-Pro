@@ -14,7 +14,7 @@ const supabase = createClient(
 
 const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 
-// Cuentas administradoras: Inmunes a baneos, límites de IP y bloqueos de autoreferidos
+// Lista de cuentas exentas de baneos por multicuentas
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
 async function checkMembership(userId, chatId) {
@@ -91,12 +91,15 @@ export default async function handler(req, res) {
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
-    // --- ACCIÓN: OBTENER REFERIDOS EN TIEMPO REAL ---
+    // --- ACCIÓN: OBTENER REFERIDOS EN TIEMPO REAL (CORREGIDA APrueba de Fallos) ---
     if (action === 'get-referrals') {
       const targetId = String(userId);
-      const { data: lv1 } = await supabase.from('users').select('id, username, created_at, referral_reward_granted').eq('referred_by', targetId);
-      const { data: dbUser } = await supabase.from('users').select('referral_earnings').eq('id', targetId).single();
+      // Usamos select('*') para que no falle si falta alguna columna en Supabase
+      const { data: lv1, error: errLv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
+      const { data: dbUser, error: errDb } = await supabase.from('users').select('*').eq('id', targetId).single();
       
+      if (errLv1) console.error("Error consultando referidos:", errLv1);
+
       return res.status(200).json({ 
         success: true, 
         referrals: lv1 || [], 
@@ -143,9 +146,10 @@ export default async function handler(req, res) {
       const allJoined = isMember1 && isMember2;
 
       if (allJoined) {
-        const { data: currentUser } = await supabase.from('users').select('id, referred_by, is_human, referral_reward_granted').eq('id', targetId).single();
+        // Usamos select('*') para proteger de fallos
+        const { data: currentUser } = await supabase.from('users').select('*').eq('id', targetId).single();
         if (currentUser && currentUser.is_human && currentUser.referred_by && !currentUser.referral_reward_granted) {
-          const { data: referrer } = await supabase.from('users').select('id, balance, referral_earnings, total_earnings').eq('id', currentUser.referred_by).single();
+          const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).single();
           if (referrer) {
             const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
             const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
@@ -207,10 +211,8 @@ export default async function handler(req, res) {
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
     
-    // Verificamos si el usuario o el referidor es un administrador (inmune)
     const isAdmin = ADMIN_IDS.includes(targetId) || ADMIN_IDS.includes(String(start_param));
 
-    // Reglas restrictivas aplicadas SOLO si nadie en la transacción es admin
     if (!isAdmin) {
       if (detectedPrev && String(detectedPrev) !== targetId) {
         await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId || null, ip_address: clientIp || null, is_banned: true });
@@ -238,7 +240,7 @@ export default async function handler(req, res) {
     if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
     if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
     
-    // Si la cuenta es de prueba, ya existía, pero el sistema no la vinculó por fraude, la vinculamos ahora.
+    // Asignar el referidor a la cuenta de prueba si eres admin
     if (dbUser && !dbUser.referred_by && start_param && String(start_param) !== targetId && isAdmin) {
       updates.referred_by = String(start_param);
     }
@@ -253,11 +255,8 @@ export default async function handler(req, res) {
         id: targetId, username: targetUser.username || 'Usuario', balance: 0, total_earnings: 0, referral_earnings: 0, device_id: currentDeviceId || null, ip_address: clientIp || null, is_human: false, referral_reward_granted: false 
       };
       if (start_param && String(start_param) !== targetId) {
-        const { data: referrer } = await supabase.from('users').select('id, ip_address, device_id').eq('id', String(start_param)).single();
-        
-        // Bloqueo antifraude cancelado si eres administrador
+        const { data: referrer } = await supabase.from('users').select('*').eq('id', String(start_param)).single();
         const isFraud = referrer && !isAdmin && ((referrer.device_id && currentDeviceId && referrer.device_id === currentDeviceId) || (referrer.ip_address && clientIp && referrer.ip_address === clientIp));
-        
         if (referrer && !isFraud) newUserObj.referred_by = String(start_param);
       }
       const { data: newUser, error: insertErr } = await supabase.from('users').insert([newUserObj]).select().single();
@@ -265,7 +264,7 @@ export default async function handler(req, res) {
       dbUser = newUser;
     }
 
-    const { data: lv1 } = await supabase.from('users').select('id, username, created_at, referral_reward_granted').eq('referred_by', targetId);
+    const { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
     const isMember1 = await checkMembership(targetId, "-1003685621367");
     const isMember2 = await checkMembership(targetId, "-1004377164928"); 
