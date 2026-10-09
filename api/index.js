@@ -32,11 +32,9 @@ async function checkMembership(userId, chatId) {
 
 async function publishToTelegramGroup(chatId, text, photoData, userLink, username, buttonConfig) {
   try {
-    // Eliminada la firma de "Publicado por"
     const formattedText = text; 
     const apiUrl = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-    // 1. Configurar botón interactivo con COLOR (style) de Telegram
     let reply_markup = undefined;
     if (buttonConfig && buttonConfig.url && buttonConfig.text) {
       reply_markup = {
@@ -49,10 +47,8 @@ async function publishToTelegramGroup(chatId, text, photoData, userLink, usernam
       };
     }
 
-    // 2. Procesar Foto y enviar
     if (photoData) {
       if (photoData.startsWith('data:image')) {
-        // Enviar Base64 procesándolo como archivo físico (FormData)
         const base64Data = photoData.split(',')[1];
         const buffer = Buffer.from(base64Data, 'base64');
         const blob = new Blob([buffer], { type: 'image/jpeg' });
@@ -68,23 +64,13 @@ async function publishToTelegramGroup(chatId, text, photoData, userLink, usernam
         const resData = await response.json();
         if (!resData.ok) throw new Error(resData.description);
       } else {
-        // Si fuera una URL externa normal
         await axios.post(`${apiUrl}/sendPhoto`, {
-          chat_id: chatId,
-          photo: photoData,
-          caption: formattedText,
-          parse_mode: 'HTML',
-          reply_markup
+          chat_id: chatId, photo: photoData, caption: formattedText, parse_mode: 'HTML', reply_markup
         });
       }
     } else {
-      // Si solo es texto
       await axios.post(`${apiUrl}/sendMessage`, {
-        chat_id: chatId,
-        text: formattedText,
-        parse_mode: 'HTML',
-        disable_web_page_preview: false,
-        reply_markup
+        chat_id: chatId, text: formattedText, parse_mode: 'HTML', disable_web_page_preview: false, reply_markup
       });
     }
     return true;
@@ -104,6 +90,19 @@ export default async function handler(req, res) {
     const { user, action, userId, start_param, previousAccountDetected } = req.body; 
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
+
+    // --- ACCIÓN: OBTENER REFERIDOS EN TIEMPO REAL ---
+    if (action === 'get-referrals') {
+      const targetId = String(userId);
+      const { data: lv1 } = await supabase.from('users').select('id, username, created_at, referral_reward_granted').eq('referred_by', targetId);
+      const { data: dbUser } = await supabase.from('users').select('referral_earnings').eq('id', targetId).single();
+      
+      return res.status(200).json({ 
+        success: true, 
+        referrals: lv1 || [], 
+        earnings: dbUser?.referral_earnings || 0 
+      });
+    }
 
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
@@ -199,17 +198,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
+    // REGISTRO
     const targetUser = user || { id: userId };
     const targetId = String(targetUser?.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
-    
-    // Verificamos si el usuario actual es un admin
     const isAdmin = ADMIN_IDS.includes(targetId);
 
-    // Solo aplicamos las reglas restrictivas de multicuentas e IP si NO es administrador
     if (!isAdmin) {
       if (detectedPrev && String(detectedPrev) !== targetId) {
         await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId || null, ip_address: clientIp || null, is_banned: true });
@@ -255,7 +252,7 @@ export default async function handler(req, res) {
       dbUser = newUser;
     }
 
-    const { data: lv1 } = await supabase.from('users').select('id, username, created_at').eq('referred_by', targetId);
+    const { data: lv1 } = await supabase.from('users').select('id, username, created_at, referral_reward_granted').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
     const isMember1 = await checkMembership(targetId, "-1003685621367");
     const isMember2 = await checkMembership(targetId, "-1004377164928"); 
