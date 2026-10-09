@@ -1,77 +1,88 @@
 import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
-const darkStyles = {
+const candyCyber = {
   container: {
     color: '#ffffff',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: "'Fredoka', 'Quicksand', system-ui, sans-serif",
     paddingBottom: '20px'
   },
   title: {
-    fontSize: '22px',
+    fontSize: '24px',
     fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: '1px',
+    letterSpacing: '1.5px',
     textTransform: 'uppercase',
     margin: '10px 0 16px 0',
-    color: '#ffffff'
+    background: 'linear-gradient(90deg, #ff41b4, #00f0ff, #ffe600)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    textShadow: '0 0 20px rgba(255, 65, 180, 0.4)'
   },
   card: {
-    backgroundColor: '#1a1a1a',
-    border: '1px solid #333333',
-    borderRadius: '16px',
-    padding: '16px',
+    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))',
+    border: '2px solid #ff41b4',
+    borderRadius: '24px',
+    padding: '18px',
     marginBottom: '16px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+    boxShadow: '0 8px 24px rgba(255, 65, 180, 0.25), inset 0 1px 0 rgba(255,255,255,0.2)'
   },
   cardInteractive: {
-    backgroundColor: '#1a1a1a',
-    border: '1px solid #333333',
-    borderRadius: '16px',
-    padding: '14px 16px',
+    background: 'linear-gradient(135deg, rgba(38, 14, 66, 0.9), rgba(18, 7, 36, 0.9))',
+    border: '2px solid #8a2be2',
+    borderRadius: '20px',
+    padding: '14px 18px',
     marginBottom: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     cursor: 'pointer',
-    transition: 'border-color 0.2s ease'
+    boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)',
+    transition: 'all 0.2s ease'
   },
   btnPrimary: {
     width: '100%',
-    padding: '14px',
-    backgroundColor: '#00ccff',
-    color: '#000000',
+    padding: '15px',
+    background: 'linear-gradient(180deg, #ff66cc 0%, #ff1493 50%, #d80073 100%)',
+    color: '#ffffff',
     border: 'none',
-    borderRadius: '14px',
-    fontWeight: '800',
-    fontSize: '15px',
+    borderRadius: '18px',
+    fontWeight: '900',
+    fontSize: '16px',
+    letterSpacing: '0.5px',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(0, 204, 255, 0.25)'
+    boxShadow: '0 6px 0 #8b004b, 0 10px 20px rgba(255, 20, 147, 0.4)',
+    textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+    transform: 'translateY(0)',
+    transition: 'all 0.1s ease'
   },
   btnDark: {
-    padding: '10px 16px',
-    backgroundColor: '#00ccff',
-    color: '#000000',
+    padding: '12px 18px',
+    background: 'linear-gradient(180deg, #00ffff, #00aaff)',
+    color: '#050214',
     border: 'none',
-    borderRadius: '12px',
-    fontWeight: '800',
-    cursor: 'pointer'
+    borderRadius: '16px',
+    fontWeight: '900',
+    fontSize: '13px',
+    cursor: 'pointer',
+    boxShadow: '0 4px 0 #0077aa, 0 6px 15px rgba(0, 255, 255, 0.4)'
   },
   btnLight: {
-    padding: '10px 16px',
-    backgroundColor: '#262626',
-    color: '#888888',
-    border: '1px solid #3a3a3a',
-    borderRadius: '12px',
+    padding: '12px 18px',
+    background: 'rgba(255, 255, 255, 0.08)',
+    color: '#ff99dd',
+    border: '2px solid rgba(255, 65, 180, 0.3)',
+    borderRadius: '16px',
     fontWeight: '800',
+    fontSize: '13px',
     cursor: 'pointer'
   },
   input: {
     width: '100%',
-    backgroundColor: '#121212',
-    border: '1px solid #333333',
-    borderRadius: '12px',
-    padding: '12px',
+    background: 'rgba(15, 5, 28, 0.8)',
+    border: '2px solid #8a2be2',
+    borderRadius: '16px',
+    padding: '12px 14px',
     fontSize: '14px',
     color: '#ffffff',
     outline: 'none',
@@ -86,27 +97,33 @@ const darkStyles = {
   },
   progressStep: (active) => ({
     width: '45px',
-    height: '6px',
-    backgroundColor: active ? '#00ccff' : '#262626',
-    borderRadius: '10px',
-    transition: 'all 0.2s ease'
+    height: '8px',
+    background: active 
+      ? 'linear-gradient(90deg, #ff1493, #00f0ff)' 
+      : 'rgba(255, 255, 255, 0.1)',
+    borderRadius: '20px',
+    boxShadow: active ? '0 0 10px #00f0ff' : 'none',
+    transition: 'all 0.3s ease'
   })
 };
 
 const TEMPLATES = [
   {
-    title: 'Airdrop Update',
+    title: 'Airdrop Boom',
     icon: '🚀',
+    accent: '#ff007f',
     text: '🚀 Nuevo Airdrop confirmado. Participa gratis completando las tareas y asegura tus tokens.'
   },
   {
-    title: 'Big Giveaway',
-    icon: '🎁',
-    text: '🎁 Gran sorteo activo para la comunidad. Entra al enlace y gana recompensas exclusivas.'
+    title: 'Candy Giveaway',
+    icon: '🍬',
+    accent: '#00f0ff',
+    text: '🍬 Gran recompensa activa para la comunidad. Entra al enlace y gana saldo exclusivo.'
   },
   {
-    title: 'Bot de Referidos',
-    icon: '👥',
+    title: 'Mega Referidos',
+    icon: '💎',
+    accent: '#ffe600',
     text: '💎 Gana saldo en Telegram todos los días. Prueba la Mini App oficial y comparte tu enlace.'
   }
 ];
@@ -123,7 +140,7 @@ export default function PublishTab({ userData, setUserData }) {
   const [postText, setPostText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
-  const [buttonConfig, setButtonConfig] = useState({ text: 'Abrir', url: '', color: 'neutral' });
+  const [buttonConfig, setButtonConfig] = useState({ text: 'Abrir', url: '', color: 'pink' });
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const [showButtonModal, setShowButtonModal] = useState(false);
@@ -151,14 +168,14 @@ export default function PublishTab({ userData, setUserData }) {
   const handleNextStep3 = () => {
     if (selectedGroups.length === 0) return toast.error("Selecciona al menos un grupo.");
     if (balance < totalCost) {
-      return toast.error(`Saldo insuficiente. Necesitas ${totalCost} PT y tienes ${balance} PT.`);
+      return toast.error(`Saldo insuficiente. Tienes ${balance} PT y necesitas ${totalCost} PT.`);
     }
     setStep(4);
   };
 
   const handlePublish = async () => {
     setIsPublishing(true);
-    const tid = toast.loading("Publicando en los grupos seleccionados...");
+    const tid = toast.loading("Enviando publicación...");
 
     try {
       const finalLink = buttonConfig.url || linkUrl || 'https://t.me/ReffRobot/app';
@@ -185,144 +202,156 @@ export default function PublishTab({ userData, setUserData }) {
         }
       }
 
-      toast.success("¡Publicado con éxito!", { id: tid });
+      toast.success("¡Publicado en los grupos!", { id: tid });
       setPostText('');
       setImageUrl('');
       setLinkUrl('');
       setSelectedGroups([]);
       setStep(1);
     } catch (err) {
-      toast.error(err.message || "Error al procesar la publicación", { id: tid });
+      toast.error(err.message || "Error al procesar", { id: tid });
     } finally {
       setIsPublishing(false);
     }
   };
 
   return (
-    <div style={darkStyles.container}>
+    <div style={candyCyber.container}>
       <Toaster position="top-center" />
-      <h2 style={darkStyles.title}>PUBLICAR</h2>
+      <h2 style={candyCyber.title}>✨ PUBLICAR POST ✨</h2>
 
-      {/* Selector superior: Crear post / Mis posts */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+      {/* Selector Crear / Historial */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <button 
           onClick={() => setActiveTab('create')} 
-          style={activeTab === 'create' ? { ...darkStyles.btnDark, flex: 1 } : { ...darkStyles.btnLight, flex: 1 }}
+          style={activeTab === 'create' ? { ...candyCyber.btnDark, flex: 1 } : { ...candyCyber.btnLight, flex: 1 }}
         >
           🚀 Crear post
         </button>
         <button 
           onClick={() => setActiveTab('history')} 
-          style={activeTab === 'history' ? { ...darkStyles.btnDark, flex: 1 } : { ...darkStyles.btnLight, flex: 1 }}
+          style={activeTab === 'history' ? { ...candyCyber.btnDark, flex: 1 } : { ...candyCyber.btnLight, flex: 1 }}
         >
-          📋 Mis posts
+          🍭 Mis posts
         </button>
       </div>
 
       {activeTab === 'create' && (
         <>
-          <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', color: '#888888', letterSpacing: '0.5px' }}>
-            PASO {step} DE 4
+          <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>
+            NIVEL {step} DE 4
           </div>
-          <div style={darkStyles.progressBarContainer}>
-            <div style={darkStyles.progressStep(step >= 1)} />
-            <div style={darkStyles.progressStep(step >= 2)} />
-            <div style={darkStyles.progressStep(step >= 3)} />
-            <div style={darkStyles.progressStep(step >= 4)} />
+          <div style={candyCyber.progressBarContainer}>
+            <div style={candyCyber.progressStep(step >= 1)} />
+            <div style={candyCyber.progressStep(step >= 2)} />
+            <div style={candyCyber.progressStep(step >= 3)} />
+            <div style={candyCyber.progressStep(step >= 4)} />
           </div>
 
-          {/* ================= PASO 1: TEXTO & PLANTILLAS ================= */}
+          {/* ================= PASO 1 ================= */}
           {step === 1 && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '10px', color: '#fff' }}>
-                ¿Qué quieres compartir?
+              <h3 style={{ fontSize: '17px', fontWeight: '900', marginBottom: '10px', color: '#ffe600' }}>
+                ¿Qué mensaje quieres lanzar?
               </h3>
-              <div style={darkStyles.card}>
+              <div style={candyCyber.card}>
                 <textarea
-                  style={{ ...darkStyles.input, height: '110px', resize: 'none', border: 'none', padding: 0 }}
-                  placeholder="Escribe tu mensaje o anuncio aquí..."
+                  style={{ 
+                    ...candyCyber.input, 
+                    height: '115px', 
+                    resize: 'none', 
+                    border: 'none', 
+                    background: 'transparent',
+                    padding: 0,
+                    fontSize: '15px'
+                  }}
+                  placeholder="Escribe tu anuncio aquí con emojis y estilo..."
                   maxLength={500}
                   value={postText}
                   onChange={(e) => setPostText(e.target.value)}
                 />
-                <div style={{ textAlign: 'right', fontSize: '11px', color: '#666666', marginTop: '6px' }}>
+                <div style={{ textAlign: 'right', fontSize: '11px', color: '#ff99dd', marginTop: '6px', fontWeight: 'bold' }}>
                   {postText.length} / 500
                 </div>
-                <button onClick={handleNextStep1} style={{ ...darkStyles.btnPrimary, marginTop: '12px' }}>
-                  Continuar &gt;
+                <button onClick={handleNextStep1} style={{ ...candyCyber.btnPrimary, marginTop: '14px' }}>
+                  SIGUIENTE NIVEL ➔
                 </button>
               </div>
 
-              <div style={{ fontSize: '12px', fontWeight: '800', color: '#888888', marginBottom: '10px', textTransform: 'uppercase' }}>
-                Plantillas rápidas
+              <div style={{ fontSize: '12px', fontWeight: '900', color: '#00f0ff', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                🍬 Plantillas Deliciosas
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                 {TEMPLATES.map((tmpl, idx) => (
                   <div
                     key={idx}
                     onClick={() => setPostText(tmpl.text)}
-                    style={{ ...darkStyles.card, padding: '12px', cursor: 'pointer', marginBottom: 0 }}
+                    style={{ 
+                      ...candyCyber.card, 
+                      padding: '12px 8px', 
+                      cursor: 'pointer', 
+                      marginBottom: 0,
+                      borderColor: tmpl.accent,
+                      textAlign: 'center'
+                    }}
                   >
-                    <div style={{ fontSize: '22px', marginBottom: '4px' }}>{tmpl.icon}</div>
-                    <div style={{ fontWeight: '800', fontSize: '13px', color: '#ffffff' }}>{tmpl.title}</div>
-                    <div style={{ fontSize: '11px', color: '#777777', marginTop: '4px', lineHeight: '1.3' }}>
-                      {tmpl.text.slice(0, 42)}...
-                    </div>
+                    <div style={{ fontSize: '26px', marginBottom: '4px' }}>{tmpl.icon}</div>
+                    <div style={{ fontWeight: '900', fontSize: '11px', color: '#fff' }}>{tmpl.title}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ================= PASO 2: EXTRAS (IMAGEN Y BOTÓN) ================= */}
+          {/* ================= PASO 2 ================= */}
           {step === 2 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                <button onClick={() => setStep(1)} style={{ ...darkStyles.btnLight, padding: '6px 12px' }}>&lt;</button>
-                <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: '#fff' }}>¿Le añades algo?</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <button onClick={() => setStep(1)} style={{ ...candyCyber.btnLight, padding: '6px 12px' }}>◀</button>
+                <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>¡Ponle dulces extras!</h3>
               </div>
-              <p style={{ fontSize: '12px', color: '#888888', marginBottom: '14px' }}>
-                Opcional. Una imagen y un botón interactivo captan más vistas.
+              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>
+                Los botones y fotos hacen que tu post brille mucho más.
               </p>
 
-              <div onClick={() => setShowImageModal(true)} style={darkStyles.cardInteractive}>
+              <div onClick={() => setShowImageModal(true)} style={candyCyber.cardInteractive}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ fontSize: '24px' }}>🖼️</div>
+                  <div style={{ fontSize: '28px' }}>🖼️</div>
                   <div>
-                    <div style={{ fontWeight: '800', color: '#ffffff', fontSize: '14px' }}>Imagen</div>
-                    <div style={{ fontSize: '12px', color: imageUrl ? '#00ccff' : '#777777' }}>
-                      {imageUrl ? 'Imagen adjuntada ✓' : 'Añade una URL pública'}
+                    <div style={{ fontWeight: '900', color: '#ffffff', fontSize: '15px' }}>Imagen Neón</div>
+                    <div style={{ fontSize: '12px', color: imageUrl ? '#00f0ff' : '#aaa' }}>
+                      {imageUrl ? 'Imagen adjuntada ✓' : 'Pega una URL'}
                     </div>
                   </div>
                 </div>
-                <div style={{ color: '#888', fontWeight: 'bold' }}>&gt;</div>
+                <div style={{ color: '#00f0ff', fontWeight: '900', fontSize: '18px' }}>➔</div>
               </div>
 
-              <div onClick={() => setShowButtonModal(true)} style={darkStyles.cardInteractive}>
+              <div onClick={() => setShowButtonModal(true)} style={candyCyber.cardInteractive}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ fontSize: '24px' }}>🔘</div>
+                  <div style={{ fontSize: '28px' }}>🔘</div>
                   <div>
-                    <div style={{ fontWeight: '800', color: '#ffffff', fontSize: '14px' }}>Botón interactivo</div>
-                    <div style={{ fontSize: '12px', color: buttonConfig.url ? '#00ccff' : '#777777' }}>
-                      {buttonConfig.url ? `Botón: "${buttonConfig.text}"` : 'Toca para configurar enlace'}
+                    <div style={{ fontWeight: '900', color: '#ffffff', fontSize: '15px' }}>Botón Especial</div>
+                    <div style={{ fontSize: '12px', color: buttonConfig.url ? '#ff41b4' : '#aaa' }}>
+                      {buttonConfig.url ? `Texto: "${buttonConfig.text}"` : 'Toca para configurarlo'}
                     </div>
                   </div>
                 </div>
-                <div style={{ color: '#888', fontWeight: 'bold' }}>&gt;</div>
+                <div style={{ color: '#ff41b4', fontWeight: '900', fontSize: '18px' }}>➔</div>
               </div>
 
-              <button onClick={handleNextStep2} style={{ ...darkStyles.btnPrimary, marginTop: '16px' }}>
-                Continuar al selector de grupos &gt;
+              <button onClick={handleNextStep2} style={{ ...candyCyber.btnPrimary, marginTop: '16px' }}>
+                ELEGIR GRUPOS ➔
               </button>
             </div>
           )}
 
-          {/* ================= PASO 3: SELECCIÓN DE GRUPOS ================= */}
+          {/* ================= PASO 3 ================= */}
           {step === 3 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <button onClick={() => setStep(2)} style={{ ...darkStyles.btnLight, padding: '6px 12px' }}>&lt;</button>
-                <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: '#fff' }}>¿Dónde se publica?</h3>
+                <button onClick={() => setStep(2)} style={{ ...candyCyber.btnLight, padding: '6px 12px' }}>◀</button>
+                <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>¿A qué planetas lo enviamos?</h3>
               </div>
 
               {AVAILABLE_GROUPS.map((grp) => {
@@ -332,91 +361,109 @@ export default function PublishTab({ userData, setUserData }) {
                     key={grp.id}
                     onClick={() => handleToggleGroup(grp.id)}
                     style={{
-                      ...darkStyles.cardInteractive,
-                      borderColor: isSelected ? '#00ccff' : '#333333',
-                      backgroundColor: isSelected ? '#12252e' : '#1a1a1a'
+                      ...candyCyber.cardInteractive,
+                      borderColor: isSelected ? '#00f0ff' : '#8a2be2',
+                      background: isSelected 
+                        ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(46, 16, 77, 0.9))' 
+                        : candyCyber.cardInteractive.background,
+                      boxShadow: isSelected ? '0 0 15px rgba(0, 240, 255, 0.4)' : candyCyber.cardInteractive.boxShadow
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: '800', fontSize: '14px', color: '#ffffff' }}>{grp.name}</div>
-                      <div style={{ fontSize: '11px', color: '#888888' }}>{grp.members}</div>
+                      <div style={{ fontWeight: '900', fontSize: '15px', color: '#ffffff' }}>{grp.name}</div>
+                      <div style={{ fontSize: '12px', color: '#ff99dd' }}>{grp.members}</div>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      readOnly
-                      style={{ width: '18px', height: '18px', accentColor: '#00ccff' }}
-                    />
+                    <div style={{
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      background: isSelected ? '#00f0ff' : 'transparent',
+                      border: '2px solid #00f0ff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#000', fontWeight: '900', fontSize: '14px'
+                    }}>
+                      {isSelected ? '✓' : ''}
+                    </div>
                   </div>
                 );
               })}
 
               <div style={{
-                backgroundColor: '#12252e',
-                border: '1px solid #00ccff',
-                borderRadius: '14px',
-                padding: '14px',
+                background: 'linear-gradient(90deg, #ff1493, #8a2be2)',
+                borderRadius: '18px',
+                padding: '14px 18px',
                 display: 'flex',
                 justifyContent: 'space-between',
-                fontWeight: '800',
-                fontSize: '13px',
+                fontWeight: '900',
+                fontSize: '14px',
                 marginBottom: '14px',
-                color: '#00ccff'
+                boxShadow: '0 4px 15px rgba(255, 20, 147, 0.3)'
               }}>
-                <span>{selectedGroups.length} grupos seleccionados</span>
+                <span>🎯 {selectedGroups.length} seleccionados</span>
                 <span>Costo: {totalCost} PT</span>
               </div>
 
-              <button onClick={handleNextStep3} style={darkStyles.btnPrimary}>
-                Continuar al resumen &gt;
+              <button onClick={handleNextStep3} style={candyCyber.btnPrimary}>
+                REVISAR MISIÓN ➔
               </button>
             </div>
           )}
 
-          {/* ================= PASO 4: RESUMEN Y CONFIRMACIÓN ================= */}
+          {/* ================= PASO 4 ================= */}
           {step === 4 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <button onClick={() => setStep(3)} style={{ ...darkStyles.btnLight, padding: '6px 12px' }}>&lt;</button>
-                <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: '#fff' }}>Revisar y Publicar</h3>
+                <button onClick={() => setStep(3)} style={{ ...candyCyber.btnLight, padding: '6px 12px' }}>◀</button>
+                <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>Vista Previa</h3>
               </div>
 
-              <div style={darkStyles.card}>
-                <div style={{ fontSize: '11px', color: '#888', fontWeight: 'bold', marginBottom: '6px' }}>VISTA PREVIA:</div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', marginBottom: '10px', color: '#eee' }}>{postText}</div>
+              <div style={candyCyber.card}>
+                <div style={{ fontSize: '11px', color: '#00f0ff', fontWeight: '900', marginBottom: '8px' }}>POST FINAL:</div>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', marginBottom: '12px', color: '#fff', lineHeight: '1.4' }}>{postText}</div>
                 {imageUrl && (
-                  <div style={{ fontSize: '12px', color: '#00ccff', marginBottom: '8px' }}>
-                    🖼️ Imagen adjunta: {imageUrl.slice(0, 35)}...
+                  <div style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '8px' }}>
+                    🖼️ Imagen adjuntada lista
                   </div>
                 )}
                 {buttonConfig.url && (
                   <div style={{
                     display: 'inline-block',
-                    padding: '6px 14px',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    backgroundColor: buttonConfig.color === 'blue' ? '#0070f3' : buttonConfig.color === 'green' ? '#28a745' : '#262626',
-                    color: '#ffffff'
+                    padding: '8px 18px',
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: '900',
+                    background: buttonConfig.color === 'cyan' ? '#00f0ff' : buttonConfig.color === 'yellow' ? '#ffe600' : '#ff1493',
+                    color: '#050214',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                   }}>
-                    🔗 {buttonConfig.text}
+                    {buttonConfig.text} ➔
                   </div>
                 )}
               </div>
 
-              <div style={{ fontSize: '13px', marginBottom: '14px', padding: '0 4px', color: '#aaa', lineHeight: '1.6' }}>
-                • Tu saldo: <strong style={{ color: '#ffcc00' }}>{balance} PT</strong><br />
-                • Costo total: <strong style={{ color: '#ff8a80' }}>-{totalCost} PT</strong><br />
-                • Saldo restante estimado: <strong style={{ color: '#fff' }}>{(balance - totalCost).toFixed(2)} PT</strong>
+              <div style={{ 
+                background: 'rgba(255,255,255,0.05)', 
+                border: '1px solid rgba(255,255,255,0.1)', 
+                borderRadius: '16px', 
+                padding: '12px 16px', 
+                fontSize: '13px', 
+                marginBottom: '16px', 
+                color: '#fff', 
+                lineHeight: '1.7' 
+              }}>
+                • Saldo actual: <strong style={{ color: '#00f0ff' }}>{balance} PT</strong><br />
+                • Inversión: <strong style={{ color: '#ff41b4' }}>-{totalCost} PT</strong><br />
+                • Te quedarán: <strong style={{ color: '#ffe600' }}>{(balance - totalCost).toFixed(2)} PT</strong>
               </div>
 
               <button 
                 onClick={handlePublish} 
                 disabled={isPublishing} 
-                style={{ ...darkStyles.btnPrimary, backgroundColor: '#28a745', color: '#fff' }}
+                style={{ 
+                  ...candyCyber.btnPrimary, 
+                  background: 'linear-gradient(180deg, #00ffaa, #00bb77)', 
+                  boxShadow: '0 6px 0 #007744, 0 10px 20px rgba(0, 255, 170, 0.4)' 
+                }}
               >
-                {isPublishing ? 'Enviando...' : '🚀 CONFIRMAR Y PUBLICAR'}
+                {isPublishing ? 'DISPARANDO POST...' : '⚡ ¡LANZAR AHORA! ⚡'}
               </button>
             </div>
           )}
@@ -425,72 +472,73 @@ export default function PublishTab({ userData, setUserData }) {
 
       {/* Pestaña Mis Posts */}
       {activeTab === 'history' && (
-        <div style={darkStyles.card}>
-          <h4 style={{ margin: '0 0 8px 0', color: '#fff' }}>Historial reciente</h4>
-          <p style={{ fontSize: '13px', color: '#888' }}>
-            Aquí podrás consultar las campañas y anuncios enviados a los grupos.
+        <div style={candyCyber.card}>
+          <h4 style={{ margin: '0 0 8px 0', color: '#ffe600' }}>Tus Campañas</h4>
+          <p style={{ fontSize: '13px', color: '#ff99dd' }}>
+            Aquí verás el historial de todos tus lanzamientos espaciales.
           </p>
         </div>
       )}
 
-      {/* ================= MODAL DE CONFIGURACIÓN DEL BOTÓN ================= */}
+      {/* ================= MODAL BOTÓN ================= */}
       {showButtonModal && (
         <div style={{
-          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000,
+          backdropFilter: 'blur(5px)'
         }}>
-          <div style={{ ...darkStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontWeight: '800', color: '#fff', fontSize: '16px' }}>Botón interactivo</h3>
+          <div style={{ ...candyCyber.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontWeight: '900', color: '#00f0ff', fontSize: '17px' }}>Botón Brillante</h3>
               <button 
                 onClick={() => setShowButtonModal(false)}
-                style={{ ...darkStyles.btnLight, padding: '4px 8px' }}
+                style={{ ...candyCyber.btnLight, padding: '4px 10px', color: '#fff', borderColor: '#ff1493' }}
               >
                 ✕
               </button>
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>TEXTO DEL BOTÓN</label>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>TEXTO DEL BOTÓN</label>
               <input
-                style={darkStyles.input}
+                style={candyCyber.input}
                 value={buttonConfig.text}
                 onChange={(e) => setButtonConfig({ ...buttonConfig, text: e.target.value })}
-                placeholder="Ej. Abrir Mini App"
+                placeholder="Ej. Entrar al Airdrop"
               />
             </div>
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>ENLACE (URL)</label>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>ENLACE (URL)</label>
               <input
-                style={darkStyles.input}
+                style={candyCyber.input}
                 value={buttonConfig.url}
                 onChange={(e) => setButtonConfig({ ...buttonConfig, url: e.target.value })}
                 placeholder="https://t.me/..."
               />
             </div>
 
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>COLOR</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>SABOR / COLOR</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '6px' }}>
                 {[
-                  { id: 'neutral', label: 'Neutro', bg: '#262626' },
-                  { id: 'blue', label: 'Azul', bg: '#0070f3' },
-                  { id: 'green', label: 'Verde', bg: '#28a745' },
-                  { id: 'red', label: 'Rojo', bg: '#dc3545' }
+                  { id: 'pink', label: 'Fresa', bg: '#ff1493' },
+                  { id: 'cyan', label: 'Menta', bg: '#00f0ff' },
+                  { id: 'yellow', label: 'Banana', bg: '#ffe600' }
                 ].map((c) => (
                   <button
                     key={c.id}
                     onClick={() => setButtonConfig({ ...buttonConfig, color: c.id })}
                     style={{
-                      padding: '6px 2px',
-                      fontSize: '11px',
-                      fontWeight: '800',
+                      padding: '8px 4px',
+                      fontSize: '12px',
+                      fontWeight: '900',
                       backgroundColor: c.bg,
-                      color: '#ffffff',
-                      border: buttonConfig.color === c.id ? '2px solid #00ccff' : '1px solid #444',
-                      borderRadius: '8px',
-                      cursor: 'pointer'
+                      color: '#050214',
+                      border: buttonConfig.color === c.id ? '3px solid #ffffff' : 'none',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                     }}
                   >
                     {c.label}
@@ -499,42 +547,43 @@ export default function PublishTab({ userData, setUserData }) {
               </div>
             </div>
 
-            <button onClick={() => setShowButtonModal(false)} style={darkStyles.btnPrimary}>
-              Guardar
+            <button onClick={() => setShowButtonModal(false)} style={candyCyber.btnPrimary}>
+              GUARDAR BOTÓN
             </button>
           </div>
         </div>
       )}
 
-      {/* ================= MODAL DE IMAGEN ================= */}
+      {/* ================= MODAL IMAGEN ================= */}
       {showImageModal && (
         <div style={{
-          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000,
+          backdropFilter: 'blur(5px)'
         }}>
-          <div style={{ ...darkStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontWeight: '800', color: '#fff', fontSize: '16px' }}>Adjuntar Imagen</h3>
+          <div style={{ ...candyCyber.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#ffe600' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontWeight: '900', color: '#ffe600', fontSize: '17px' }}>Imagen Neón</h3>
               <button 
                 onClick={() => setShowImageModal(false)}
-                style={{ ...darkStyles.btnLight, padding: '4px 8px' }}
+                style={{ ...candyCyber.btnLight, padding: '4px 10px', color: '#fff', borderColor: '#ff1493' }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '11px', color: '#888', fontWeight: 'bold' }}>URL PÚBLICA DE LA IMAGEN</label>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>URL PÚBLICA DE LA FOTO</label>
               <input
-                style={darkStyles.input}
+                style={candyCyber.input}
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://ejemplo.com/imagen.jpg"
+                placeholder="https://ejemplo.com/foto.jpg"
               />
             </div>
 
-            <button onClick={() => setShowImageModal(false)} style={darkStyles.btnPrimary}>
-              Guardar Imagen
+            <button onClick={() => setShowImageModal(false)} style={candyCyber.btnPrimary}>
+              GUARDAR FOTO
             </button>
           </div>
         </div>
