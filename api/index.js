@@ -14,7 +14,7 @@ const supabase = createClient(
 
 const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 
-// Lista de cuentas exentas de baneos por multicuentas
+// Lista de administradores inmunes a restricciones
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
 async function checkMembership(userId, chatId) {
@@ -28,6 +28,55 @@ async function checkMembership(userId, chatId) {
   } catch (error) {
     return false;
   }
+}
+
+// FUNCIÓN MAESTRA: Intenta liberar el bono de referido si se cumplen las condiciones
+async function tryGrantReferralReward(targetId) {
+  try {
+    const { data: currentUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
+    if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted) {
+      return false;
+    }
+
+    // 1. Debe haber pasado el captcha
+    if (!currentUser.is_human) {
+      return false;
+    }
+
+    // 2. Debe ser miembro de ambos canales
+    const isMember1 = await checkMembership(targetId, "-1003685621367"); 
+    const isMember2 = await checkMembership(targetId, "-1004377164928"); 
+
+    const isTestAdmin = ADMIN_IDS.includes(String(targetId)) || ADMIN_IDS.includes(String(currentUser.referred_by));
+    
+    // Si no es admin y no está en los canales, no libera
+    if ((!isMember1 || !isMember2) && !isTestAdmin) {
+      return false;
+    }
+
+    // 3. Liberar recompensa al referidor
+    const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).maybeSingle();
+    if (referrer) {
+      const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
+      const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
+      const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
+
+      await supabase.from('users').update({ 
+        balance: refBalance, 
+        referral_earnings: refEarnings, 
+        total_earnings: refTotal 
+      }).eq('id', referrer.id);
+
+      await supabase.from('users').update({ 
+        referral_reward_granted: true 
+      }).eq('id', String(targetId));
+
+      return true;
+    }
+  } catch (err) {
+    console.error("Error liberando bono de referido:", err);
+  }
+  return false;
 }
 
 async function publishToTelegramGroup(chatId, text, photoData, userLink, username, buttonConfig) {
@@ -91,15 +140,25 @@ export default async function handler(req, res) {
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
-    // --- ACCIÓN: OBTENER REFERIDOS EN TIEMPO REAL (CORREGIDA APrueba de Fallos) ---
+    // --- ACCIÓN: OBTENER REFERIDOS EN TIEMPO REAL CON AUTO-RECONCILIACIÓN ---
     if (action === 'get-referrals') {
       const targetId = String(userId);
-      // Usamos select('*') para que no falle si falta alguna columna en Supabase
-      const { data: lv1, error: errLv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
-      const { data: dbUser, error: errDb } = await supabase.from('users').select('*').eq('id', targetId).single();
+      let { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
       
-      if (errLv1) console.error("Error consultando referidos:", errLv1);
+      // Si hay referidos pendientes, intentar liberarlos automáticamente
+      if (lv1 && lv1.length > 0) {
+        for (const refUser of lv1) {
+          if (!refUser.referral_reward_granted) {
+            await tryGrantReferralReward(refUser.id);
+          }
+        }
+        // Consultar de nuevo con los estados actualizados
+        const refreshed = await supabase.from('users').select('*').eq('referred_by', targetId);
+        lv1 = refreshed.data || lv1;
+      }
 
+      const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
+      
       return res.status(200).json({ 
         success: true, 
         referrals: lv1 || [], 
@@ -107,12 +166,17 @@ export default async function handler(req, res) {
       });
     }
 
+    // --- ACCIÓN: MARCAR COMO HUMANO TRAS PASAR CAPTCHA ---
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
       if (!targetId) return res.status(400).json({ success: false, error: 'User ID missing' });
 
       const { error } = await supabase.from('users').update({ is_human: true }).eq('id', targetId);
       if (error) return res.status(500).json({ success: false, error: error.message });
+
+      // INTENTO DE LIBERACIÓN TRAS PASAR EL CAPTCHA
+      await tryGrantReferralReward(targetId);
+
       return res.status(200).json({ success: true, is_human: true });
     }
 
@@ -138,7 +202,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: CHECK CHANNELS (PAGO AL REFERIDOR) ---
+    // --- ACCIÓN: VERIFICACIÓN DE CANALES ---
     if (action === 'check-channels') {
       const targetId = String(userId);
       const isMember1 = await checkMembership(targetId, "-1003685621367"); 
@@ -146,20 +210,10 @@ export default async function handler(req, res) {
       const allJoined = isMember1 && isMember2;
 
       if (allJoined) {
-        // Usamos select('*') para proteger de fallos
-        const { data: currentUser } = await supabase.from('users').select('*').eq('id', targetId).single();
-        if (currentUser && currentUser.is_human && currentUser.referred_by && !currentUser.referral_reward_granted) {
-          const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).single();
-          if (referrer) {
-            const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
-            const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
-            const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
-
-            await supabase.from('users').update({ balance: refBalance, referral_earnings: refEarnings, total_earnings: refTotal }).eq('id', referrer.id);
-            await supabase.from('users').update({ referral_reward_granted: true }).eq('id', targetId);
-          }
-        }
+        // INTENTO DE LIBERACIÓN TRAS UNIRSE A LOS CANALES
+        await tryGrantReferralReward(targetId);
       }
+
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined });
     }
 
@@ -240,7 +294,6 @@ export default async function handler(req, res) {
     if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
     if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
     
-    // Asignar el referidor a la cuenta de prueba si eres admin
     if (dbUser && !dbUser.referred_by && start_param && String(start_param) !== targetId && isAdmin) {
       updates.referred_by = String(start_param);
     }
@@ -263,6 +316,9 @@ export default async function handler(req, res) {
       if (insertErr) return res.status(500).json({ success: false, error: insertErr.message });
       dbUser = newUser;
     }
+
+    // Si ya completó los requisitos, intentar liberar bono al iniciar sesión
+    await tryGrantReferralReward(targetId);
 
     const { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
