@@ -30,47 +30,26 @@ async function checkMembership(userId, chatId) {
   }
 }
 
-// FUNCIÓN MAESTRA: Intenta liberar el bono de referido si se cumplen las condiciones
 async function tryGrantReferralReward(targetId) {
   try {
     const { data: currentUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
-    if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted) {
-      return false;
-    }
+    if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted) return false;
+    if (!currentUser.is_human) return false;
 
-    // 1. Debe haber pasado el captcha
-    if (!currentUser.is_human) {
-      return false;
-    }
-
-    // 2. Debe ser miembro de ambos canales
     const isMember1 = await checkMembership(targetId, "-1003685621367"); 
     const isMember2 = await checkMembership(targetId, "-1004377164928"); 
 
     const isTestAdmin = ADMIN_IDS.includes(String(targetId)) || ADMIN_IDS.includes(String(currentUser.referred_by));
-    
-    // Si no es admin y no está en los canales, no libera
-    if ((!isMember1 || !isMember2) && !isTestAdmin) {
-      return false;
-    }
+    if ((!isMember1 || !isMember2) && !isTestAdmin) return false;
 
-    // 3. Liberar recompensa al referidor
     const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).maybeSingle();
     if (referrer) {
       const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
       const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
       const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
 
-      await supabase.from('users').update({ 
-        balance: refBalance, 
-        referral_earnings: refEarnings, 
-        total_earnings: refTotal 
-      }).eq('id', referrer.id);
-
-      await supabase.from('users').update({ 
-        referral_reward_granted: true 
-      }).eq('id', String(targetId));
-
+      await supabase.from('users').update({ balance: refBalance, referral_earnings: refEarnings, total_earnings: refTotal }).eq('id', referrer.id);
+      await supabase.from('users').update({ referral_reward_granted: true }).eq('id', String(targetId));
       return true;
     }
   } catch (err) {
@@ -140,43 +119,146 @@ export default async function handler(req, res) {
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
-    // --- ACCIÓN: OBTENER REFERIDOS EN TIEMPO REAL CON AUTO-RECONCILIACIÓN ---
+    // ================= [ GESTIÓN DE TAREAS COMUNITARIAS ] =================
+
+    // 1. OBTENER LISTA DE TAREAS ACTIVAS DISPONIBLES
+    if (action === 'get-tasks') {
+      const targetId = String(userId);
+
+      // Traer tareas activas con cupos disponibles
+      const { data: allTasks, error: taskErr } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (taskErr) return res.status(500).json({ success: false, error: taskErr.message });
+
+      // Traer los IDs de las tareas que este usuario ya completó
+      const { data: completedRows } = await supabase
+        .from('user_completed_tasks')
+        .select('task_id')
+        .eq('user_id', targetId);
+
+      const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
+
+      // Filtrar para que solo salgan las que no ha completado todavía
+      const availableTasks = (allTasks || []).filter(t => {
+        const notDoneByUser = !completedIds.has(String(t.id));
+        const hasSlots = Number(t.completions_done || 0) < Number(t.completions_total);
+        return notDoneByUser && hasSlots;
+      });
+
+      return res.status(200).json({ success: true, tasks: availableTasks });
+    }
+
+    // 2. CREAR NUEVA TAREA Y DESCONTAR SALDO
+    if (action === 'create-task') {
+      const { creator_id, type, title, url, bot_token, completions_total, reward } = req.body;
+      const targetId = String(creator_id || userId);
+
+      const count = Number(completions_total || 100);
+      const rew = Number(reward || 0.1);
+      const totalCost = Number((count * rew).toFixed(2));
+
+      const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
+      if (!dbUser) return res.status(404).json({ success: false, error: 'Usuario no encontrado.' });
+
+      const currentBalance = Number(dbUser.balance || 0);
+      if (currentBalance < totalCost) {
+        return res.status(400).json({ success: false, error: `Saldo insuficiente. Requiere ${totalCost} PT.` });
+      }
+
+      // Descontar saldo
+      const newBalance = Number((currentBalance - totalCost).toFixed(2));
+      await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
+
+      // Insertar tarea en la base de datos
+      const { data: newTask, error: insertErr } = await supabase.from('tasks').insert([{
+        creator_id: targetId,
+        type,
+        title,
+        url,
+        bot_token: bot_token || null,
+        completions_total: count,
+        completions_done: 0,
+        reward: rew,
+        total_cost: totalCost,
+        status: 'active'
+      }]).select().single();
+
+      if (insertErr) return res.status(500).json({ success: false, error: insertErr.message });
+
+      return res.status(200).json({ success: true, task: newTask, balance: newBalance });
+    }
+
+    // 3. COMPLETAR TAREA Y PAGAR AL USUARIO
+    if (action === 'complete-task') {
+      const { taskId } = req.body;
+      const targetId = String(userId);
+
+      const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+      if (!task || task.status !== 'active') {
+        return res.status(400).json({ success: false, error: 'Esta tarea ya no está disponible.' });
+      }
+
+      // Verificar si ya la completó
+      const { data: alreadyDone } = await supabase
+        .from('user_completed_tasks')
+        .select('id')
+        .eq('task_id', taskId)
+        .eq('user_id', targetId)
+        .maybeSingle();
+
+      if (alreadyDone) {
+        return res.status(400).json({ success: false, error: 'Ya completaste esta tarea previamente.' });
+      }
+
+      // Registrar tarea como completada
+      await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
+
+      // Pagar recompensa al usuario
+      const rewardAmount = Number(task.reward || 0.1);
+      const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
+      
+      const newBalance = Number((Number(dbUser.balance || 0) + rewardAmount).toFixed(2));
+      const newTotal = Number((Number(dbUser.total_earnings || 0) + rewardAmount).toFixed(2));
+
+      await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
+
+      // Incrementar contador de la tarea
+      const newDoneCount = Number(task.completions_done || 0) + 1;
+      const isFinished = newDoneCount >= Number(task.completions_total);
+
+      await supabase.from('tasks').update({
+        completions_done: newDoneCount,
+        status: isFinished ? 'completed' : 'active'
+      }).eq('id', taskId);
+
+      return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
+    }
+
+    // ================= [ FIN DE TAREAS ] =================
+
     if (action === 'get-referrals') {
       const targetId = String(userId);
       let { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
-      
-      // Si hay referidos pendientes, intentar liberarlos automáticamente
       if (lv1 && lv1.length > 0) {
         for (const refUser of lv1) {
-          if (!refUser.referral_reward_granted) {
-            await tryGrantReferralReward(refUser.id);
-          }
+          if (!refUser.referral_reward_granted) await tryGrantReferralReward(refUser.id);
         }
-        // Consultar de nuevo con los estados actualizados
         const refreshed = await supabase.from('users').select('*').eq('referred_by', targetId);
         lv1 = refreshed.data || lv1;
       }
-
       const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
-      
-      return res.status(200).json({ 
-        success: true, 
-        referrals: lv1 || [], 
-        earnings: dbUser?.referral_earnings || 0 
-      });
+      return res.status(200).json({ success: true, referrals: lv1 || [], earnings: dbUser?.referral_earnings || 0 });
     }
 
-    // --- ACCIÓN: MARCAR COMO HUMANO TRAS PASAR CAPTCHA ---
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
       if (!targetId) return res.status(400).json({ success: false, error: 'User ID missing' });
-
-      const { error } = await supabase.from('users').update({ is_human: true }).eq('id', targetId);
-      if (error) return res.status(500).json({ success: false, error: error.message });
-
-      // INTENTO DE LIBERACIÓN TRAS PASAR EL CAPTCHA
+      await supabase.from('users').update({ is_human: true }).eq('id', targetId);
       await tryGrantReferralReward(targetId);
-
       return res.status(200).json({ success: true, is_human: true });
     }
 
@@ -198,22 +280,16 @@ export default async function handler(req, res) {
 
       const newBalance = Number((currentBalance - 1).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', String(userId));
-
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- ACCIÓN: VERIFICACIÓN DE CANALES ---
     if (action === 'check-channels') {
       const targetId = String(userId);
       const isMember1 = await checkMembership(targetId, "-1003685621367"); 
       const isMember2 = await checkMembership(targetId, "-1004377164928"); 
       const allJoined = isMember1 && isMember2;
 
-      if (allJoined) {
-        // INTENTO DE LIBERACIÓN TRAS UNIRSE A LOS CANALES
-        await tryGrantReferralReward(targetId);
-      }
-
+      if (allJoined) await tryGrantReferralReward(targetId);
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined });
     }
 
@@ -257,14 +333,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // --- REGISTRO / VERIFICACIÓN DE USUARIOS ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser?.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
-    
     const isAdmin = ADMIN_IDS.includes(targetId) || ADMIN_IDS.includes(String(start_param));
 
     if (!isAdmin) {
@@ -316,9 +390,6 @@ export default async function handler(req, res) {
       if (insertErr) return res.status(500).json({ success: false, error: insertErr.message });
       dbUser = newUser;
     }
-
-    // Si ya completó los requisitos, intentar liberar bono al iniciar sesión
-    await tryGrantReferralReward(targetId);
 
     const { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
     const n1 = lv1?.length || 0;
