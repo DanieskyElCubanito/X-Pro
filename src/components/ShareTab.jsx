@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { botApi } from '../api/botApi';
+import WebApp from '@twa-dev/sdk'; // Añadido para el enlace dinámico
 
 const neon = {
   card: {
@@ -46,7 +47,7 @@ const neon = {
   }
 };
 
-function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
+function ShareTab({ stats, userId, totalReferralEarnings }) {
   const [referralsList, setReferralsList] = useState(stats?.referralsList || []);
   const [earnings, setEarnings] = useState(totalReferralEarnings || stats?.c1 || 0);
   const [loading, setLoading] = useState(false);
@@ -72,34 +73,45 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
   };
 
   const n1 = referralsList.length;
-  const totalEarned = parseFloat(earnings).toFixed(4);
+  // Convertimos a 2 decimales para que se vea como saldo real
+  const totalEarned = parseFloat(earnings).toFixed(2);
+  const inviteLink = `https://t.me/ReffRobot/app?startapp=${userId}`;
 
   const handleCopy = () => {
     if (!userId) return toast.error("Error: ID no encontrado.");
-    const link = `https://t.me/ReffRobot/app?startapp=${userId}`;
-    navigator.clipboard.writeText(link)
+    navigator.clipboard.writeText(inviteLink)
       .then(() => toast.success("¡Enlace copiado al portapapeles!"))
       .catch(() => toast.error("Error al copiar el enlace"));
   };
 
+  const handleShare = () => {
+    if (!userId) return toast.error("Error: ID no encontrado.");
+    const text = "⚡ ¡Entra a la red, completa tareas simples y gana CLICK gratis! 🚀";
+    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
+  };
+
   return (
     <div className="fade-in" style={{ paddingBottom: '20px' }}>
-      
+
       {/* TARJETA INVITACIÓN */}
       <div style={neon.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-          <span style={{ fontSize: '24px' }}>⚡</span>
+          <span style={{ fontSize: '24px', filter: 'drop-shadow(0 0 10px rgba(0, 240, 255, 0.4))' }}>👥</span>
           <h4 style={{ margin: 0, color: '#00f0ff', fontSize: '16px', fontWeight: '900', letterSpacing: '1px' }}>
-            SISTEMA DE AFILIADOS
+            PROGRAMA DE AFILIADOS
           </h4>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
           <div style={{ ...neon.statBox, flex: 1 }}>
-            <div style={{ color: '#ff99dd', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>TUS INVITADOS</div>
+            <div style={{ color: '#ff99dd', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>RED ACTIVA</div>
             <div style={{ color: '#ffe600', fontSize: '22px', fontWeight: '900' }}>{n1}</div>
           </div>
-          <button onClick={fetchReferrals} style={{ ...neon.statBox, background: '#2b0b47', border: '1px solid #ff41b4', padding: '10px', cursor: 'pointer' }}>
+          <button 
+            onClick={fetchReferrals} 
+            disabled={loading}
+            style={{ ...neon.statBox, background: loading ? '#555' : '#2b0b47', border: '1px solid #ff41b4', padding: '10px', cursor: loading ? 'not-allowed' : 'pointer' }}
+          >
             <div style={{ fontSize: '18px', animation: loading ? 'spin 1s linear infinite' : 'none' }}>🔄</div>
             <div style={{ color: '#fff', fontSize: '9px', fontWeight: 'bold', marginTop: '4px' }}>ACTUALIZAR</div>
           </button>
@@ -115,17 +127,17 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
         </div>
       </div>
 
-      {/* TARJETA DE ESTADÍSTICAS */}
+      {/* TARJETA DE ESTADÍSTICAS GLOBALES */}
       <div style={{ ...neon.card, borderColor: '#8a2be2' }}>
         <div style={neon.totalCard}>
           <div>
-            <p style={{ fontSize: '11px', color: '#ff99dd', margin: '0 0 4px 0', fontWeight: '900' }}>GANANCIAS TOTALES</p>
-            <p style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
-              {totalEarned} <span style={{ fontSize: '14px', color: '#ffe600' }}>PT</span>
+            <p style={{ fontSize: '11px', color: '#ff99dd', margin: '0 0 4px 0', fontWeight: '900' }}>GANANCIAS POR INVITADOS</p>
+            <p style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
+              {totalEarned} <span style={{ fontSize: '14px', color: '#ffe600' }}>CLICK</span>
             </p>
           </div>
           <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '14px', fontSize: '20px' }}>
-            💎
+            🪙
           </div>
         </div>
       </div>
@@ -134,16 +146,19 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
       <div style={{ ...neon.card, borderColor: '#ff41b4' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h4 style={{ color: '#00f0ff', fontSize: '15px', margin: 0, fontWeight: '900' }}>
-            👥 Tu Red ({n1})
+            📊 Tu Red de Tráfico ({n1})
           </h4>
-          <span style={{ fontSize: '11px', color: '#ff99dd', fontWeight: 'bold' }}>ID / Estado</span>
+          <span style={{ fontSize: '11px', color: '#ff99dd', fontWeight: 'bold' }}>ID / ESTADO</span>
         </div>
 
         {loading && n1 === 0 ? (
           <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px', fontWeight: 'bold' }}>Sincronizando red...</div>
         ) : n1 === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: '#888', fontSize: '13px', lineHeight: '1.5' }}>
-            Aún no tienes afiliados registrados.<br/>¡Comparte tu enlace para comenzar!
+          <div style={{ textAlign: 'center', padding: '20px 0', backgroundColor: 'rgba(255, 65, 180, 0.05)', borderRadius: '14px', border: '1px dashed #ff41b4' }}>
+            <span style={{ fontSize: '30px', display: 'block', marginBottom: '10px' }}>👻</span>
+            <span style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', fontWeight: 'bold' }}>
+              Aún no tienes afiliados registrados.<br/>¡Invita amigos para ganar CLICK gratis!
+            </span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '5px' }}>
@@ -158,11 +173,11 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
                     <div style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace' }}>ID: {ref.id}</div>
                   </div>
                 </div>
-                
+
                 {/* SI PASÓ EL CAPTCHA SE PAGA, SINO ESTÁ EN ESPERA */}
                 {ref.referral_reward_granted ? (
                   <span style={{ color: '#00ffaa', fontSize: '12px', fontWeight: '900', background: 'rgba(0, 255, 170, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px solid #00ffaa' }}>
-                    +1.0 PT
+                    +1.0 CLICK
                   </span>
                 ) : (
                   <span style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', background: 'rgba(255, 230, 0, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px dashed #ffe600' }}>
@@ -173,9 +188,9 @@ function ShareTab({ stats, handleShare, userId, totalReferralEarnings }) {
             ))}
           </div>
         )}
-        
+
         <p style={{ textAlign: 'center', fontSize: '11px', color: '#aaa', marginTop: '16px', lineHeight: '1.4' }}>
-          *El saldo se libera cuando tu afiliado se une a los canales y completa la verificación humana.
+          *Ganas <strong>1.0 CLICK</strong> cuando tu afiliado ingresa y verifica su cuenta.
         </p>
       </div>
     </div>
