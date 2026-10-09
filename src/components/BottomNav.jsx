@@ -22,16 +22,6 @@ const TabIcons = {
       <polygon points="22 2 15 22 11 13 2 9 22 2" fill="none" />
     </svg>
   ),
-  top: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(255,230,0,0.5))' }}>
-      <path d="M6 4h12v4a6 6 0 0 1-12 0V4z" />
-      <path d="M6 6H3a2 2 0 0 0-2 2v1a4 4 0 0 0 4 4h1" />
-      <path d="M18 6h3a2 2 0 0 1 2 2v1a4 4 0 0 1-4 4h-1" />
-      <path d="M12 14v4" />
-      <path d="M8 21h8" />
-      <path d="M10 18h4" />
-    </svg>
-  ),
   referrals: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a2be2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(138,43,226,0.5))' }}>
       <circle cx="9" cy="7" r="3.5" />
@@ -47,8 +37,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
     { id: 'home', label: 'Inicio', icon: TabIcons.home, color: '#ff41b4' },
     { id: 'tasks', label: 'Tareas', icon: TabIcons.tasks, color: '#00f0ff' },
     { id: 'publish', label: 'Publicar', icon: TabIcons.publish, color: '#00ffaa' },
-    { id: 'top', label: 'Top', icon: TabIcons.top, color: '#ffe600' },
-    { id: 'referrals', label: 'Referidos', icon: TabIcons.referrals, color: '#8a2be2' }
+    { id: 'referrals', label: 'Afiliados', icon: TabIcons.referrals, color: '#8a2be2' }
   ];
 
   return (
@@ -56,7 +45,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
       position: 'fixed', bottom: 0, left: 0, right: 0,
       backgroundColor: 'rgba(10, 3, 20, 0.95)', backdropFilter: 'blur(16px)',
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-      padding: '8px 4px 16px 4px', borderTop: '2px solid #8a2be2',
+      padding: '8px 8px 16px 8px', borderTop: '2px solid #8a2be2',
       boxShadow: '0 -4px 20px rgba(138, 43, 226, 0.3)', zIndex: 99999, userSelect: 'none'
     }}>
       {tabs.map((tab) => {
@@ -66,7 +55,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
           <button
             key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
             style={{
-              flex: 1, maxWidth: '68px', height: '54px',
+              flex: 1, maxWidth: '75px', height: '54px',
               backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
               border: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
               borderRadius: '14px', boxShadow: isActive ? `0 0 10px ${tab.color}40` : 'none',
@@ -78,7 +67,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', transform: isActive ? 'scale(1.1)' : 'scale(1)', transition: 'transform 0.2s' }}>
               {tab.icon}
             </div>
-            <span style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '-0.3px', lineHeight: 1, color: isActive ? tab.color : '#666' }}>
+            <span style={{ fontSize: '10px', fontWeight: '900', letterSpacing: '-0.3px', lineHeight: 1, color: isActive ? tab.color : '#888' }}>
               {tab.label}
             </span>
           </button>
