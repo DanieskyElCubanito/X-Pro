@@ -35,9 +35,18 @@ export const botApi = {
   claimDailyChannel: (userId, channelId) => 
     postAction('claim-daily-channel', { userId, channelId }),
 
-  // NUEVA FUNCIÓN: Obtiene la lista de referidos actualizada al instante
   getReferrals: (userId) => 
-    postAction('get-referrals', { userId })
+    postAction('get-referrals', { userId }),
+
+  // --- NUEVAS FUNCIONES DE TAREAS ---
+  createTask: (payload) => 
+    postAction('create-task', payload),
+
+  getTasks: (userId) => 
+    postAction('get-tasks', { userId }),
+
+  completeTask: (userId, taskId) => 
+    postAction('complete-task', { userId, taskId })
 };
 
 export default botApi;
