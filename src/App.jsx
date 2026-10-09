@@ -79,14 +79,6 @@ const neonTheme = {
     letterSpacing: '0.5px',
     cursor: 'pointer',
     boxShadow: '0 4px 0 #0066aa, 0 8px 18px rgba(0, 240, 255, 0.45)'
-  },
-  tabPlaceholder: {
-    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))',
-    border: '2px solid #8a2be2',
-    borderRadius: '24px',
-    padding: '30px 20px',
-    textAlign: 'center',
-    boxShadow: '0 8px 24px rgba(138, 43, 226, 0.3)'
   }
 };
 
@@ -110,8 +102,8 @@ function App() {
       const generatedDeviceId = result.visitorId;
 
       const storedFirstUser = localStorage.getItem('xpro_linked_user');
-
       let previousAccount = null;
+
       if (!storedFirstUser) {
         localStorage.setItem('xpro_linked_user', String(teleUser.id));
       } else if (storedFirstUser !== String(teleUser.id)) {
@@ -156,8 +148,8 @@ function App() {
       try {
         WebApp.ready(); 
         WebApp.expand();
-        
-        // Bloquear el cierre accidental al deslizar en Telegram
+
+        // FIX UX: Evita que el usuario cierre la app por error al deslizar hacia abajo (Común en Telegram Web Apps)
         if (WebApp.disableVerticalSwipes) {
           WebApp.disableVerticalSwipes();
         }
@@ -182,7 +174,8 @@ function App() {
 
   const handleShare = () => {
     const inviteLink = `https://t.me/ReffRobot/app?startapp=${userData?.id}`;
-    const text = "⚡ ¡Entra a la red, publica en grupos y gana Puntos (PT) gratis! 🚀";
+    // Cambiado 'PT' por 'CLICK'
+    const text = "⚡ ¡Entra a la red, publica en grupos y gana Puntos (CLICK) gratis! 🚀";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
 
@@ -191,10 +184,7 @@ function App() {
     return (
       <div style={neonTheme.center}>
         <style>{`
-          @keyframes spin { 
-            0% { transform: rotate(0deg); } 
-            100% { transform: rotate(360deg); } 
-          }
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         `}</style>
         <div style={neonTheme.loaderGlow}></div>
         <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>
@@ -246,7 +236,7 @@ function App() {
       />
 
       <div style={neonTheme.main}>
-        {/* 1. INICIO (Aquí ahora se incluye el Perfil y el Saldo) */}
+        {/* 1. INICIO (Perfil y Saldo) */}
         {activeTab === 'home' && (
           <div className="fade-in">
             <ProfileHeader userData={userData} />
@@ -254,7 +244,7 @@ function App() {
           </div>
         )}
 
-        {/* 2. TAREAS / ANUNCIOS */}
+        {/* 2. TAREAS / MERCADO DE TRÁFICO */}
         {activeTab === 'tasks' && (
           <div className="fade-in">
             <AdsTab userData={userData} setUserData={setUserData} />
@@ -268,20 +258,7 @@ function App() {
           </div>
         )}
 
-        {/* 4. TOP RANKING */}
-        {activeTab === 'top' && (
-          <div className="fade-in" style={neonTheme.tabPlaceholder}>
-            <div style={{ fontSize: '40px', marginBottom: '8px' }}>🏆</div>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: '900', color: '#ffe600' }}>
-              Torneo Semanal
-            </h3>
-            <p style={{ fontSize: '13px', color: '#ff99dd', margin: 0 }}>
-              La tabla de clasificaciones cósmicas estará disponible muy pronto.
-            </p>
-          </div>
-        )}
-
-        {/* 5. REFERIDOS */}
+        {/* 4. AFILIADOS (Referidos) */}
         {activeTab === 'referrals' && (
           <div className="fade-in">
             <ShareTab 
@@ -294,7 +271,7 @@ function App() {
         )}
       </div>
 
-      {/* Barra de navegación inferior */}
+      {/* BARRA DE NAVEGACIÓN INFERIOR DE 4 BOTONES */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
