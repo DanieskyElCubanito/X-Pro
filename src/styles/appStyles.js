@@ -32,17 +32,17 @@ export const s = {
     textShadow: '0 0 10px rgba(255, 65, 180, 0.4)'
   },
 
-  // --- [ CONTENEDORES GENERALES ] ---
+    // --- [ CONTENEDORES GENERALES ] ---
   container: { 
     backgroundColor: '#0a0314', 
     backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)',
     color: '#ffffff', 
-    height: '100vh',
-    fontFamily: "'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif",
+    minHeight: '100vh', // Cambiado de height a minHeight
+    fontFamily: "'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif",
     display: 'flex', 
     flexDirection: 'column',
-    overflow: 'hidden',
     boxSizing: 'border-box'
+    // Se eliminó overflow: hidden para permitir el scroll natural
   },
 
   main: { 
@@ -51,10 +51,10 @@ export const s = {
     maxWidth: '500px', 
     margin: '0 auto', 
     width: '100%', 
-    boxSizing: 'border-box',
-    overflowY: 'auto', 
-    WebkitOverflowScrolling: 'touch'
+    boxSizing: 'border-box'
+    // Se eliminó overflowY: auto para que la página completa se deslice
   }, 
+
 
   // --- [ PERFIL DE USUARIO ] ---
   profileHeader: {
