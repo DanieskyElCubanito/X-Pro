@@ -14,7 +14,7 @@ const supabase = createClient(
 
 const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 
-// Lista de cuentas exentas de baneos por multicuentas
+// Cuentas administradoras: Inmunes a baneos, límites de IP y bloqueos de autoreferidos
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
 async function checkMembership(userId, chatId) {
@@ -135,6 +135,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
+    // --- ACCIÓN: CHECK CHANNELS (PAGO AL REFERIDOR) ---
     if (action === 'check-channels') {
       const targetId = String(userId);
       const isMember1 = await checkMembership(targetId, "-1003685621367"); 
@@ -198,15 +199,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // REGISTRO
+    // --- REGISTRO / VERIFICACIÓN DE USUARIOS ---
     const targetUser = user || { id: userId };
     const targetId = String(targetUser?.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
-    const isAdmin = ADMIN_IDS.includes(targetId);
+    
+    // Verificamos si el usuario o el referidor es un administrador (inmune)
+    const isAdmin = ADMIN_IDS.includes(targetId) || ADMIN_IDS.includes(String(start_param));
 
+    // Reglas restrictivas aplicadas SOLO si nadie en la transacción es admin
     if (!isAdmin) {
       if (detectedPrev && String(detectedPrev) !== targetId) {
         await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId || null, ip_address: clientIp || null, is_banned: true });
@@ -233,6 +237,12 @@ export default async function handler(req, res) {
     const updates = {};
     if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
     if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
+    
+    // Si la cuenta es de prueba, ya existía, pero el sistema no la vinculó por fraude, la vinculamos ahora.
+    if (dbUser && !dbUser.referred_by && start_param && String(start_param) !== targetId && isAdmin) {
+      updates.referred_by = String(start_param);
+    }
+
     if (Object.keys(updates).length > 0) {
       await supabase.from('users').update(updates).eq('id', targetId);
       dbUser = { ...dbUser, ...updates };
@@ -244,8 +254,11 @@ export default async function handler(req, res) {
       };
       if (start_param && String(start_param) !== targetId) {
         const { data: referrer } = await supabase.from('users').select('id, ip_address, device_id').eq('id', String(start_param)).single();
-        const isSelfReferral = referrer && ((referrer.device_id && currentDeviceId && referrer.device_id === currentDeviceId) || (referrer.ip_address && clientIp && referrer.ip_address === clientIp));
-        if (referrer && !isSelfReferral) newUserObj.referred_by = String(start_param);
+        
+        // Bloqueo antifraude cancelado si eres administrador
+        const isFraud = referrer && !isAdmin && ((referrer.device_id && currentDeviceId && referrer.device_id === currentDeviceId) || (referrer.ip_address && clientIp && referrer.ip_address === clientIp));
+        
+        if (referrer && !isFraud) newUserObj.referred_by = String(start_param);
       }
       const { data: newUser, error: insertErr } = await supabase.from('users').insert([newUserObj]).select().single();
       if (insertErr) return res.status(500).json({ success: false, error: insertErr.message });
