@@ -246,11 +246,10 @@ function App() {
       />
 
       <div style={neonTheme.main}>
-        <ProfileHeader userData={userData} />
-
-        {/* 1. INICIO */}
+        {/* 1. INICIO (Aquí ahora se incluye el Perfil y el Saldo) */}
         {activeTab === 'home' && (
           <div className="fade-in">
+            <ProfileHeader userData={userData} />
             <HomeTab userData={userData} setUserData={setUserData} />
           </div>
         )}
