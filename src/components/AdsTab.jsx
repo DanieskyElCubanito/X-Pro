@@ -60,14 +60,12 @@ const TASK_TYPES = [
 ];
 
 export default function AdsTab({ userData, setUserData }) {
-  const [view, setView] = useState('list'); // 'list' | 'wizard'
+  const [view, setView] = useState('list');
   
-  // Lista de tareas activas reales
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState(null);
 
-  // Estados del Wizard
   const [taskType, setTaskType] = useState(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [botToken, setBotToken] = useState('');
@@ -81,7 +79,6 @@ export default function AdsTab({ userData, setUserData }) {
   const balance = Number(userData?.balance || 0);
   const totalCost = Number((completions * reward).toFixed(2));
 
-  // Cargar tareas al abrir la pestaña
   useEffect(() => {
     if (userData?.id) fetchTasks();
   }, [userData?.id]);
@@ -90,9 +87,7 @@ export default function AdsTab({ userData, setUserData }) {
     setLoadingTasks(true);
     try {
       const data = await botApi.getTasks(userData?.id);
-      if (data && data.success) {
-        setTasks(data.tasks || []);
-      }
+      if (data && data.success) setTasks(data.tasks || []);
     } catch (e) {
       console.error("Error al cargar tareas:", e);
     } finally {
@@ -127,11 +122,8 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // Guardar en la base de datos real
   const handleCreateTask = async () => {
-    if (balance < totalCost) {
-      return toast.error(`Saldo insuficiente. Tienes ${balance} PT y requieres ${totalCost} PT.`);
-    }
+    if (balance < totalCost) return toast.error(`Saldo insuficiente. Tienes ${balance} PT y requieres ${totalCost} PT.`);
 
     setIsCreating(true);
     const tid = toast.loading("Registrando campaña en la red...");
@@ -148,19 +140,14 @@ export default function AdsTab({ userData, setUserData }) {
       });
 
       if (!res.success) throw new Error(res.error || "Error al crear la tarea.");
-
-      if (res.balance !== undefined) {
-        setUserData(prev => ({ ...prev, balance: res.balance }));
-      }
+      if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
 
       toast.success("¡Campaña activada y disponible para la comunidad!", { id: tid });
 
-      // Resetear formulario y recargar lista
       setTaskType(null); setTargetUrl(''); setBotToken(''); setTaskName(''); setCompletions(100); setReward(0.1);
       setCurrentStepIndex(0);
       setView('list');
       fetchTasks();
-
     } catch (err) {
       toast.error(err.message || "No se pudo crear la campaña.", { id: tid });
     } finally {
@@ -168,29 +155,36 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // Realizar y cobrar una tarea disponible
+  // --- SOLUCIÓN: CÓDIGO NATIVO PARA ABRIR ENLACES EN TELEGRAM ---
   const handleDoTask = async (task) => {
     try {
-      // 1. Abrir el enlace usando SOLO métodos internos de Telegram
-      if (task.url.includes('t.me') || task.url.includes('telegram.me')) {
-        WebApp.openTelegramLink(task.url); // Abre internamente links de Telegram (Bots, Grupos, Canales, Mini Apps)
+      let finalUrl = task.url.trim();
+
+      // Convertir formatos como "@panbot" a "https://t.me/panbot" para evitar errores del navegador
+      if (finalUrl.startsWith('@')) {
+        finalUrl = `https://t.me/${finalUrl.substring(1)}`;
+      } else if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = `https://${finalUrl}`;
+      }
+
+      // Si es un enlace de Telegram, forzar la apertura NATIVA de Telegram (Chats, Grupos, Bots)
+      if (finalUrl.includes('t.me') || finalUrl.includes('telegram.me')) {
+        WebApp.openTelegramLink(finalUrl); 
       } else {
-        WebApp.openLink(task.url); // Abre links externos en el navegador IN-APP de Telegram, sin sacarte de la app
+        // Si es una web externa (ej. YouTube), abrir en el NAVEGADOR INTERNO de Telegram (no en Chrome/Safari)
+        WebApp.openLink(finalUrl, { try_instant_view: true }); 
       }
 
       setCompletingTaskId(task.id);
       const tid = toast.loading("Verificando tarea...");
 
-      // Damos 3 segundos para que el usuario abra la app/canal
       setTimeout(async () => {
         try {
           const res = await botApi.completeTask(userData?.id, task.id);
           if (res.success) {
             toast.success(`¡Tarea completada! +${res.reward} PT`, { id: tid });
-            if (res.balance !== undefined) {
-              setUserData(prev => ({ ...prev, balance: res.balance }));
-            }
-            fetchTasks(); // Actualizar lista
+            if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
+            fetchTasks(); 
           } else {
             toast.error(res.error || "No se pudo validar la tarea.", { id: tid });
           }
@@ -254,13 +248,13 @@ export default function AdsTab({ userData, setUserData }) {
             <div style={neon.card}>
               <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4' }}>
                 {taskType === 'link' || taskType === 'bot' 
-                  ? 'Pega un enlace válido. Para bots o Mini Apps, usa tu enlace de Telegram (https://t.me/...).' 
-                  : 'Ingresa el enlace público de tu grupo/canal (ej. https://t.me/MiGrupo).'}
+                  ? 'Pega un enlace válido (ej. @mibot o https://t.me/mibot).' 
+                  : 'Ingresa el usuario o enlace público (ej. @MiGrupo o https://t.me/MiGrupo).'}
               </p>
               
               <input 
                 style={neon.input} 
-                placeholder="https://t.me/..." 
+                placeholder="@usuario o https://t.me/..." 
                 value={targetUrl} 
                 onChange={(e) => setTargetUrl(e.target.value)} 
               />
