@@ -40,13 +40,13 @@ export const s = {
     color: '#ffffff', 
     minHeight: '100vh', 
     fontFamily: "'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif",
-    display: 'block', // Liberamos el Flexbox para evitar encierros táctiles
+    display: 'block', 
     boxSizing: 'border-box'
   },
 
   main: { 
-    display: 'block', // Liberamos el flex
-    padding: '16px 16px 110px 16px', // Padding inferior para esquivar el BottomNav
+    display: 'block', 
+    padding: '16px 16px 110px 16px', 
     maxWidth: '500px', 
     margin: '0 auto', 
     width: '100%', 
@@ -255,7 +255,7 @@ export const s = {
     flexDirection: 'column', 
     alignItems: 'center', 
     fontSize: '11px', 
-    width: '33%', 
+    width: '25%', // Updated for 4 items
     gap: '4px', 
     fontWeight: '800',
     cursor: 'pointer' 
@@ -266,7 +266,7 @@ export const s = {
     flexDirection: 'column', 
     alignItems: 'center', 
     fontSize: '11px', 
-    width: '33%', 
+    width: '25%', // Updated for 4 items
     gap: '4px', 
     fontWeight: '900',
     textShadow: '0 0 10px rgba(0, 240, 255, 0.6)',
