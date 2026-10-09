@@ -14,21 +14,28 @@ import BottomNav from './components/BottomNav';
 import ChannelJoin from './components/ChannelJoin';
 import CaptchaVerification from './components/CaptchaVerification';
 
-// Estilos globales Candy Cyberpunk para App
-const candyTheme = {
+// Estilos globales Neón Cyberpunk para App
+const neonTheme = {
   container: {
     backgroundColor: '#0a0314',
     backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)',
     minHeight: '100vh',
+    height: 'var(--tg-viewport-height, 100vh)', 
     color: '#ffffff',
     fontFamily: "'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif",
-    paddingBottom: '90px',
+    display: 'flex', 
+    flexDirection: 'column',
     boxSizing: 'border-box'
   },
   main: {
+    flex: 1, 
     maxWidth: '520px',
     margin: '0 auto',
-    padding: '16px 14px'
+    width: '100%', 
+    padding: '16px 16px 110px 16px',
+    boxSizing: 'border-box',
+    overflowY: 'auto', 
+    WebkitOverflowScrolling: 'touch' 
   },
   center: {
     minHeight: '100vh',
@@ -39,7 +46,8 @@ const candyTheme = {
     backgroundColor: '#0a0314',
     backgroundImage: 'radial-gradient(circle at center, #260b3f 0%, #0a0314 85%)',
     padding: '24px',
-    textAlign: 'center'
+    textAlign: 'center',
+    boxSizing: 'border-box'
   },
   loaderGlow: {
     width: '56px',
@@ -148,6 +156,12 @@ function App() {
       try {
         WebApp.ready(); 
         WebApp.expand();
+        
+        // Bloquear el cierre accidental al deslizar en Telegram
+        if (WebApp.disableVerticalSwipes) {
+          WebApp.disableVerticalSwipes();
+        }
+
         const user = WebApp.initDataUnsafe?.user;
         const inviterId = WebApp.initDataUnsafe?.start_param;
 
@@ -168,23 +182,23 @@ function App() {
 
   const handleShare = () => {
     const inviteLink = `https://t.me/ReffRobot/app?startapp=${userData?.id}`;
-    const text = "🍬 ¡Entra al juego, publica en grupos y gana Puntos (PT) gratis! 🚀";
+    const text = "⚡ ¡Entra a la red, publica en grupos y gana Puntos (PT) gratis! 🚀";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
 
   // PANTALLA DE CARGA (Loader Neón)
   if (status === 'loading') {
     return (
-      <div style={candyTheme.center}>
+      <div style={neonTheme.center}>
         <style>{`
           @keyframes spin { 
             0% { transform: rotate(0deg); } 
             100% { transform: rotate(360deg); } 
           }
         `}</style>
-        <div style={candyTheme.loaderGlow}></div>
+        <div style={neonTheme.loaderGlow}></div>
         <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>
-          CARGANDO MUNDO CANDY...
+          CARGANDO MUNDO NEÓN...
         </p>
       </div>
     );
@@ -193,8 +207,8 @@ function App() {
   // PANTALLA DE ERROR
   if (status === 'error') {
     return (
-      <div style={candyTheme.center}>
-        <div style={candyTheme.errorCard}>
+      <div style={neonTheme.center}>
+        <div style={neonTheme.errorCard}>
           <div style={{ fontSize: '42px', marginBottom: '8px' }}>⚠️</div>
           <h2 style={{ color: '#ffe600', margin: '0 0 10px 0', fontSize: '20px', fontWeight: '900' }}>
             Acceso Interrumpido
@@ -202,7 +216,7 @@ function App() {
           <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>
             {errorMessage}
           </p>
-          <button style={candyTheme.btnRetry} onClick={() => window.location.reload()}>
+          <button style={neonTheme.btnRetry} onClick={() => window.location.reload()}>
             🔄 REINTENTAR
           </button>
         </div>
@@ -214,8 +228,8 @@ function App() {
   if (!isHuman && status === 'member') return <CaptchaVerification userData={userData} setIsHuman={setIsHuman} />;
 
   return (
-    <div style={candyTheme.container}>
-      {/* Notificaciones Toaster con estilo Candy */}
+    <div style={neonTheme.container}>
+      {/* Notificaciones Toaster con estilo Neón */}
       <Toaster 
         position="top-center" 
         reverseOrder={false}
@@ -231,7 +245,7 @@ function App() {
         }} 
       />
 
-      <div style={candyTheme.main}>
+      <div style={neonTheme.main}>
         <ProfileHeader userData={userData} />
 
         {/* 1. INICIO */}
@@ -257,7 +271,7 @@ function App() {
 
         {/* 4. TOP RANKING */}
         {activeTab === 'top' && (
-          <div className="fade-in" style={candyTheme.tabPlaceholder}>
+          <div className="fade-in" style={neonTheme.tabPlaceholder}>
             <div style={{ fontSize: '40px', marginBottom: '8px' }}>🏆</div>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: '900', color: '#ffe600' }}>
               Torneo Semanal
