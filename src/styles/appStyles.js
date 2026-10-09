@@ -1,7 +1,7 @@
 export const s = {
   // --- [ ESTADOS DE CARGA Y ERRORES ] ---
   center: {
-    height: '100vh',
+    minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -10,7 +10,8 @@ export const s = {
     backgroundImage: 'radial-gradient(circle at center, #260b3f 0%, #0a0314 85%)',
     color: '#ffffff',
     textAlign: 'center',
-    padding: '20px'
+    padding: '20px',
+    boxSizing: 'border-box'
   },
   loader: {
     width: '46px',
@@ -32,29 +33,25 @@ export const s = {
     textShadow: '0 0 10px rgba(255, 65, 180, 0.4)'
   },
 
-    // --- [ CONTENEDORES GENERALES ] ---
+  // --- [ CONTENEDORES GENERALES ] ---
   container: { 
     backgroundColor: '#0a0314', 
     backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)',
     color: '#ffffff', 
-    minHeight: '100vh', // Cambiado de height a minHeight
+    minHeight: '100vh', 
     fontFamily: "'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif",
-    display: 'flex', 
-    flexDirection: 'column',
+    display: 'block', // Liberamos el Flexbox para evitar encierros táctiles
     boxSizing: 'border-box'
-    // Se eliminó overflow: hidden para permitir el scroll natural
   },
 
   main: { 
-    flex: 1, 
-    padding: '16px 16px 105px 16px', 
+    display: 'block', // Liberamos el flex
+    padding: '16px 16px 110px 16px', // Padding inferior para esquivar el BottomNav
     maxWidth: '500px', 
     margin: '0 auto', 
     width: '100%', 
     boxSizing: 'border-box'
-    // Se eliminó overflowY: auto para que la página completa se deslice
   }, 
-
 
   // --- [ PERFIL DE USUARIO ] ---
   profileHeader: {
