@@ -14,6 +14,9 @@ const supabase = createClient(
 
 const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 
+// Lista de cuentas exentas de baneos por multicuentas
+const ADMIN_IDS = ['8968109534', '8892196101'];
+
 async function checkMembership(userId, chatId) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${userId}`;
@@ -29,7 +32,8 @@ async function checkMembership(userId, chatId) {
 
 async function publishToTelegramGroup(chatId, text, photoData, userLink, username, buttonConfig) {
   try {
-    const formattedText = `${text}\n\n👤 Publicado por: @${username || 'Usuario'}`;
+    // Eliminada la firma de "Publicado por"
+    const formattedText = text; 
     const apiUrl = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
     // 1. Configurar botón interactivo con COLOR (style) de Telegram
@@ -39,8 +43,8 @@ async function publishToTelegramGroup(chatId, text, photoData, userLink, usernam
         inline_keyboard: [[{ 
           text: buttonConfig.text, 
           url: buttonConfig.url,
-          style: buttonConfig.color, // Color del botón: 'primary', 'success', 'danger', 'default'
-          color: buttonConfig.color  // Soporte de compatibilidad API alternativa
+          style: buttonConfig.color, 
+          color: buttonConfig.color  
         }]]
       };
     }
@@ -111,7 +115,6 @@ export default async function handler(req, res) {
     }
 
     if (action === 'publish-post') {
-      // INCLUYE BUTTONCONFIG Y PHOTODATA
       const { text, link, photoData, chatId, buttonConfig } = req.body;
       if (!text || !chatId) return res.status(400).json({ success: false, error: 'Faltan datos obligatorios.' });
 
@@ -202,23 +205,29 @@ export default async function handler(req, res) {
 
     const currentDeviceId = targetUser.deviceId || req.body.deviceId;
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
+    
+    // Verificamos si el usuario actual es un admin
+    const isAdmin = ADMIN_IDS.includes(targetId);
 
-    if (detectedPrev && String(detectedPrev) !== targetId) {
-      await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId || null, ip_address: clientIp || null, is_banned: true });
-      return res.status(403).json({ success: false, error: 'Acceso denegado: Navegador vinculado a otra cuenta.' });
-    }
-
-    if (currentDeviceId) {
-      const { data: firstOwner } = await supabase.from('users').select('id, is_banned').eq('device_id', currentDeviceId).order('created_at', { ascending: true }).limit(1).maybeSingle();
-      if (firstOwner && String(firstOwner.id) !== targetId) {
-        await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId, ip_address: clientIp || null, is_banned: true });
-        return res.status(403).json({ success: false, error: 'Acceso denegado: Dispositivo vinculado a otra cuenta.' });
+    // Solo aplicamos las reglas restrictivas de multicuentas e IP si NO es administrador
+    if (!isAdmin) {
+      if (detectedPrev && String(detectedPrev) !== targetId) {
+        await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId || null, ip_address: clientIp || null, is_banned: true });
+        return res.status(403).json({ success: false, error: 'Acceso denegado: Navegador vinculado a otra cuenta.' });
       }
-    }
 
-    if (clientIp) {
-      const { count: accountsOnThisIp } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('ip_address', clientIp).neq('id', targetId);
-      if (accountsOnThisIp && accountsOnThisIp >= 2) return res.status(403).json({ success: false, error: 'Límite IP alcanzado.' });
+      if (currentDeviceId) {
+        const { data: firstOwner } = await supabase.from('users').select('id, is_banned').eq('device_id', currentDeviceId).order('created_at', { ascending: true }).limit(1).maybeSingle();
+        if (firstOwner && String(firstOwner.id) !== targetId) {
+          await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId, ip_address: clientIp || null, is_banned: true });
+          return res.status(403).json({ success: false, error: 'Acceso denegado: Dispositivo vinculado a otra cuenta.' });
+        }
+      }
+
+      if (clientIp) {
+        const { count: accountsOnThisIp } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('ip_address', clientIp).neq('id', targetId);
+        if (accountsOnThisIp && accountsOnThisIp >= 2) return res.status(403).json({ success: false, error: 'Límite IP alcanzado.' });
+      }
     }
 
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
