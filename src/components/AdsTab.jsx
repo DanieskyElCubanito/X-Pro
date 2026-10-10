@@ -18,7 +18,6 @@ const neon = {
   taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap' }
 };
 
-// Íconos SVG personalizados para cada tipo de tarea
 const TaskIcons = {
   channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>,
   group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
@@ -28,7 +27,6 @@ const TaskIcons = {
   miniapp: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 12h4" /><path d="M8 10v4" /><line x1="15" y1="13" x2="15.01" y2="13" /><line x1="18" y1="11" x2="18.01" y2="11" /></svg>
 };
 
-// PLANTILLAS ENFOCADAS EN SISTEMAS DE AFILIADOS Y CRYPTO
 const TASK_TYPES = [
   { id: 'channel', icon: TaskIcons.channel('#00f0ff'), title: 'Canal de Telegram', desc: 'Consigue suscriptores reales', color: '#00f0ff', autoName: 'Suscribirse al Canal' },
   { id: 'group', icon: TaskIcons.group('#00ffaa'), title: 'Grupo de Telegram', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Grupo' },
@@ -43,20 +41,18 @@ export default function AdsTab({ userData, setUserData }) {
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState(null);
-  
   const [adLoading, setAdLoading] = useState(false);
 
+  // --- VARIABLES REPARADAS (Solución al pantallazo negro) ---
   const [taskType, setTaskType] = useState(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [botToken, setBotToken] = useState('');
-  
   const [completions, setCompletions] = useState(1);
-  const isCreating = useState(false)[0];
-  const setIsCreating = useState(false)[1];
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const balance = Number(userData?.balance || 0);
   const maxBalanceInt = Math.max(1, Math.floor(balance)); 
-
   const totalCost = completions;
 
   useEffect(() => {
@@ -87,11 +83,11 @@ export default function AdsTab({ userData, setUserData }) {
     const val = targetUrl.trim();
     if (!val) return toast.error("Ingresa tu enlace de afiliado.");
     
-    // Si es Grupo o Canal verificamos que sea de Telegram. Para los demás, permitimos cualquier link.
     if (taskType === 'group' || taskType === 'channel') {
       const isTelegramLink = val.startsWith('@') || val.includes('t.me/') || val.includes('telegram.me/');
       if (!isTelegramLink) return toast.error("Debe ser un enlace válido de Telegram.");
       
+      setIsVerifying(true);
       const tid = toast.loading("Verificando administrador...");
       try {
         const res = await botApi.verifyBotAdmin(val);
@@ -103,9 +99,10 @@ export default function AdsTab({ userData, setUserData }) {
         }
       } catch (e) {
         toast.error("Error al verificar el enlace.", { id: tid });
+      } finally {
+        setIsVerifying(false);
       }
     } else {
-      // Para Airdrops, Minería, Bots y MiniApps pasa directo
       nextStep();
     }
   };
@@ -127,7 +124,7 @@ export default function AdsTab({ userData, setUserData }) {
       toast.success("¡Campaña activada con éxito!", { id: tid });
       
       setTaskType(null); setTargetUrl(''); setBotToken(''); setCompletions(1);
-      setCurrentStepIndex(0); setView('activity'); // Lleva a Mis Anuncios para que vea su creación
+      setCurrentStepIndex(0); setView('activity'); 
     } catch (err) {
       toast.error(err.message || "Error al procesar la campaña.", { id: tid });
     } finally {
@@ -136,16 +133,13 @@ export default function AdsTab({ userData, setUserData }) {
   };
 
   const handleWatchAd = () => {
-    if (typeof window.showGiga !== 'function') {
-      return toast.error("El servidor de anuncios no está disponible.");
-    }
+    if (typeof window.showGiga !== 'function') return toast.error("El servidor de anuncios no está disponible.");
     if (adLoading) return;
 
     setAdLoading(true);
     const tid = toast.loading("Sintonizando anuncio...");
 
-    window.showGiga()
-      .then(async () => {
+    window.showGiga().then(async () => {
         toast.loading("Acreditando +0.50 CLICK...", { id: tid });
         try {
           const res = await botApi.claimBonus(userData.id);
@@ -155,13 +149,9 @@ export default function AdsTab({ userData, setUserData }) {
           } else {
             toast.error("Error al procesar el pago.", { id: tid });
           }
-        } catch (error) {
-          toast.error("Error de conexión.", { id: tid });
-        } finally {
-          setAdLoading(false);
-        }
-      })
-      .catch(() => {
+        } catch (error) { toast.error("Error de conexión.", { id: tid }); } 
+        finally { setAdLoading(false); }
+      }).catch(() => {
         toast.error("Anuncio no completado. Cancelando pago.", { id: tid });
         setAdLoading(false);
       });
@@ -198,9 +188,7 @@ export default function AdsTab({ userData, setUserData }) {
     } catch (e) { setCompletingTaskId(null); }
   };
 
-  // Filtrar "Mis Anuncios" (Las tareas donde yo soy el creador)
   const myTasks = tasks.filter(t => t.creator_id === String(userData?.id));
-  // Las tareas de la comunidad (Donde yo NO soy el creador)
   const communityTasks = tasks.filter(t => t.creator_id !== String(userData?.id));
 
   const renderInstructionText = () => {
@@ -211,32 +199,19 @@ export default function AdsTab({ userData, setUserData }) {
 
   return (
     <div style={{ color: '#ffffff', paddingBottom: '20px' }}>
-
-      {/* NAVEGACIÓN SUPERIOR */}
       {(view === 'list' || view === 'activity') && (
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <button 
-            onClick={() => setView('list')} 
-            style={{ flex: 1, padding: '12px', borderRadius: '16px', fontWeight: '900', fontSize: '13px', border: 'none', cursor: 'pointer', transition: '0.2s',
-              background: view === 'list' ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 'rgba(255,255,255,0.05)',
-              color: view === 'list' ? '#050214' : '#00f0ff',
-              boxShadow: view === 'list' ? '0 4px 15px rgba(0,240,255,0.3)' : 'none', letterSpacing: '0.5px'
-            }}>
+          <button onClick={() => setView('list')} 
+            style={{ flex: 1, padding: '12px', borderRadius: '16px', fontWeight: '900', fontSize: '13px', border: 'none', cursor: 'pointer', transition: '0.2s', background: view === 'list' ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 'rgba(255,255,255,0.05)', color: view === 'list' ? '#050214' : '#00f0ff', boxShadow: view === 'list' ? '0 4px 15px rgba(0,240,255,0.3)' : 'none', letterSpacing: '0.5px' }}>
             ⚡ MERCADO
           </button>
-          <button 
-            onClick={() => setView('activity')} 
-            style={{ flex: 1, padding: '12px', borderRadius: '16px', fontWeight: '900', fontSize: '13px', border: 'none', cursor: 'pointer', transition: '0.2s',
-              background: view === 'activity' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'rgba(255,255,255,0.05)',
-              color: view === 'activity' ? '#fff' : '#ff41b4',
-              boxShadow: view === 'activity' ? '0 4px 15px rgba(255,20,147,0.3)' : 'none', letterSpacing: '0.5px'
-            }}>
+          <button onClick={() => setView('activity')} 
+            style={{ flex: 1, padding: '12px', borderRadius: '16px', fontWeight: '900', fontSize: '13px', border: 'none', cursor: 'pointer', transition: '0.2s', background: view === 'activity' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'rgba(255,255,255,0.05)', color: view === 'activity' ? '#fff' : '#ff41b4', boxShadow: view === 'activity' ? '0 4px 15px rgba(255,20,147,0.3)' : 'none', letterSpacing: '0.5px' }}>
             📋 MIS ANUNCIOS
           </button>
         </div>
       )}
 
-      {/* VISTA: LISTA DE TAREAS DE LA COMUNIDAD */}
       {view === 'list' && (
         <div className="fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 5px' }}>
@@ -244,7 +219,6 @@ export default function AdsTab({ userData, setUserData }) {
             <button onClick={fetchTasks} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
           </div>
 
-          {/* TAREA FIJA: ANUNCIO GIGA PUB */}
           <div style={{...neon.taskCard, borderColor: '#ff1493', background: 'linear-gradient(145deg, rgba(255, 20, 147, 0.1), #1a0b33)'}}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{...neon.taskIconBox, borderColor: '#ff1493'}}>
@@ -252,15 +226,10 @@ export default function AdsTab({ userData, setUserData }) {
               </div>
               <div>
                 <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>Anuncio Patrocinado</div>
-                <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>
-                  Disponible ilimitadamente
-                </div>
+                <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>Disponible ilimitadamente</div>
               </div>
             </div>
-            <button 
-              onClick={handleWatchAd} disabled={adLoading}
-              style={adLoading ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #ff1493, #d80073)', color: '#fff', boxShadow: '0 4px 0 #8b004b'}}
-            >
+            <button onClick={handleWatchAd} disabled={adLoading} style={adLoading ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #ff1493, #d80073)', color: '#fff', boxShadow: '0 4px 0 #8b004b'}}>
               {adLoading ? 'CARGANDO...' : '+0.50 CLICK'}
             </button>
           </div>
@@ -270,9 +239,7 @@ export default function AdsTab({ userData, setUserData }) {
           ) : communityTasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
               <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>🏜️</span>
-              <p style={{ color: '#ff99dd', fontSize: '13px', fontWeight: 'bold', margin: 0, lineHeight: '1.5' }}>
-                No hay campañas disponibles de otros usuarios.<br/>¡Aprovecha y crea la tuya ahora mismo!
-              </p>
+              <p style={{ color: '#ff99dd', fontSize: '13px', fontWeight: 'bold', margin: 0, lineHeight: '1.5' }}>No hay campañas disponibles de otros usuarios.<br/>¡Aprovecha y crea la tuya ahora mismo!</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -282,15 +249,10 @@ export default function AdsTab({ userData, setUserData }) {
                     <div style={neon.taskIconBox}>{TaskIcons[task.type] ? TaskIcons[task.type]('#00f0ff') : TaskIcons.airdrop('#00f0ff')}</div>
                     <div>
                       <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>{task.title}</div>
-                      <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>
-                        {task.completions_done} / {task.completions_total} referidos
-                      </div>
+                      <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{task.completions_done} / {task.completions_total} referidos</div>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleDoTask(task)} disabled={completingTaskId === task.id}
-                    style={completingTaskId === task.id ? neon.taskButtonDisabled : neon.taskButton}
-                  >
+                  <button onClick={() => handleDoTask(task)} disabled={completingTaskId === task.id} style={completingTaskId === task.id ? neon.taskButtonDisabled : neon.taskButton}>
                     {completingTaskId === task.id ? 'ESPERANDO...' : `+${Number(task.reward).toFixed(2)} CLICK`}
                   </button>
                 </div>
@@ -299,14 +261,11 @@ export default function AdsTab({ userData, setUserData }) {
           )}
 
           <div style={{ marginTop: '20px' }}>
-            <button onClick={() => setView('wizard')} style={neon.btnSecondary}>
-              + CREAR CAMPAÑA DE REFERIDOS
-            </button>
+            <button onClick={() => setView('wizard')} style={neon.btnSecondary}>+ CREAR CAMPAÑA DE REFERIDOS</button>
           </div>
         </div>
       )}
 
-      {/* VISTA: ACTIVIDAD / MIS ANUNCIOS */}
       {view === 'activity' && (
         <div className="fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 5px' }}>
@@ -319,12 +278,8 @@ export default function AdsTab({ userData, setUserData }) {
           ) : myTasks.length === 0 ? (
             <div style={{...neon.card, textAlign: 'center', padding: '30px 20px', borderColor: '#ff1493' }}>
               <div style={{ fontSize: '46px', marginBottom: '10px', filter: 'drop-shadow(0 0 10px rgba(255, 65, 180, 0.5))' }}>📋</div>
-              <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: '0 0 20px 0' }}>
-                Aún no has creado ningún anuncio o tus campañas ya finalizaron.
-              </p>
-              <button onClick={() => setView('wizard')} style={{...neon.btnPrimary, background: 'linear-gradient(180deg, #ff1493, #d80073)', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.4)'}}>
-                CREAR MI PRIMER ANUNCIO
-              </button>
+              <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: '0 0 20px 0' }}>Aún no has creado ningún anuncio o tus campañas ya finalizaron.</p>
+              <button onClick={() => setView('wizard')} style={{...neon.btnPrimary, background: 'linear-gradient(180deg, #ff1493, #d80073)', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.4)'}}>CREAR MI PRIMER ANUNCIO</button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -339,13 +294,10 @@ export default function AdsTab({ userData, setUserData }) {
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{task.title}</div>
-                          <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                            {task.url.substring(0, 25)}...
-                          </div>
+                          <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold', fontFamily: 'monospace' }}>{task.url.substring(0, 25)}...</div>
                         </div>
                       </div>
                       
-                      {/* BARRA DE PROGRESO */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '6px' }}>
                         <span style={{ color: '#ff41b4' }}>Progreso</span>
                         <span style={{ color: '#fff' }}>{task.completions_done} / {task.completions_total} referidos</span>
@@ -362,7 +314,6 @@ export default function AdsTab({ userData, setUserData }) {
         </div>
       )}
 
-      {/* VISTA: WIZARD DE CREACIÓN DE TAREAS */}
       {view === 'wizard' && (
         <div className="fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -430,24 +381,19 @@ export default function AdsTab({ userData, setUserData }) {
                 <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#ffe600', margin: 0, textTransform: 'uppercase' }}>Afiliados Deseados</h3>
               </div>
               <div style={{...neon.card, padding: '16px'}}>
-                
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
                   {[1, 4, 8, 'MAX'].map(val => {
                     const isMax = val === 'MAX';
                     const numericVal = isMax ? maxBalanceInt : val;
                     const isActive = completions === numericVal;
-
                     return (
                       <button key={val} onClick={() => setCompletions(numericVal)}
-                        style={{ flex: 1, padding: '10px 0', fontSize: '12px', fontWeight: '900', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s',
-                          background: isActive ? '#00f0ff' : 'rgba(15, 5, 28, 0.8)', color: isActive ? '#050214' : '#fff', 
-                          border: isActive ? 'none' : '1px solid #8a2be2', boxShadow: isActive ? '0 0 10px rgba(0, 240, 255, 0.5)' : 'none' }}>
+                        style={{ flex: 1, padding: '10px 0', fontSize: '12px', fontWeight: '900', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s', background: isActive ? '#00f0ff' : 'rgba(15, 5, 28, 0.8)', color: isActive ? '#050214' : '#fff', border: isActive ? 'none' : '1px solid #8a2be2', boxShadow: isActive ? '0 0 10px rgba(0, 240, 255, 0.5)' : 'none' }}>
                         {val}
                       </button>
                     )
                   })}
                 </div>
-
                 <div style={{ background: 'rgba(15, 5, 28, 0.8)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #3a1a5c' }}>
                   <span style={{ fontSize: '13px', color: '#ff99dd', fontWeight: '900', textTransform: 'uppercase' }}>Cantidad de Referidos</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -456,10 +402,7 @@ export default function AdsTab({ userData, setUserData }) {
                     <button onClick={() => setCompletions(p => p + 1)} style={{...neon.btnAction, background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', borderColor: '#00f0ff'}}>+</button>
                   </div>
                 </div>
-                
-                <p style={{ textAlign: 'center', fontSize: '11px', color: '#888', marginTop: '12px', fontWeight: 'bold' }}>
-                  * Pagas 1 CLICK por cada referido que complete la tarea.
-                </p>
+                <p style={{ textAlign: 'center', fontSize: '11px', color: '#888', marginTop: '12px', fontWeight: 'bold' }}>* Pagas 1 CLICK por cada referido que complete la tarea.</p>
               </div>
 
               <div style={{ background: 'linear-gradient(90deg, #ff1493, #8a2be2)', borderRadius: '20px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.3)', marginBottom: '16px' }}>
@@ -467,9 +410,7 @@ export default function AdsTab({ userData, setUserData }) {
                   <div style={{ fontSize: '11px', color: '#fff', fontWeight: '900', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Costo Total</div>
                   <div style={{ fontSize: '24px', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255, 255, 255, 0.3)' }}>{totalCost} CLICK</div>
                 </div>
-                <div style={{ textAlign: 'right', fontSize: '11px', color: '#ff99dd', fontWeight: 'bold' }}>
-                  Tu Saldo:<br/><strong style={{color: balance >= totalCost ? '#00ffaa' : '#ffe600', fontSize: '14px'}}>{balance.toFixed(2)} CLICK</strong>
-                </div>
+                <div style={{ textAlign: 'right', fontSize: '11px', color: '#ff99dd', fontWeight: 'bold' }}>Tu Saldo:<br/><strong style={{color: balance >= totalCost ? '#00ffaa' : '#ffe600', fontSize: '14px'}}>{balance.toFixed(2)} CLICK</strong></div>
               </div>
 
               <button onClick={handleCreateTask} disabled={isCreating} style={{ ...neon.btnPrimary, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', boxShadow: '0 6px 0 #007744, 0 10px 20px rgba(0, 255, 170, 0.4)' }}>
