@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
-// 👇 TU DIRECCIÓN REAL (Sirve tanto para TON como para GRAM) 👇
+// 👇 TU DIRECCIÓN REAL DE LA RED TON 👇
 const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I"; 
 
 const neon = {
@@ -34,15 +34,14 @@ const neon = {
 };
 
 const PACKAGES = [
-  { id: 1, clicks: 100, priceTon: 0.5, priceGram: 50, priceStars: 50 },
-  { id: 2, clicks: 500, priceTon: 2.5, priceGram: 250, priceStars: 250 },
-  { id: 3, clicks: 1000, priceTon: 5.0, priceGram: 500, priceStars: 500, popular: true }
+  { id: 1, clicks: 100, priceGram: 0.5, priceStars: 50 },
+  { id: 2, clicks: 500, priceGram: 2.5, priceStars: 250 },
+  { id: 3, clicks: 1000, priceGram: 5.0, priceStars: 500, popular: true }
 ];
 
 const METHODS = [
-  { id: 'stars', name: 'Telegram Stars', icon: '⭐', desc: 'Pago nativo rápido', color: '#ffe600' },
-  { id: 'ton', name: 'TON Coin', icon: '💎', desc: 'Red principal TON', color: '#0088cc' },
-  { id: 'gram', name: 'GRAM Token', icon: '💰', desc: 'Token ecosistema', color: '#00f0ff' }
+  { id: 'stars', name: 'Telegram Stars', icon: '⭐', desc: 'Pago nativo sin salir de la app', color: '#ffe600' },
+  { id: 'gram', name: 'GRAM', icon: '💎', desc: 'Moneda nativa de la Red TON', color: '#00f0ff' }
 ];
 
 export default function HomeTab({ userData, setActiveTab }) {
@@ -58,6 +57,9 @@ export default function HomeTab({ userData, setActiveTab }) {
   const clickBalance = Number(userData?.balance || 0).toFixed(2);
   const globalClicks = userData?.global_clicks || '0';
   const clicksReceived = userData?.clicks_received || '0';
+
+  // Memo de pago: Es vital para saber quién pagó. Será el ID del usuario.
+  const paymentMemo = userData?.id ? String(userData.id) : 'RECARGA';
 
   const openHistory = async () => {
     setShowHistory(true);
@@ -82,28 +84,45 @@ export default function HomeTab({ userData, setActiveTab }) {
     toast.success("Wallet copiada al portapapeles");
   };
 
+  const copyMemo = () => {
+    navigator.clipboard.writeText(paymentMemo);
+    toast.success("Comentario copiado. ¡Pégalo en tu billetera!");
+  };
+
   const openTonkeeper = () => {
-    const amountStr = selectedMethod.id === 'ton' ? selectedPack.priceTon * 1e9 : selectedPack.priceGram * 1e9; 
-    const url = `ton://transfer/${MY_WALLET}?amount=${amountStr}`;
-    WebApp.openLink(url);
+    // 1e9 convierte los GRAM/TON a nano-gram para la blockchain
+    const amountStr = selectedPack.priceGram * 1e9; 
+    
+    // URL oficial de transferencia de TON con el MEMO incluido
+    const url = `ton://transfer/${MY_WALLET}?amount=${amountStr}&text=${paymentMemo}`;
+    
+    try {
+      WebApp.openLink(url);
+    } catch (error) {
+      toast.error("Tu dispositivo no encontró una billetera compatible instalada.");
+    }
   };
 
   const handleSimulateVerify = () => {
     const tid = toast.loading("Buscando transacción en la blockchain...");
     setTimeout(() => {
-      toast.error("No se detectó el pago. Reintenta en 1 minuto o contacta a soporte.", { id: tid });
+      toast.error("No se detectó el pago. Reintenta en 1 minuto o contacta a soporte si ya enviaste los fondos.", { id: tid });
     }, 4000);
   };
 
   const handleStarsPayment = async () => {
-    const tid = toast.loading("Generando factura segura...");
+    const tid = toast.loading("Conectando con Telegram...");
     setTimeout(() => {
-      toast.error("Paso pendiente: Necesitamos conectar la ruta de pago de Stars en tu backend para generar la Invoice oficial.", { id: tid, duration: 6000 });
+      toast.error("El servidor backend aún no tiene la ruta para generar facturas de Stars. Contáctate con el desarrollador.", { id: tid, duration: 5000 });
     }, 2000);
   };
 
   return (
     <div className="fade-in" style={neon.container}>
+      
+      {/* Esto asegura que las notificaciones salgan por encima de todo */}
+      <Toaster containerStyle={{ zIndex: 9999999 }} />
+
       <div style={neon.header}>
         <div onClick={openHistory} style={neon.iconBtn}>🕒</div>
         <h1 style={neon.title}>INICIO</h1>
@@ -142,7 +161,7 @@ export default function HomeTab({ userData, setActiveTab }) {
         <hr style={neon.dashedDivider} />
         <div style={neon.howStep}>
           <div style={neon.howStepIcon('#ff1493', '#ffffff', 'rgba(255, 20, 147, 0.4)')}>💎</div>
-          <div style={neon.howStepText}>Recarga saldo con Stars, GRAM o TON para campañas grandes.</div>
+          <div style={neon.howStepText}>Recarga saldo con Stars o GRAM para campañas grandes.</div>
         </div>
       </div>
 
@@ -157,7 +176,7 @@ export default function HomeTab({ userData, setActiveTab }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span>💎</span> RECARGAR SALDO CLICK
         </div>
-        <span style={{ fontSize: '10px', color: '#050214', fontWeight: 'bold', textTransform: 'none' }}>Paga con Stars / TON / GRAM</span>
+        <span style={{ fontSize: '10px', color: '#050214', fontWeight: 'bold', textTransform: 'none' }}>Paga con Stars / GRAM</span>
       </button>
 
       {/* MODAL DE PASARELA DE PAGOS */}
@@ -189,7 +208,7 @@ export default function HomeTab({ userData, setActiveTab }) {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: '#00f0ff', fontWeight: '900', fontSize: '14px' }}>~ {pkg.priceTon} TON</div>
+                      <div style={{ color: '#00f0ff', fontWeight: '900', fontSize: '14px' }}>~ {pkg.priceGram} GRAM</div>
                       <div style={{ color: '#888', fontSize: '10px' }}>o {pkg.priceStars} ⭐</div>
                     </div>
                   </div>
@@ -214,7 +233,7 @@ export default function HomeTab({ userData, setActiveTab }) {
                       <div style={{ color: '#aaa', fontSize: '11px' }}>{method.desc}</div>
                     </div>
                     <div style={{ color: method.color, fontWeight: '900', fontSize: '16px' }}>
-                      {method.id === 'ton' ? selectedPack.priceTon : method.id === 'gram' ? selectedPack.priceGram : selectedPack.priceStars}
+                      {method.id === 'gram' ? selectedPack.priceGram : selectedPack.priceStars}
                     </div>
                   </div>
                 ))}
@@ -229,7 +248,7 @@ export default function HomeTab({ userData, setActiveTab }) {
                   <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px', filter: `drop-shadow(0 0 15px ${selectedMethod.color})` }}>{selectedMethod.icon}</span>
                   <div style={{ color: '#aaa', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Total a pagar</div>
                   <div style={{ color: selectedMethod.color, fontSize: '32px', fontWeight: '900', margin: '4px 0' }}>
-                    {selectedMethod.id === 'ton' ? selectedPack.priceTon : selectedMethod.id === 'gram' ? selectedPack.priceGram : selectedPack.priceStars} {selectedMethod.id.toUpperCase()}
+                    {selectedMethod.id === 'gram' ? selectedPack.priceGram : selectedPack.priceStars} {selectedMethod.id.toUpperCase()}
                   </div>
                   <div style={{ color: '#00f0ff', fontSize: '13px', fontWeight: 'bold' }}>Recibes: {selectedPack.clicks} CLICK ⚡</div>
                 </div>
@@ -245,15 +264,23 @@ export default function HomeTab({ userData, setActiveTab }) {
                   </div>
                 ) : (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <p style={{ textAlign: 'center', color: '#ff99dd', fontSize: '12px', fontWeight: 'bold' }}>Envíe el monto exacto a la siguiente Wallet:</p>
+                    <div style={{ background: 'rgba(255, 20, 147, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid #ff1493', textAlign: 'center' }}>
+                      <span style={{ color: '#ff99dd', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>⚠️ Comentario Obligatorio (MEMO)</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', background: '#0a0314', padding: '8px 12px', borderRadius: '8px' }}>
+                        <span style={{ color: '#fff', fontWeight: '900', fontSize: '14px', letterSpacing: '1px' }}>{paymentMemo}</span>
+                        <button onClick={copyMemo} style={{ background: 'transparent', border: 'none', color: '#ff1493', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>COPIAR</button>
+                      </div>
+                      <p style={{ color: '#ffb3d9', fontSize: '10px', margin: '6px 0 0 0' }}>Si omites este comentario, perderás tus fondos.</p>
+                    </div>
                     
-                    <div style={{ background: '#0a0314', padding: '16px', borderRadius: '12px', border: '1px dashed #00f0ff', wordBreak: 'break-all', textAlign: 'center', color: '#fff', fontFamily: 'monospace', fontSize: '13px' }}>
+                    <div style={{ background: '#0a0314', padding: '16px', borderRadius: '12px', border: '1px dashed #00f0ff', wordBreak: 'break-all', textAlign: 'center', color: '#fff', fontFamily: 'monospace', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{color: '#00f0ff', fontSize: '10px', fontWeight: 'bold'}}>TU WALLET DE RECEPCIÓN</span>
                       {MY_WALLET}
                     </div>
                     
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={copyWallet} style={{ flex: 1, padding: '12px', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', border: '1px solid #00f0ff', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>📋 COPIAR</button>
-                      <button onClick={openTonkeeper} style={{ flex: 1, padding: '12px', background: '#0088cc', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>💎 ABRIR WALLET</button>
+                      <button onClick={copyWallet} style={{ flex: 1, padding: '12px', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', border: '1px solid #00f0ff', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>📋 COPIAR BILLETERA</button>
+                      <button onClick={openTonkeeper} style={{ flex: 1, padding: '12px', background: '#0088cc', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>💎 ABRIR TONKEEPER</button>
                     </div>
                     <button onClick={handleSimulateVerify} style={{ width: '100%', padding: '16px', marginTop: 'auto', background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', boxShadow: '0 6px 0 #007744' }}>
                       ✅ YA PAGUÉ, VERIFICAR
