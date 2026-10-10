@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    
+
     <!-- Evita parpadeos blancos en la barra de estado del celular -->
     <meta name="theme-color" content="#0a0314" />
-    
+
     <title>Red Neón ⚡</title>
 
     <!-- 1. Telegram Web App SDK (Carga prioritaria) -->
@@ -15,8 +15,8 @@
     <!-- 2. Cloudflare Turnstile -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
-    <!-- 3. Monetización Giga Pub -->
-    <script src="https://ad.gigapub.tech/script?id=6215" async></script>
+    <!-- 3. Monetización Giga Pub (Cuenta nueva sin auto-popups) -->
+    <script src="https://ad.gigapub.tech/script?id=8567"></script>
 
     <style>
       /* FONDO NEÓN Y SCROLL DESBLOQUEADO */
@@ -82,14 +82,11 @@
   </head>
   <body>
     <div id="root">
-      <!-- Este contenido desaparece automáticamente en milisegundos cuando React carga -->
       <div id="fallback-loader">
         <div class="spinner"></div>
         <p style="margin-top: 20px; font-size: 14px; font-weight: 900; color: #ff66cc; letter-spacing: 1px;">CARGANDO MUNDO NEÓN...</p>
       </div>
     </div>
-
-    <!-- Carga del archivo principal de React -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
