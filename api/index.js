@@ -16,7 +16,6 @@ const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 const BOT_ID = BOT_TOKEN.split(':')[0];
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
-// Extrae el usuario de un enlace para la API de Telegram
 function extractTelegramUsername(url) {
   let val = url.trim();
   if (val.startsWith('@')) return val;
@@ -25,7 +24,6 @@ function extractTelegramUsername(url) {
   return null;
 }
 
-// Fetch seguro con Timeout para no colgar el Vercel Function
 async function fetchWithTimeout(url, options = {}, timeout = 5000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -34,7 +32,6 @@ async function fetchWithTimeout(url, options = {}, timeout = 5000) {
   return response;
 }
 
-// Comprueba membresía
 async function checkMembership(userId, chatId) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${userId}`;
@@ -47,7 +44,6 @@ async function checkMembership(userId, chatId) {
   }
 }
 
-// Comprueba permisos de administrador del Bot
 async function checkAdminStatus(chatId) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${BOT_ID}`;
@@ -60,7 +56,6 @@ async function checkAdminStatus(chatId) {
   }
 }
 
-// Motor de liberación de recompensas de referidos (Bono fijo inicial de 1 CLICK)
 async function tryGrantReferralReward(targetId) {
   try {
     const { data: currentUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
@@ -99,7 +94,6 @@ export default async function handler(req, res) {
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
-    // ================= [ MÓDULO TAREAS ] =================
     if (action === 'verify-admin') {
       const chatId = extractTelegramUsername(req.body.url);
       if (!chatId) return res.status(400).json({ success: false, error: 'Enlace público inválido.' });
@@ -112,7 +106,7 @@ export default async function handler(req, res) {
       const { creator_id, type, title, url, bot_token, completions_total, reward } = req.body;
       const targetId = String(creator_id || userId);
       const count = Number(completions_total || 100);
-      const rew = Number(reward || 1); // Forzado a 1 CLICK
+      const rew = Number(reward || 1); 
       const totalCost = Number((count * rew).toFixed(2));
 
       const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
@@ -173,7 +167,6 @@ export default async function handler(req, res) {
 
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
 
-      // --- NUEVO: SISTEMA DE COMISIÓN DEL 20% ---
       if (dbUser.referred_by) {
         const commissionAmount = Number((rewardAmount * 0.20).toFixed(2));
         const { data: referrer } = await supabase.from('users').select('id, balance, referral_earnings, total_earnings').eq('id', dbUser.referred_by).maybeSingle();
@@ -195,7 +188,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
-    // ================= [ MÓDULO ACCIONES BÁSICAS ] =================
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
       if (!targetId) return res.status(400).json({ success: false, error: 'ID missing' });
@@ -235,7 +227,38 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, referrals: lv1 || [], earnings: dbUser?.referral_earnings || 0 });
     }
 
-    // ================= [ MÓDULO LOGIN Y ESTADÍSTICAS REALES ] =================
+    if (action === 'get-history') {
+      const targetId = String(userId);
+      const { data: myTasks } = await supabase.from('tasks').select('id, title, total_cost, created_at').eq('creator_id', targetId).order('created_at', { ascending: false }).limit(15);
+      const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id, created_at').eq('user_id', targetId).order('created_at', { ascending: false }).limit(15);
+
+      let history = [];
+      
+      if (myTasks) {
+        myTasks.forEach(t => history.push({
+          id: `out_${t.id}`, type: 'spend', title: `Campaña: ${t.title}`, 
+          amount: `-${Number(t.total_cost || 0).toFixed(2)}`, date: t.created_at
+        }));
+      }
+
+      if (completedRows && completedRows.length > 0) {
+        const taskIds = completedRows.map(r => r.task_id);
+        const { data: tasksInfo } = await supabase.from('tasks').select('id, title, reward').in('id', taskIds);
+        
+        completedRows.forEach(r => {
+          const tInfo = tasksInfo?.find(ti => String(ti.id) === String(r.task_id));
+          history.push({
+            id: `in_${r.task_id}_${r.created_at}`, type: 'earn', 
+            title: tInfo ? `Tú completaste: ${tInfo.title}` : 'Tarea Completada', 
+            amount: `+${Number(tInfo?.reward || 1).toFixed(2)}`, date: r.created_at
+          });
+        });
+      }
+
+      history.sort((a, b) => new Date(b.date) - new Date(a.date));
+      return res.status(200).json({ success: true, history: history.slice(0, 20) });
+    }
+
     const targetUser = user || { id: userId };
     const targetId = String(targetUser?.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
