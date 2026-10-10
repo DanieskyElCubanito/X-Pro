@@ -1,68 +1,21 @@
-
 import { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
 const neon = {
-  card: { 
-    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', 
-    border: '2px solid #00f0ff', borderRadius: '24px', padding: '20px', 
-    marginBottom: '16px', boxShadow: '0 8px 24px rgba(0, 240, 255, 0.15)' 
-  },
-  cardInteractive: { 
-    background: 'linear-gradient(135deg, rgba(38, 14, 66, 0.9), rgba(18, 7, 36, 0.9))', 
-    border: '2px solid #8a2be2', borderRadius: '20px', padding: '16px', 
-    marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '14px', 
-    cursor: 'pointer', boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)', transition: 'all 0.2s ease' 
-  },
-  btnPrimary: { 
-    width: '100%', padding: '14px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', 
-    color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', 
-    cursor: 'pointer', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', 
-    textTransform: 'uppercase', letterSpacing: '0.5px' 
-  },
-  btnSecondary: { 
-    width: '100%', padding: '14px', background: 'transparent', color: '#ff99dd', 
-    border: '2px dashed #ff41b4', borderRadius: '16px', fontWeight: '900', fontSize: '15px', 
-    cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 65, 180, 0.2)', textTransform: 'uppercase' 
-  },
-  btnAction: { 
-    width: '40px', height: '40px', background: 'rgba(255, 65, 180, 0.1)', color: '#ff41b4', 
-    border: '2px solid #ff41b4', borderRadius: '12px', fontWeight: '900', fontSize: '20px', 
-    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' 
-  },
-  input: { 
-    width: '100%', background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', 
-    borderRadius: '16px', padding: '14px 16px', fontSize: '15px', color: '#ffffff', 
-    outline: 'none', boxSizing: 'border-box' 
-  },
+  card: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #00f0ff', borderRadius: '24px', padding: '20px', marginBottom: '16px', boxShadow: '0 8px 24px rgba(0, 240, 255, 0.15)' },
+  cardInteractive: { background: 'linear-gradient(135deg, rgba(38, 14, 66, 0.9), rgba(18, 7, 36, 0.9))', border: '2px solid #8a2be2', borderRadius: '20px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)', transition: 'all 0.2s ease' },
+  btnPrimary: { width: '100%', padding: '14px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  btnSecondary: { width: '100%', padding: '14px', background: 'transparent', color: '#ff99dd', border: '2px dashed #ff41b4', borderRadius: '16px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 65, 180, 0.2)', textTransform: 'uppercase' },
+  btnAction: { width: '40px', height: '40px', background: 'rgba(255, 65, 180, 0.1)', color: '#ff41b4', border: '2px solid #ff41b4', borderRadius: '12px', fontWeight: '900', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  input: { width: '100%', background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', borderRadius: '16px', padding: '14px 16px', fontSize: '15px', color: '#ffffff', outline: 'none', boxSizing: 'border-box' },
   progressBox: { display: 'flex', justifyContent: 'center', gap: '8px', margin: '15px 0 25px 0' },
-  progressStep: (active) => ({ 
-    width: '40px', height: '6px', 
-    background: active ? 'linear-gradient(90deg, #ff1493, #00f0ff)' : 'rgba(255, 255, 255, 0.1)', 
-    borderRadius: '10px', boxShadow: active ? '0 0 10px #00f0ff' : 'none', transition: 'all 0.3s ease' 
-  }),
-  taskCard: {
-    background: 'linear-gradient(145deg, #10061e, #1a0b33)',
-    border: '1.5px solid rgba(138, 43, 226, 0.5)', borderRadius: '20px', padding: '16px',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-    marginBottom: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.4), inset 0 2px 10px rgba(138, 43, 226, 0.1)',
-  },
-  taskIconBox: {
-    width: '48px', height: '48px', borderRadius: '14px',
-    background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.2))',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 240, 255, 0.3)'
-  },
-  taskButton: {
-    background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', 
-    borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', 
-    boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap'
-  },
-  taskButtonDisabled: {
-    background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2',
-    borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap'
-  }
+  progressStep: (active) => ({ width: '40px', height: '6px', background: active ? 'linear-gradient(90deg, #ff1493, #00f0ff)' : 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', boxShadow: active ? '0 0 10px #00f0ff' : 'none', transition: 'all 0.3s ease' }),
+  taskCard: { background: 'linear-gradient(145deg, #10061e, #1a0b33)', border: '1.5px solid rgba(138, 43, 226, 0.5)', borderRadius: '20px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.4), inset 0 2px 10px rgba(138, 43, 226, 0.1)' },
+  taskIconBox: { width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 240, 255, 0.3)' },
+  taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
+  taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap' }
 };
 
 const TaskIcons = {
@@ -84,20 +37,21 @@ export default function AdsTab({ userData, setUserData }) {
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState(null);
+  
+  // Estado para el anuncio Giga Pub
+  const [adLoading, setAdLoading] = useState(false);
 
   const [taskType, setTaskType] = useState(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [botToken, setBotToken] = useState('');
   
-  // Economía 1:1
   const [completions, setCompletions] = useState(1);
   const isCreating = useState(false)[0];
   const setIsCreating = useState(false)[1];
 
   const balance = Number(userData?.balance || 0);
-  const maxBalanceInt = Math.max(1, Math.floor(balance)); // Para el botón MAX
+  const maxBalanceInt = Math.max(1, Math.floor(balance)); 
 
-  // Como la recompensa es 1 CLICK por usuario, el costo total es igual a las completaciones
   const totalCost = completions;
 
   useEffect(() => {
@@ -154,20 +108,18 @@ export default function AdsTab({ userData, setUserData }) {
     if (balance < totalCost) return toast.error(`Saldo insuficiente.`);
     setIsCreating(true);
     const tid = toast.loading("Publicando tarea...");
-
     const fixedTitle = TASK_TYPES.find(t => t.id === taskType)?.autoName || 'Nueva Tarea';
 
     try {
       const res = await botApi.createTask({
         creator_id: userData?.id, type: taskType, title: fixedTitle,
         url: targetUrl, bot_token: botToken || null,
-        completions_total: completions, reward: 1 // Fijado en 1 CLICK por persona
+        completions_total: completions, reward: 1
       });
       if (!res.success) throw new Error(res.error);
       if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
       toast.success("¡Campaña activada con éxito!", { id: tid });
       
-      // Reiniciar Wizard
       setTaskType(null); setTargetUrl(''); setBotToken(''); setCompletions(1);
       setCurrentStepIndex(0); setView('list');
     } catch (err) {
@@ -175,6 +127,40 @@ export default function AdsTab({ userData, setUserData }) {
     } finally {
       setIsCreating(false);
     }
+  };
+
+  // TAREA DE GIGA PUB
+  const handleWatchAd = () => {
+    if (typeof window.showGiga !== 'function') {
+      return toast.error("El servidor de anuncios no está disponible.");
+    }
+    if (adLoading) return;
+
+    setAdLoading(true);
+    const tid = toast.loading("Sintonizando anuncio...");
+
+    window.showGiga()
+      .then(async () => {
+        toast.loading("Acreditando +0.50 CLICK...", { id: tid });
+        try {
+          const res = await botApi.claimBonus(userData.id);
+          if (res.success) {
+            toast.success("¡Completado! +0.50 CLICK", { id: tid });
+            if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
+          } else {
+            toast.error("Error al procesar el pago.", { id: tid });
+          }
+        } catch (error) {
+          toast.error("Error de conexión.", { id: tid });
+        } finally {
+          setAdLoading(false);
+        }
+      })
+      .catch(() => {
+        // Estricto: Si hay error, bloqueador o cierre prematuro, no se paga.
+        toast.error("Anuncio no completado. Cancelando pago.", { id: tid });
+        setAdLoading(false);
+      });
   };
 
   const handleDoTask = async (task) => {
@@ -230,7 +216,7 @@ export default function AdsTab({ userData, setUserData }) {
               color: view === 'activity' ? '#fff' : '#ff41b4',
               boxShadow: view === 'activity' ? '0 4px 15px rgba(255,20,147,0.3)' : 'none', letterSpacing: '0.5px'
             }}>
-            📜 ACTIVIDAD
+            📋 MIS ANUNCIOS
           </button>
         </div>
       )}
@@ -243,8 +229,29 @@ export default function AdsTab({ userData, setUserData }) {
             <button onClick={fetchTasks} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
           </div>
 
+          {/* TAREA FIJA: ANUNCIO GIGA PUB */}
+          <div style={{...neon.taskCard, borderColor: '#ff1493', background: 'linear-gradient(145deg, rgba(255, 20, 147, 0.1), #1a0b33)'}}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{...neon.taskIconBox, borderColor: '#ff1493'}}>
+                <span style={{fontSize: '24px'}}>📺</span>
+              </div>
+              <div>
+                <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>Anuncio Patrocinado</div>
+                <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>
+                  Disponible ilimitadamente
+                </div>
+              </div>
+            </div>
+            <button 
+              onClick={handleWatchAd} disabled={adLoading}
+              style={adLoading ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #ff1493, #d80073)', color: '#fff', boxShadow: '0 4px 0 #8b004b'}}
+            >
+              {adLoading ? 'CARGANDO...' : '+0.50 CLICK'}
+            </button>
+          </div>
+
           {loadingTasks ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#00f0ff', fontSize: '14px', fontWeight: 'bold' }}>Sincronizando tareas...</div>
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '14px', fontWeight: 'bold' }}>Sincronizando tareas...</div>
           ) : tasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
               <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>🏜️</span>
@@ -284,18 +291,18 @@ export default function AdsTab({ userData, setUserData }) {
         </div>
       )}
 
-      {/* VISTA: ACTIVIDAD */}
+      {/* VISTA: ACTIVIDAD / MIS ANUNCIOS */}
       {view === 'activity' && (
         <div className="fade-in">
           <div style={neon.card}>
             <div style={{ textAlign: 'center', padding: '30px 0' }}>
-              <div style={{ fontSize: '46px', marginBottom: '10px', filter: 'drop-shadow(0 0 10px rgba(255, 65, 180, 0.5))' }}>📜</div>
-              <h3 style={{ margin: '0 0 10px 0', color: '#ff41b4', fontSize: '18px', fontWeight: '900', textTransform: 'uppercase' }}>Registro de Actividad</h3>
+              <div style={{ fontSize: '46px', marginBottom: '10px', filter: 'drop-shadow(0 0 10px rgba(255, 65, 180, 0.5))' }}>📋</div>
+              <h3 style={{ margin: '0 0 10px 0', color: '#ff41b4', fontSize: '18px', fontWeight: '900', textTransform: 'uppercase' }}>Mis Anuncios</h3>
               <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: '0 0 20px 0' }}>
-                Aquí aparecerán las tareas que has completado y las campañas que has creado.
+                El historial de los anuncios que has publicado y su progreso aparecerá aquí muy pronto.
               </p>
               <div style={{ padding: '16px', background: 'rgba(15, 5, 28, 0.8)', borderRadius: '14px', border: '1px dashed #8a2be2', color: '#888', fontSize: '12px', fontWeight: 'bold' }}>
-                No hay actividad reciente.
+                Historial vacío o en mantenimiento.
               </div>
             </div>
           </div>
