@@ -177,7 +177,7 @@ export default async function handler(req, res) {
       if (dbUser.referred_by) {
         const commissionAmount = Number((rewardAmount * 0.20).toFixed(2));
         const { data: referrer } = await supabase.from('users').select('id, balance, referral_earnings, total_earnings').eq('id', dbUser.referred_by).maybeSingle();
-        
+
         if (referrer) {
           const refNewBalance = Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2));
           const refNewRefEarn = Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2));
@@ -215,8 +215,8 @@ export default async function handler(req, res) {
 
     if (action === 'claim-bonus') {
       const { data: u } = await supabase.from('users').select('balance, total_earnings').eq('id', String(userId)).single();
-      const newBalance = Number((Number(u.balance || 0) + 0.1).toFixed(2));
-      const newTotal = Number((Number(u.total_earnings || 0) + 0.1).toFixed(2));
+      const newBalance = Number((Number(u.balance || 0) + 0.5).toFixed(2));
+      const newTotal = Number((Number(u.total_earnings || 0) + 0.5).toFixed(2));
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', String(userId));
       return res.status(200).json({ success: true, balance: newBalance });
     }
