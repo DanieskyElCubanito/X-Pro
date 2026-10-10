@@ -3,9 +3,17 @@ import toast from 'react-hot-toast';
 
 // --- ESTILOS NEÓN CYBERPUNK ---
 const neon = {
-  container: { display: 'flex', flexDirection: 'column', width: '100%' },
-
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%'
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '20px'
+  },
   iconBtn: {
     width: '46px', height: '46px', background: 'rgba(15, 5, 28, 0.8)',
     border: '2px solid #8a2be2', borderRadius: '14px', boxShadow: '0 0 10px rgba(138, 43, 226, 0.4)',
@@ -15,8 +23,9 @@ const neon = {
     fontSize: '28px', fontWeight: '900', letterSpacing: '-0.5px', textTransform: 'uppercase',
     color: '#00f0ff', margin: 0, textShadow: '0 0 15px rgba(0, 240, 255, 0.4)'
   },
-
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' },
+  statsGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px'
+  },
   statCard: (borderColor, bgColor, glowColor) => ({
     background: bgColor, border: `2px solid ${borderColor}`, borderRadius: '20px',
     boxShadow: `0 4px 15px ${glowColor}`, padding: '16px 6px',
@@ -26,24 +35,34 @@ const neon = {
     width: '36px', height: '36px', background: 'rgba(0,0,0,0.3)', borderRadius: '10px',
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', marginBottom: '10px'
   },
-  statNumber: { fontSize: '22px', fontWeight: '900', lineHeight: '1.1', marginBottom: '6px', color: '#ffffff' },
-  statDesc: { fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: '1.2', color: '#ff99dd' },
-
+  statNumber: {
+    fontSize: '22px', fontWeight: '900', lineHeight: '1.1', marginBottom: '6px', color: '#ffffff'
+  },
+  statDesc: {
+    fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: '1.2', color: '#ff99dd'
+  },
   infoCard: {
     background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.6), rgba(20, 8, 38, 0.8))',
     border: '2px solid #8a2be2', borderRadius: '26px', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.2)',
     padding: '20px 18px', marginBottom: '20px'
   },
-  howTitle: { fontSize: '14px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase', color: '#ffe600', marginBottom: '16px' },
-  howStep: { display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 0' },
+  howTitle: {
+    fontSize: '14px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase', color: '#ffe600', marginBottom: '16px'
+  },
+  howStep: {
+    display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 0'
+  },
   howStepIcon: (bgColor, textColor, glowColor) => ({
     width: '44px', height: '44px', background: bgColor, color: textColor, borderRadius: '14px',
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '900',
     flexShrink: 0, boxShadow: `0 0 15px ${glowColor}`
   }),
-  howStepText: { fontSize: '14px', fontWeight: '800', lineHeight: '1.3', color: '#ffffff' },
-  dashedDivider: { border: 'none', borderTop: '2px dashed rgba(255, 65, 180, 0.4)', margin: '6px 0' },
-
+  howStepText: {
+    fontSize: '14px', fontWeight: '800', lineHeight: '1.3', color: '#ffffff'
+  },
+  dashedDivider: {
+    border: 'none', borderTop: '2px dashed rgba(255, 65, 180, 0.4)', margin: '6px 0'
+  },
   btnClick: {
     width: '100%', background: 'linear-gradient(180deg, #ff1493 0%, #d80073 100%)', color: '#ffffff',
     border: 'none', borderRadius: '20px', boxShadow: '0 6px 0 #8b004b, 0 10px 20px rgba(255, 20, 147, 0.4)',
@@ -55,15 +74,45 @@ const neon = {
     border: '2px solid #ffffff', borderRadius: '20px', boxShadow: '0 6px 0 #0055aa, 0 10px 25px rgba(0, 240, 255, 0.5)',
     padding: '16px', fontSize: '15px', fontWeight: '900', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer'
+  },
+  // ESTILOS PARA EL MODAL DE HISTORIAL
+  modalOverlay: {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(5, 2, 20, 0.85)', backdropFilter: 'blur(5px)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    zIndex: 100000
+  },
+  modalContent: {
+    width: '100%', height: '70vh',
+    background: 'linear-gradient(180deg, rgba(46, 16, 77, 0.95), rgba(20, 8, 38, 1))',
+    borderTop: '2px solid #00f0ff',
+    borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
+    padding: '24px 20px', display: 'flex', flexDirection: 'column',
+    boxShadow: '0 -10px 30px rgba(0, 240, 255, 0.2)'
+  },
+  historyItem: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '12px 14px', background: 'rgba(15, 5, 28, 0.8)',
+    borderRadius: '12px', border: '1px solid rgba(138, 43, 226, 0.5)',
+    marginBottom: '8px'
   }
 };
 
 export default function HomeTab({ userData, setActiveTab }) {
-  // Saldo normal del usuario
-  const clickBalance = Number(userData?.balance || 0).toFixed(2);
+  const [showHistory, setShowHistory] = useState(false);
 
+  const clickBalance = Number(userData?.balance || 0).toFixed(2);
   const globalClicks = userData?.global_clicks || '0';
   const clicksReceived = userData?.clicks_received || '0';
+
+  // Datos simulados para el historial (luego los conectaremos al backend)
+  const mockHistory = [
+    { id: 1, type: 'earn', title: 'Tarea: Unirse a Canal', amount: '+1.00', date: 'Hoy, 14:30' },
+    { id: 2, type: 'spend', title: 'Campaña: Mi Bot Web3', amount: '-10.00', date: 'Hoy, 10:15' },
+    { id: 3, type: 'earn', title: 'Bono: Anuncio Visto', amount: '+0.50', date: 'Ayer, 20:00' },
+    { id: 4, type: 'earn', title: 'Comisión: Afiliado #145', amount: '+0.20', date: 'Ayer, 18:45' },
+    { id: 5, type: 'earn', title: 'Bono: Nuevo Afiliado', amount: '+1.00', date: 'Ayer, 18:42' },
+  ];
 
   return (
     <div className="fade-in" style={neon.container}>
@@ -71,7 +120,7 @@ export default function HomeTab({ userData, setActiveTab }) {
       {/* HEADER */}
       <div style={neon.header}>
         <div 
-          onClick={() => toast('El historial estará disponible pronto.', {icon: '🕒'})} 
+          onClick={() => setShowHistory(true)} 
           style={neon.iconBtn}
         >
           🕒
@@ -82,21 +131,18 @@ export default function HomeTab({ userData, setActiveTab }) {
 
       {/* TRES TARJETAS DE MÉTRICAS */}
       <div style={neon.statsGrid}>
-        {/* Global */}
         <div style={neon.statCard('#8a2be2', 'rgba(138, 43, 226, 0.2)', 'rgba(138, 43, 226, 0.3)')}>
           <div style={neon.statInnerIcon}>🌐</div>
           <div style={neon.statNumber}>{globalClicks}</div>
           <div style={{...neon.statDesc, color: '#ff99dd'}}>Clicks Globales</div>
         </div>
 
-        {/* Saldo de Clicks */}
         <div style={neon.statCard('#00f0ff', 'rgba(0, 240, 255, 0.1)', 'rgba(0, 240, 255, 0.3)')}>
           <div style={neon.statInnerIcon}>⚡</div>
           <div style={{...neon.statNumber, color: '#00f0ff'}}>{clickBalance}</div>
           <div style={{...neon.statDesc, color: '#ffffff'}}>Saldo</div>
         </div>
 
-        {/* Clicks Recibidos */}
         <div style={neon.statCard('#ff1493', 'rgba(255, 20, 147, 0.2)', 'rgba(255, 20, 147, 0.3)')}>
           <div style={neon.statInnerIcon}>📥</div>
           <div style={neon.statNumber}>{clicksReceived}</div>
@@ -130,7 +176,7 @@ export default function HomeTab({ userData, setActiveTab }) {
       <button 
         onClick={() => {
           if (setActiveTab) {
-            setActiveTab('tasks'); // Esto navega a AdsTab.jsx (Mercado 1x1)
+            setActiveTab('tasks'); 
           } else {
             toast('Toca el botón ⚡ MERCADO abajo en el menú.', {icon: '⚡'})
           }
@@ -156,6 +202,48 @@ export default function HomeTab({ userData, setActiveTab }) {
           Paga con GRAM / Crypto
         </span>
       </button>
+
+      {/* MODAL DE HISTORIAL FLOTANTE */}
+      {showHistory && (
+        <div className="fade-in" style={neon.modalOverlay} onClick={() => setShowHistory(false)}>
+          {/* Evitar que al hacer clic dentro del modal se cierre */}
+          <div style={neon.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: '#00f0ff', fontSize: '20px', fontWeight: '900', textTransform: 'uppercase' }}>
+                🕒 Mi Historial
+              </h3>
+              <button 
+                onClick={() => setShowHistory(false)} 
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
+              {mockHistory.map((item) => (
+                <div key={item.id} style={neon.historyItem}>
+                  <div>
+                    <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{item.title}</div>
+                    <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{item.date}</div>
+                  </div>
+                  <div style={{ 
+                    color: item.type === 'earn' ? '#00ffaa' : '#ff1493', 
+                    fontSize: '16px', fontWeight: '900',
+                    textShadow: item.type === 'earn' ? '0 0 5px rgba(0,255,170,0.5)' : '0 0 5px rgba(255,20,147,0.5)'
+                  }}>
+                    {item.amount}
+                  </div>
+                </div>
+              ))}
+              
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <p style={{ color: '#888', fontSize: '12px', fontStyle: 'italic' }}>Mostrando los últimos 5 movimientos.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
