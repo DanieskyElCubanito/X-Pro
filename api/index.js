@@ -60,7 +60,7 @@ async function checkAdminStatus(chatId) {
   }
 }
 
-// Motor de liberación de recompensas de referidos
+// Motor de liberación de recompensas de referidos (Bono fijo inicial de 1 CLICK)
 async function tryGrantReferralReward(targetId) {
   try {
     const { data: currentUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
       const { creator_id, type, title, url, bot_token, completions_total, reward } = req.body;
       const targetId = String(creator_id || userId);
       const count = Number(completions_total || 100);
-      const rew = Number(reward || 0.1);
+      const rew = Number(reward || 1); // Forzado a 1 CLICK
       const totalCost = Number((count * rew).toFixed(2));
 
       const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
@@ -150,7 +150,6 @@ export default async function handler(req, res) {
       const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
       if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
 
-      // Verificación antifraude
       if (task.type === 'group' || task.type === 'channel') {
         const chatId = extractTelegramUsername(task.url);
         if (chatId) {
@@ -167,12 +166,25 @@ export default async function handler(req, res) {
 
       await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
 
-      const rewardAmount = Number(task.reward || 0.1);
+      const rewardAmount = Number(task.reward || 1);
       const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
       const newBalance = Number((Number(dbUser.balance || 0) + rewardAmount).toFixed(2));
       const newTotal = Number((Number(dbUser.total_earnings || 0) + rewardAmount).toFixed(2));
 
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
+
+      // --- NUEVO: SISTEMA DE COMISIÓN DEL 20% ---
+      if (dbUser.referred_by) {
+        const commissionAmount = Number((rewardAmount * 0.20).toFixed(2));
+        const { data: referrer } = await supabase.from('users').select('id, balance, referral_earnings, total_earnings').eq('id', dbUser.referred_by).maybeSingle();
+        
+        if (referrer) {
+          const refNewBalance = Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2));
+          const refNewRefEarn = Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2));
+          const refNewTotal = Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2));
+          await supabase.from('users').update({ balance: refNewBalance, referral_earnings: refNewRefEarn, total_earnings: refNewTotal }).eq('id', referrer.id);
+        }
+      }
 
       const newDoneCount = Number(task.completions_done || 0) + 1;
       await supabase.from('tasks').update({ 
@@ -232,7 +244,6 @@ export default async function handler(req, res) {
     const detectedPrev = previousAccountDetected || targetUser.previousAccountDetected;
     const isAdmin = ADMIN_IDS.includes(targetId) || ADMIN_IDS.includes(String(start_param));
 
-    // Antifraude Login
     if (!isAdmin) {
       if (detectedPrev && String(detectedPrev) !== targetId) {
         await supabase.from('users').upsert({ id: targetId, username: targetUser.username || 'Usuario', device_id: currentDeviceId, ip_address: clientIp, is_banned: true });
@@ -250,7 +261,6 @@ export default async function handler(req, res) {
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
     if (dbUser && dbUser.is_banned) return res.status(403).json({ success: false, error: 'Cuenta suspendida.' });
 
-    // Registro o Actualización
     const updates = {};
     if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
     if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
@@ -274,20 +284,17 @@ export default async function handler(req, res) {
       dbUser = newUser;
     }
 
-    // Comprobaciones finales de login
     await tryGrantReferralReward(targetId);
     const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
     const isMember1 = await checkMembership(targetId, "-1003685621367");
     const isMember2 = await checkMembership(targetId, "-1004377164928"); 
 
-    // OBTENER ESTADÍSTICAS REALES PARA EL HOME (Novedad Top Global)
     const { data: totalTasks } = await supabase.from('tasks').select('completions_done');
     const globalClicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
-    
+
     const { data: myTasks } = await supabase.from('tasks').select('completions_done').eq('creator_id', targetId);
     const myReceivedClicks = myTasks ? myTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
 
-    // Formatear globalClicks a formato "1.2K" si es mayor a 1000
     const formattedGlobal = globalClicks >= 1000 ? (globalClicks / 1000).toFixed(1) + 'K' : globalClicks;
 
     dbUser.global_clicks = formattedGlobal;
