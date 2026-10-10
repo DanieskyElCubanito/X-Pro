@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { botApi } from '../api/botApi';
-import WebApp from '@twa-dev/sdk'; // Añadido para el enlace dinámico
+import WebApp from '@twa-dev/sdk';
 
 const neon = {
   card: {
@@ -52,7 +52,6 @@ function ShareTab({ stats, userId, totalReferralEarnings }) {
   const [earnings, setEarnings] = useState(totalReferralEarnings || stats?.c1 || 0);
   const [loading, setLoading] = useState(false);
 
-  // Recarga los referidos automáticamente al entrar a la pestaña
   useEffect(() => {
     if (userId) fetchReferrals();
   }, [userId]);
@@ -73,7 +72,6 @@ function ShareTab({ stats, userId, totalReferralEarnings }) {
   };
 
   const n1 = referralsList.length;
-  // Convertimos a 2 decimales para que se vea como saldo real
   const totalEarned = parseFloat(earnings).toFixed(2);
   const inviteLink = `https://t.me/ReffRobot/app?startapp=${userId}`;
 
@@ -136,8 +134,11 @@ function ShareTab({ stats, userId, totalReferralEarnings }) {
               {totalEarned} <span style={{ fontSize: '14px', color: '#ffe600' }}>CLICK</span>
             </p>
           </div>
-          <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '14px', fontSize: '20px' }}>
-            🪙
+          {/* ÍCONO REEMPLAZADO (Adiós cuadradito roto) */}
+          <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 5px rgba(255,230,0,0.5))' }}>
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
           </div>
         </div>
       </div>
@@ -148,7 +149,6 @@ function ShareTab({ stats, userId, totalReferralEarnings }) {
           <h4 style={{ color: '#00f0ff', fontSize: '15px', margin: 0, fontWeight: '900' }}>
             📊 Tu Red de Tráfico ({n1})
           </h4>
-          <span style={{ fontSize: '11px', color: '#ff99dd', fontWeight: 'bold' }}>ID / ESTADO</span>
         </div>
 
         {loading && n1 === 0 ? (
@@ -162,36 +162,48 @@ function ShareTab({ stats, userId, totalReferralEarnings }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '5px' }}>
-            {referralsList.map((ref, idx) => (
-              <div key={ref.id || idx} style={neon.refItem}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '24px', height: '24px', background: 'rgba(0, 240, 255, 0.1)', border: '1px solid #00f0ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00f0ff', fontSize: '10px', fontWeight: 'bold' }}>
-                    {idx + 1}
+            {referralsList.map((ref, idx) => {
+              const avatarLetter = ref.username ? ref.username.charAt(0).toUpperCase() : 'U';
+              
+              return (
+                <div key={ref.id || idx} style={neon.refItem}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* AVATAR DE PERFIL DEL INVITADO */}
+                    <div style={{ 
+                      width: '36px', height: '36px', borderRadius: '50%', 
+                      background: 'linear-gradient(135deg, #00f0ff, #ff1493)', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      color: '#fff', fontWeight: '900', fontSize: '16px',
+                      border: '2px solid rgba(255, 255, 255, 0.2)'
+                    }}>
+                      {avatarLetter}
+                    </div>
+                    <div>
+                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{ref.username || 'Usuario'}</div>
+                      <div style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace' }}>ID: {ref.id}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>{ref.username || 'Usuario'}</div>
-                    <div style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace' }}>ID: {ref.id}</div>
-                  </div>
-                </div>
 
-                {/* SI PASÓ EL CAPTCHA SE PAGA, SINO ESTÁ EN ESPERA */}
-                {ref.referral_reward_granted ? (
-                  <span style={{ color: '#00ffaa', fontSize: '12px', fontWeight: '900', background: 'rgba(0, 255, 170, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px solid #00ffaa' }}>
-                    +1.0 CLICK
-                  </span>
-                ) : (
-                  <span style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', background: 'rgba(255, 230, 0, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px dashed #ffe600' }}>
-                    PENDIENTE
-                  </span>
-                )}
-              </div>
-            ))}
+                  {ref.referral_reward_granted ? (
+                    <span style={{ color: '#00ffaa', fontSize: '12px', fontWeight: '900', background: 'rgba(0, 255, 170, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px solid #00ffaa' }}>
+                      ACTIVO
+                    </span>
+                  ) : (
+                    <span style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', background: 'rgba(255, 230, 0, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px dashed #ffe600' }}>
+                      PENDIENTE
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <p style={{ textAlign: 'center', fontSize: '11px', color: '#aaa', marginTop: '16px', lineHeight: '1.4' }}>
-          *Ganas <strong>1.0 CLICK</strong> cuando tu afiliado ingresa y verifica su cuenta.
-        </p>
+        <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '12px', marginTop: '16px', border: '1px dashed #8a2be2' }}>
+          <p style={{ textAlign: 'center', fontSize: '11px', color: '#00f0ff', margin: 0, lineHeight: '1.5', fontWeight: 'bold' }}>
+            Recibes <strong style={{color: '#ffe600'}}>1.0 CLICK</strong> por cada afiliado verificado<br/>+ <strong style={{color: '#00ffaa'}}>20%</strong> de cada tarea que ellos completen.
+          </p>
+        </div>
       </div>
     </div>
   );
