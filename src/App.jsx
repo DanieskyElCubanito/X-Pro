@@ -236,13 +236,13 @@ function App() {
       />
 
       <div style={neonTheme.main}>
-        {/* 1. INICIO (Perfil y Saldo) */}
         {activeTab === 'home' && (
-          <div className="fade-in">
-            <ProfileHeader userData={userData} />
-            <HomeTab userData={userData} setUserData={setUserData} />
-          </div>
-        )}
+  <div className="fade-in">
+    <ProfileHeader userData={userData} />
+    <HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} />
+  </div>
+)}
+
 
         {/* 2. TAREAS / MERCADO DE TRÁFICO */}
         {activeTab === 'tasks' && (
