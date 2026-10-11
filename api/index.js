@@ -127,40 +127,23 @@ export default async function handler(req, res) {
       const targetId = String(pubUserId);
       const COST_PER_GROUP = 10;
 
-      // Verificar y descontar saldo
+      // 1. Verificar saldo
       const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
       if (!dbUser || Number(dbUser.balance || 0) < COST_PER_GROUP) {
         return res.status(400).json({ success: false, error: 'Saldo insuficiente para publicar.' });
       }
 
-      // Construir el teclado en línea (Estilos Nativos Telegram)
+      // 2. Construir el teclado en línea
       let inline_keyboard = [];
-      
       if (buttonConfig && buttonConfig.url) {
-        let btn = {
-          text: buttonConfig.text || "Abrir Enlace",
-          url: buttonConfig.url
-        };
-        if (buttonConfig.style && buttonConfig.style !== 'default') {
-          btn.style = buttonConfig.style;
-        }
-        if (buttonConfig.icon_custom_emoji_id) {
-          btn.icon_custom_emoji_id = buttonConfig.icon_custom_emoji_id;
-        }
+        let btn = { text: buttonConfig.text || "Abrir Enlace", url: buttonConfig.url };
         inline_keyboard.push([btn]);
       } else if (link) {
         inline_keyboard.push([{ text: "Abrir App", url: link }]);
       }
 
-      // Preparar payload a Telegram
-      let payload = {
-        chat_id: chatId,
-        parse_mode: "HTML",
-      };
-      
-      if (inline_keyboard.length > 0) {
-        payload.reply_markup = { inline_keyboard };
-      }
+      let payload = { chat_id: chatId, parse_mode: "HTML" };
+      if (inline_keyboard.length > 0) payload.reply_markup = { inline_keyboard };
 
       let tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
       if (photoData && photoData.startsWith('data:image')) {
@@ -171,7 +154,7 @@ export default async function handler(req, res) {
          payload.text = text;
       }
 
-      // Enviar a Telegram
+      // 3. Enviar a Telegram
       const tgRes = await fetch(tgEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,14 +162,26 @@ export default async function handler(req, res) {
       });
       
       const tgData = await tgRes.json();
-      
       if (!tgData.ok) {
-        return res.status(400).json({ success: false, error: tgData.description }); // Muestra error real (ej. Chat not found)
+        return res.status(400).json({ success: false, error: tgData.description });
       }
 
-      // Descontar saldo y guardar éxito
+      // 4. Descontar saldo
       const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
+
+      // 5. REGISTRAR LA CAMPAÑA EN LA TABLA TASKS PARA QUE APAREZCA EN HISTORIAL Y MIS ANUNCIOS
+      await supabase.from('tasks').insert([{
+        creator_id: targetId,
+        type: 'promo',
+        title: 'Campaña en Grupo',
+        url: buttonConfig?.url || link || 'https://t.me/ClickNetworkbot',
+        completions_total: 1,
+        completions_done: 1,
+        reward: 0,
+        total_cost: COST_PER_GROUP,
+        status: 'completed'
+      }]);
 
       return res.status(200).json({ success: true, balance: newBalance });
     }
