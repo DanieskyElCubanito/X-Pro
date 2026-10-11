@@ -170,10 +170,10 @@ export default async function handler(req, res) {
       const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
 
-      // 5. REGISTRAR LA CAMPAÑA EN LA TABLA TASKS PARA QUE APAREZCA EN HISTORIAL Y MIS ANUNCIOS
+      // 5. REGISTRAR CON TIPO 'group' PARA QUE SALGA CON LA ETIQUETA CORRECTA EN EL MERCADO
       await supabase.from('tasks').insert([{
         creator_id: targetId,
-        type: 'promo',
+        type: 'group',
         title: 'Campaña en Grupo',
         url: buttonConfig?.url || link || 'https://t.me/ClickNetworkbot',
         completions_total: 1,
@@ -184,6 +184,33 @@ export default async function handler(req, res) {
       }]);
 
       return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    // =======================================================
+    // MÓDULO: EDITAR CAMPAÑA / TAREA (CREADOR O ADMIN)
+    // =======================================================
+    if (action === 'edit-task') {
+      const { taskId, requestingUserId, newTitle, newUrl, isAdminAction } = req.body;
+      const targetId = String(requestingUserId);
+
+      const { data: task, error: taskErr } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+      if (taskErr || !task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
+
+      const isOwner = String(task.creator_id) === targetId;
+      const authorizedAdmin = ADMIN_IDS.includes(targetId);
+
+      if (!isOwner && (!isAdminAction || !authorizedAdmin)) {
+        return res.status(403).json({ success: false, error: 'No tienes permisos para editar esta campaña.' });
+      }
+
+      const updates = {};
+      if (newTitle !== undefined) updates.title = newTitle;
+      if (newUrl !== undefined) updates.url = newUrl;
+
+      const { error: updateErr } = await supabase.from('tasks').update(updates).eq('id', taskId);
+      if (updateErr) return res.status(400).json({ success: false, error: 'Error al actualizar la tarea.' });
+
+      return res.status(200).json({ success: true, message: 'Campaña actualizada con éxito.' });
     }
 
     // =======================================================
@@ -208,7 +235,7 @@ export default async function handler(req, res) {
         const remainingCompletions = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
         let refundClicks = 0;
 
-        if (task.type === 'promo' && task.reward === 0) {
+        if (task.type === 'promo' || task.type === 'group' && task.reward === 0) {
           refundClicks = remainingCompletions > 0 ? Number(task.total_cost || 10) : 0;
         } else {
           refundClicks = Number((remainingCompletions * Number(task.reward || 1)).toFixed(2));
@@ -580,12 +607,12 @@ export default async function handler(req, res) {
     const isMember2 = await checkMembership(targetId, "-1004377164928"); 
 
     const { data: totalTasks } = await supabase.from('tasks').select('completions_done');
-    const globalClicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
+    const globalclicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
 
     const { data: myTasks } = await supabase.from('tasks').select('completions_done').eq('creator_id', targetId);
     const myReceivedClicks = myTasks ? myTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
 
-    const formattedGlobal = globalClicks >= 1000 ? (globalClicks / 1000).toFixed(1) + 'K' : globalClicks;
+    const formattedGlobal = globalclicks >= 1000 ? (globalclicks / 1000).toFixed(1) + 'K' : globalclicks;
 
     dbUser.global_clicks = formattedGlobal;
     dbUser.clicks_received = myReceivedClicks;
