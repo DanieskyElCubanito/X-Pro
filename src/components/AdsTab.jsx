@@ -3,8 +3,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
-// 👇 TU DIRECCIÓN REAL DE LA RED TON 👇
-const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I"; 
+const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I";
 
 const neon = {
   card: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #00f0ff', borderRadius: '24px', padding: '20px', marginBottom: '16px', boxShadow: '0 8px 24px rgba(0, 240, 255, 0.15)' },
@@ -17,8 +16,9 @@ const neon = {
   taskCard: { background: 'linear-gradient(145deg, #10061e, #1a0b33)', border: '1.5px solid rgba(138, 43, 226, 0.5)', borderRadius: '20px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.4), inset 0 2px 10px rgba(138, 43, 226, 0.1)' },
   taskIconBox: { width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 240, 255, 0.3)', flexShrink: 0 },
   taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
-  taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap' },
-  
+  taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', cursor: 'not-allowed' },
+  taskButtonCheck: { background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #007744, 0 6px 15px rgba(0, 255, 170, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
+
   calcContainer: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #8a2be2', borderRadius: '24px', padding: '20px', color: '#ffffff', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.15)' },
   pillButton: (active) => ({ flex: 1, padding: '10px 0', fontSize: '14px', fontWeight: '900', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s', background: active ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 'rgba(15, 5, 28, 0.8)', color: active ? '#050214' : '#ffffff', border: active ? 'none' : '1px solid #8a2be2', boxShadow: active ? '0 0 10px rgba(0, 240, 255, 0.5)' : 'none' }),
   label: { fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#ff99dd', marginBottom: '8px', display: 'block', letterSpacing: '0.5px' },
@@ -31,11 +31,7 @@ const neon = {
 const TaskIcons = {
   group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
   bot: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="16" y1="16" x2="16.01" y2="16" /></svg>,
-  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
-  channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /></svg>,
-  airdrop: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /></svg>,
-  mining: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2.5l7 7" /><path d="M21 9l-7-7" /></svg>,
-  miniapp: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /></svg>
+  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>
 };
 
 const TASK_TYPES = [
@@ -45,22 +41,25 @@ const TASK_TYPES = [
 ];
 
 export default function AdsTab({ userData, setUserData }) {
-  const [view, setView] = useState('list'); 
+  const [view, setView] = useState('list');
   const [tasks, setTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
-  const [completingTaskId, setCompletingTaskId] = useState(null);
   const [adLoading, setAdLoading] = useState(false);
+
+  // Estados de Tareas
+  const [taskStatus, setTaskStatus] = useState({}); // { taskId: 'waiting' | 'ready' | 'completed' }
+  const [countdown, setCountdown] = useState({}); // { taskId: 5 }
 
   // Estados Wizard
   const [taskType, setTaskType] = useState(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [botToken, setBotToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  
+
   // Estados Calculadora
   const [completions, setCompletions] = useState(100);
   const [rewardPerClick, setRewardPerClick] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState('balance'); 
+  const [paymentMethod, setPaymentMethod] = useState('balance');
 
   // Estados Checkout
   const [checkoutView, setCheckoutView] = useState(false);
@@ -68,10 +67,11 @@ export default function AdsTab({ userData, setUserData }) {
   const [tempWallet, setTempWallet] = useState('');
   const [intentId, setIntentId] = useState(null);
 
-  const [liveGramUsd, setLiveGramUsd] = useState(5.00); 
+  const [liveGramUsd, setLiveGramUsd] = useState(5.00);
 
   const balance = Number(userData?.balance || 0);
 
+  // MOTOR DE PRECIOS AUTOMATIZADO
   useEffect(() => {
     const fetchLivePrice = async () => {
       try {
@@ -87,21 +87,38 @@ export default function AdsTab({ userData, setUserData }) {
     fetchLivePrice();
   }, []);
 
-  // ==========================================
-  // MOTOR DE PRECIOS AUTOMATIZADO
-  // ==========================================
   const totalClicksCost = completions * rewardPerClick;
-  const usdPrice = totalClicksCost * 0.0025; // $0.0025 USD por CLICK
-  
-  const gramPrice = (usdPrice / liveGramUsd).toFixed(2); 
-  
-  // Telegram paga ~$0.013 USD al desarrollador por cada Star al retirar.
-  // Así garantizas no perder dinero al cobrar con Stars.
+  const usdPrice = totalClicksCost * 0.0025;
+  const gramPrice = (usdPrice / liveGramUsd).toFixed(2);
   const starsPrice = Math.ceil(usdPrice / 0.013);
 
   useEffect(() => {
     if (userData?.id && (view === 'list' || view === 'activity')) fetchTasks();
   }, [userData?.id, view]);
+
+  // Manejo del contador de 5 segundos
+  useEffect(() => {
+    const activeTasks = Object.keys(taskStatus).filter(id => taskStatus[id] === 'waiting');
+    
+    if (activeTasks.length > 0) {
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          const next = { ...prev };
+          activeTasks.forEach(id => {
+            if (next[id] > 1) {
+              next[id] -= 1;
+            } else {
+              setTaskStatus(ts => ({ ...ts, [id]: 'ready' }));
+              delete next[id];
+            }
+          });
+          return next;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [taskStatus]);
+
 
   const fetchTasks = async () => {
     setLoadingTasks(true);
@@ -124,15 +141,23 @@ export default function AdsTab({ userData, setUserData }) {
   const prevStep = () => setCurrentStepIndex(prev => Math.max(prev - 1, 0));
 
   const handleVerifyUrl = async () => {
-    const val = targetUrl.trim();
+    let val = targetUrl.trim();
     if (!val) return toast.error("Ingresa tu enlace.");
-    
+
+    if (taskType === 'channel' || taskType === 'bot') {
+      const isTelegramLink = val.startsWith('@') || val.startsWith('t.me/') || val.startsWith('https://t.me/');
+      if (!isTelegramLink) {
+        return toast.error("El enlace debe empezar con @, t.me/ o https://t.me/");
+      }
+    }
+
     if (taskType === 'channel') {
-      const isTelegramLink = val.startsWith('@') || val.includes('t.me/') || val.includes('telegram.me/');
-      if (!isTelegramLink) return toast.error("Debe ser un enlace válido de Telegram.");
-      
+      if (val.includes('+') || val.includes('joinchat')) {
+        return toast.error("No se aceptan enlaces privados. Para grupos/canales privados usa la opción 'Vistas & Promos'.");
+      }
+
       setIsVerifying(true);
-      const tid = toast.loading("Verificando administrador...");
+      const tid = toast.loading("Verificando permisos de administrador...");
       try {
         const res = await botApi.verifyBotAdmin(val);
         if (res.success) {
@@ -142,23 +167,35 @@ export default function AdsTab({ userData, setUserData }) {
           toast.error("El bot no es admin de este chat. Añádelo y reintenta.", { id: tid });
         }
       } catch (e) {
-        toast.error("Error al verificar el enlace.", { id: tid });
+        toast.error("Error al verificar el enlace público.", { id: tid });
       } finally {
         setIsVerifying(false);
       }
+
+    } else if (taskType === 'bot') {
+      if (!val.toLowerCase().includes('bot')) {
+        return toast.error("El enlace no parece válido. Debe pertenecer a un Bot o Mini App (debe contener la palabra 'bot').");
+      }
+      toast.success("¡Bot / Mini App detectada!");
+      nextStep();
     } else {
+      if (!val.startsWith('http') && !val.startsWith('@')) {
+        val = 'https://' + val;
+      }
+      setTargetUrl(val);
       nextStep();
     }
   };
 
+
   const handleCheckout = () => {
     if (paymentMethod === 'balance') {
       if (balance < totalClicksCost) return toast.error(`Saldo insuficiente. Necesitas ${totalClicksCost} CLICK.`);
-      handleCreateTaskPaid(); 
+      handleCreateTaskPaid();
     } else if (paymentMethod === 'gram') {
-      generateGramWallet(); 
+      generateGramWallet();
     } else if (paymentMethod === 'stars') {
-      handleStarsPayment(); 
+      handleStarsPayment();
     }
   };
 
@@ -176,9 +213,9 @@ export default function AdsTab({ userData, setUserData }) {
       if (!res.success) throw new Error(res.error);
       if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
       toast.success("¡Campaña activada con éxito!", { id: tid });
-      
+
       setTaskType(null); setTargetUrl(''); setBotToken(''); setCompletions(100);
-      setCurrentStepIndex(0); setCheckoutView(false); setView('activity'); 
+      setCurrentStepIndex(0); setCheckoutView(false); setView('activity');
     } catch (err) {
       toast.error(err.message || "Error al procesar la campaña.", { id: tid });
     } finally {
@@ -191,17 +228,11 @@ export default function AdsTab({ userData, setUserData }) {
     const tid = toast.loading("Generando billetera única...");
     try {
       const res = await botApi.generatePaymentWallet({
-        userId: userData.id,
-        packageId: 0, 
-        price: gramPrice, 
-        clicks: totalClicksCost
+        userId: userData.id, packageId: 0, price: gramPrice, clicks: totalClicksCost
       });
-      
       if (res.success) {
-        setTempWallet(res.wallet);
-        setIntentId(res.intentId);
-        toast.dismiss(tid);
-        setCheckoutView(true); 
+        setTempWallet(res.wallet); setIntentId(res.intentId);
+        toast.dismiss(tid); setCheckoutView(true);
       }
     } catch (e) {
       toast.error(e.message || "Error conectando a la blockchain.", { id: tid });
@@ -210,14 +241,9 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  const copyWallet = () => {
-    navigator.clipboard.writeText(tempWallet);
-    toast.success("Billetera copiada.");
-  };
-
+  const copyWallet = () => { navigator.clipboard.writeText(tempWallet); toast.success("Billetera copiada."); };
   const openTonkeeper = () => {
-    const amountStr = gramPrice * 1e9; 
-    const url = `ton://transfer/${tempWallet}?amount=${amountStr}`;
+    const url = `ton://transfer/${tempWallet}?amount=${gramPrice * 1e9}`;
     try { WebApp.openLink(url); } catch (e) { toast.error("Billetera no instalada."); }
   };
 
@@ -225,13 +251,8 @@ export default function AdsTab({ userData, setUserData }) {
     const tid = toast.loading("Verificando en la blockchain...");
     try {
       const res = await botApi.verifyCryptoPayment({ userId: userData.id, intentId: intentId, clicks: totalClicksCost });
-      if (res.success) {
-        toast.success(`Pago Exitoso.`, { id: tid });
-        await handleCreateTaskPaid(); 
-      }
-    } catch (e) {
-      toast.error(e.message || "Aún no detectamos el pago. Espera 1 minuto y reintenta.", { id: tid, duration: 6000 });
-    }
+      if (res.success) { toast.success(`Pago Exitoso.`, { id: tid }); await handleCreateTaskPaid(); }
+    } catch (e) { toast.error(e.message || "Aún no detectamos el pago. Espera 1 minuto y reintenta.", { id: tid, duration: 6000 }); }
   };
 
   const handleStarsPayment = async () => {
@@ -241,7 +262,6 @@ export default function AdsTab({ userData, setUserData }) {
       const res = await botApi.generateStarsInvoice({
         userId: userData.id, packageId: 0, stars: starsPrice, clicks: totalClicksCost
       });
-
       if (res.success) {
         toast.dismiss(tid);
         WebApp.openInvoice(res.invoiceUrl, async (status) => {
@@ -249,28 +269,61 @@ export default function AdsTab({ userData, setUserData }) {
             const confirmTid = toast.loading("Confirmando...");
             try {
               const confirmRes = await botApi.confirmStarsPayment({ userId: userData.id, intentId: res.intentId, clicks: totalClicksCost });
-              if (confirmRes.success) {
-                toast.success(`Pago exitoso.`, { id: confirmTid });
-                await handleCreateTaskPaid(); 
-              }
+              if (confirmRes.success) { toast.success(`Pago exitoso.`, { id: confirmTid }); await handleCreateTaskPaid(); }
             } catch (err) { toast.error("Error al acreditar.", { id: confirmTid }); }
-          } else {
-            toast.error("Pago no completado.");
-          }
+          } else { toast.error("Pago no completado."); }
         });
       }
+    } catch (e) { toast.error("No se pudo generar la factura.", { id: tid }); } finally { setIsGenerating(false); }
+  };
+
+  const cancelCheckout = () => { setCheckoutView(false); setIntentId(null); setTempWallet(''); };
+
+  // 1. EL USUARIO INICIA LA TAREA (ABRIR LINK Y ESPERAR 5s)
+  const handleStartTask = (task) => {
+    try {
+      let finalUrl = task.url.trim();
+      if (finalUrl.startsWith('@')) finalUrl = `https://t.me/${finalUrl.substring(1)}`;
+      else if (!finalUrl.startsWith('http')) finalUrl = `https://${finalUrl}`;
+
+      if (finalUrl.includes('t.me') || finalUrl.includes('telegram.me')) WebApp.openTelegramLink(finalUrl);
+      else WebApp.openLink(finalUrl, { try_instant_view: true });
+
+      // Inicia el estado de "esperando" para este botón específico y el contador en 5
+      setTaskStatus(prev => ({ ...prev, [task.id]: 'waiting' }));
+      setCountdown(prev => ({ ...prev, [task.id]: 5 }));
+
     } catch (e) {
-      toast.error("No se pudo generar la factura.", { id: tid });
-    } finally {
-      setIsGenerating(false);
+      toast.error("Error al abrir el enlace.");
     }
   };
 
-  const cancelCheckout = () => {
-    setCheckoutView(false);
-    setIntentId(null);
-    setTempWallet('');
+  // 2. EL USUARIO PRESIONA COMPROBAR
+  const handleCheckTask = async (task) => {
+    const tid = toast.loading("Verificando tarea...");
+    
+    // Cambiamos a verificando para que no pueda dar clic varias veces
+    setTaskStatus(prev => ({ ...prev, [task.id]: 'verifying' }));
+
+    try {
+      const res = await botApi.completeTask(userData?.id, task.id);
+      if (res.success) {
+        toast.success(`+${res.reward} CLICK`, { id: tid });
+        if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
+        
+        // Marcamos como completada (el botón dirá COMPLETADA)
+        setTaskStatus(prev => ({ ...prev, [task.id]: 'completed' }));
+      } else {
+        // Si falló (ej. no se unió al canal), vuelve a 'ready' para que intente de nuevo
+        toast.error(res.error || "Aún no has completado la tarea.", { id: tid });
+        setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' }));
+      }
+    } catch (e) { 
+      toast.error("Error de conexión al verificar.", { id: tid }); 
+      setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' }));
+    } 
   };
+
 
   const handleWatchAd = () => {
     if (typeof window.showGiga !== 'function') return toast.error("Servidor no disponible.");
@@ -285,39 +338,58 @@ export default function AdsTab({ userData, setUserData }) {
             toast.success("+0.50 CLICK", { id: tid });
             if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
           } else toast.error("Error al procesar el pago.", { id: tid });
-        } catch (error) { toast.error("Error de conexión.", { id: tid }); } 
+        } catch (error) { toast.error("Error de conexión.", { id: tid }); }
         finally { setAdLoading(false); }
       }).catch(() => { toast.error("Cancelado.", { id: tid }); setAdLoading(false); });
   };
 
-  const handleDoTask = async (task) => {
-    try {
-      let finalUrl = task.url.trim();
-      if (finalUrl.startsWith('@')) finalUrl = `https://t.me/${finalUrl.substring(1)}`;
-      else if (!finalUrl.startsWith('http')) finalUrl = `https://${finalUrl}`;
-
-      if (finalUrl.includes('t.me') || finalUrl.includes('telegram.me')) WebApp.openTelegramLink(finalUrl); 
-      else WebApp.openLink(finalUrl, { try_instant_view: true }); 
-
-      setCompletingTaskId(task.id);
-      const tid = toast.loading("Validando...");
-
-      setTimeout(async () => {
-        try {
-          const res = await botApi.completeTask(userData?.id, task.id);
-          if (res.success) {
-            toast.success(`+${res.reward} CLICK`, { id: tid });
-            if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
-            fetchTasks(); 
-          } else toast.error(res.error || "No completado.", { id: tid });
-        } catch (e) { toast.error("Error.", { id: tid }); } 
-        finally { setCompletingTaskId(null); }
-      }, 5000);
-    } catch (e) { setCompletingTaskId(null); }
-  };
-
   const myTasks = tasks.filter(t => t.creator_id === String(userData?.id));
   const communityTasks = tasks.filter(t => t.creator_id !== String(userData?.id));
+
+  // Función auxiliar para renderizar el botón correcto según el estado de la tarea
+  const renderTaskButton = (task) => {
+    const status = taskStatus[task.id];
+    
+    if (status === 'completed') {
+      return (
+        <button disabled style={neon.taskButtonDisabled}>
+          ✅ COMPLETADA
+        </button>
+      );
+    }
+    
+    if (status === 'waiting') {
+      return (
+        <button disabled style={neon.taskButtonDisabled}>
+          ESPERANDO ({countdown[task.id] || 0}s)
+        </button>
+      );
+    }
+
+    if (status === 'ready') {
+      return (
+        <button onClick={() => handleCheckTask(task)} style={neon.taskButtonCheck}>
+          ✅ COMPROBAR
+        </button>
+      );
+    }
+    
+    if (status === 'verifying') {
+       return (
+        <button disabled style={neon.taskButtonDisabled}>
+          VALIDANDO...
+        </button>
+      );
+    }
+
+    // Por defecto (no iniciada)
+    return (
+      <button onClick={() => handleStartTask(task)} style={neon.taskButton}>
+        {`+${Number(task.reward).toFixed(2)} CLICK`}
+      </button>
+    );
+  };
+
 
   return (
     <div style={{ color: '#ffffff', paddingBottom: '20px' }}>
@@ -325,11 +397,11 @@ export default function AdsTab({ userData, setUserData }) {
 
       {(view === 'list' || view === 'activity') && (
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <button onClick={() => setView('list')} 
+          <button onClick={() => setView('list')}
             style={{ flex: 1, padding: '12px', borderRadius: '16px', fontWeight: '900', fontSize: '13px', border: 'none', cursor: 'pointer', transition: '0.2s', background: view === 'list' ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 'rgba(255,255,255,0.05)', color: view === 'list' ? '#050214' : '#00f0ff', boxShadow: view === 'list' ? '0 4px 15px rgba(0,240,255,0.3)' : 'none', letterSpacing: '0.5px' }}>
             ⚡ MERCADO
           </button>
-          <button onClick={() => setView('activity')} 
+          <button onClick={() => setView('activity')}
             style={{ flex: 1, padding: '12px', borderRadius: '16px', fontWeight: '900', fontSize: '13px', border: 'none', cursor: 'pointer', transition: '0.2s', background: view === 'activity' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'rgba(255,255,255,0.05)', color: view === 'activity' ? '#fff' : '#ff41b4', boxShadow: view === 'activity' ? '0 4px 15px rgba(255,20,147,0.3)' : 'none', letterSpacing: '0.5px' }}>
             📋 MIS ANUNCIOS
           </button>
@@ -374,9 +446,7 @@ export default function AdsTab({ userData, setUserData }) {
                       <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{task.completions_done} / {task.completions_total} referidos</div>
                     </div>
                   </div>
-                  <button onClick={() => handleDoTask(task)} disabled={completingTaskId === task.id} style={completingTaskId === task.id ? neon.taskButtonDisabled : neon.taskButton}>
-                    {completingTaskId === task.id ? 'ESPERANDO...' : `+${Number(task.reward).toFixed(2)} CLICK`}
-                  </button>
+                  {renderTaskButton(task)}
                 </div>
               ))}
             </div>
@@ -419,7 +489,7 @@ export default function AdsTab({ userData, setUserData }) {
                           <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold', fontFamily: 'monospace' }}>{task.url.substring(0, 25)}...</div>
                         </div>
                       </div>
-                      
+
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '6px' }}>
                         <span style={{ color: '#ff41b4' }}>Progreso</span>
                         <span style={{ color: '#fff' }}>{task.completions_done} / {task.completions_total} referidos</span>
@@ -438,7 +508,7 @@ export default function AdsTab({ userData, setUserData }) {
 
       {view === 'wizard' && (
         <div className="fade-in">
-          
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             {currentStepIndex > 0 && !checkoutView ? (
               <button onClick={prevStep} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>◀</button>
@@ -496,7 +566,7 @@ export default function AdsTab({ userData, setUserData }) {
 
           {currentStepId === 'budget' && (
             <div className="fade-in" style={neon.calcContainer}>
-              
+
               {checkoutView ? (
                 // --- PANTALLA DE PAGO INTEGRADA ---
                 <div className="fade-in">
@@ -528,7 +598,7 @@ export default function AdsTab({ userData, setUserData }) {
                 // --- CALCULADORA ---
                 <div className="fade-in">
                   <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.5px', color: '#ffffff' }}>¿Cuánto tráfico?</h2>
-                  
+
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                     <button onClick={() => setCompletions(100)} style={neon.pillButton(completions === 100)}>100</button>
                     <button onClick={() => setCompletions(500)} style={neon.pillButton(completions === 500)}>500</button>
