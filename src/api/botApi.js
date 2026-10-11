@@ -24,13 +24,17 @@ export const botApi = {
 
   claimBonus: (userId) => postAction('claim-bonus', { userId }),
   getReferrals: (userId) => postAction('get-referrals', { userId }),
-  
+
   getHistory: (userId) => postAction('get-history', { userId }),
-  
+
   verifyBotAdmin: (url) => postAction('verify-admin', { url }),
   createTask: (payload) => postAction('create-task', payload),
   getTasks: (userId) => postAction('get-tasks', { userId }),
-  completeTask: (userId, taskId) => postAction('complete-task', { userId, taskId })
+  completeTask: (userId, taskId) => postAction('complete-task', { userId, taskId }),
+
+  // --- NUEVAS RUTAS DE PASARELA DE PAGO (BILLETERAS ÚNICAS) ---
+  generatePaymentWallet: (payload) => postAction('generate-payment-wallet', payload),
+  verifyCryptoPayment: (payload) => postAction('verify-crypto-payment', payload)
 };
 
 export default botApi;
