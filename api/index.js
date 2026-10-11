@@ -239,26 +239,32 @@ export default async function handler(req, res) {
     // =======================================================
     // MÓDULO: ELIMINAR CAMPAÑA / TAREA (CON REEMBOLSO INTERNO EN CLICK)
     // =======================================================
+    
+          // =======================================================
+    // ELIMINAR TAREA (Y REGISTRAR EN EL HISTORIAL)
+    // =======================================================
     if (action === 'delete-task') {
       const { taskId, requestingUserId, isAdminAction } = req.body;
       const targetId = String(requestingUserId);
 
+      // 1. Buscar la tarea
       const { data: task, error: taskErr } = await supabase.from('tasks').select('*').eq('id', taskId).single();
       if (taskErr || !task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
 
+      // 2. Validar permisos de seguridad estrictos
       const isOwner = String(task.creator_id) === targetId;
       const authorizedAdmin = ADMIN_IDS.includes(targetId);
-
+      
       if (!isOwner && (!isAdminAction || !authorizedAdmin)) {
         return res.status(403).json({ success: false, error: 'No tienes permisos para eliminar esta campaña.' });
       }
 
-      // Reembolso de saldo no gastado en créditos CLICK
+      // 3. Reembolso matemático exacto según el tipo de tarea
+      let refundClicks = 0;
       if (task.status === 'active') {
         const remainingCompletions = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
-        let refundClicks = 0;
 
-        if (task.type === 'promo' || task.type === 'group' && task.reward === 0) {
+        if (task.type === 'promo' || (task.type === 'group' && task.reward === 0)) {
           refundClicks = remainingCompletions > 0 ? Number(task.total_cost || 10) : 0;
         } else {
           refundClicks = Number((remainingCompletions * Number(task.reward || 1)).toFixed(2));
@@ -273,10 +279,41 @@ export default async function handler(req, res) {
         }
       }
 
-      await supabase.from('tasks').update({ status: 'cancelled' }).eq('id', taskId);
+      // 4. REGISTRAR LA ACCIÓN EN EL HISTORIAL (TRANSPARENCIA TOTAL)
+      const logTitle = authorizedAdmin && !isOwner ? '🚫 Campaña eliminada por Admin' : '🗑️ Campaña cancelada';
+      const logDesc = authorizedAdmin && !isOwner
+        ? `Un administrador ha eliminado tu campaña "${task.title}". Se han reembolsado ${refundClicks} CLICK a tu saldo.`
+        : `Cancelaste la campaña "${task.title}" y se reembolsaron ${refundClicks} CLICK de tu presupuesto no gastado.`;
 
-      return res.status(200).json({ success: true, message: 'Campaña eliminada y saldo reembolsado correctamente.' });
+      await supabase.from('history_logs').insert([{
+        user_id: task.creator_id,
+        title: logTitle,
+        description: logDesc,
+        amount: refundClicks
+      }]);
+
+      // 5. Eliminar la tarea finalmente de la base de datos
+      await supabase.from('tasks').delete().eq('id', taskId);
+
+      return res.status(200).json({ success: true, message: 'Campaña eliminada y saldo reembolsado correctamente.', refunded: refundClicks });
     }
+
+    // =======================================================
+    // OBTENER HISTORIAL COMPLETO SIN LÍMITES
+    // =======================================================
+    if (action === 'get-history') {
+      const { userId: targetUserId } = req.body;
+      
+      // Traemos TODO el historial, ordenado desde el más reciente al más antiguo
+      const { data: history } = await supabase
+        .from('history_logs')
+        .select('*')
+        .eq('user_id', String(targetUserId))
+        .order('created_at', { ascending: false }); 
+        
+      return res.status(200).json({ success: true, history: history || [] });
+    }
+
 
     // =======================================================
     // MÓDULO: PAGOS (GRAM BILLETERAS + TELEGRAM STARS)
