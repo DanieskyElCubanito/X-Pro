@@ -160,7 +160,7 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
       const tgData = await tgRes.json();
       if (!tgData.ok) {
         return res.status(400).json({ success: false, error: tgData.description });
@@ -187,10 +187,51 @@ export default async function handler(req, res) {
     }
 
     // =======================================================
+    // MÓDULO: ELIMINAR CAMPAÑA / TAREA (CON REEMBOLSO INTERNO EN CLICK)
+    // =======================================================
+    if (action === 'delete-task') {
+      const { taskId, requestingUserId, isAdminAction } = req.body;
+      const targetId = String(requestingUserId);
+
+      const { data: task, error: taskErr } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+      if (taskErr || !task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
+
+      const isOwner = String(task.creator_id) === targetId;
+      const authorizedAdmin = ADMIN_IDS.includes(targetId);
+
+      if (!isOwner && (!isAdminAction || !authorizedAdmin)) {
+        return res.status(403).json({ success: false, error: 'No tienes permisos para eliminar esta campaña.' });
+      }
+
+      // Reembolso de saldo no gastado en créditos CLICK
+      if (task.status === 'active') {
+        const remainingCompletions = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
+        let refundClicks = 0;
+
+        if (task.type === 'promo' && task.reward === 0) {
+          refundClicks = remainingCompletions > 0 ? Number(task.total_cost || 10) : 0;
+        } else {
+          refundClicks = Number((remainingCompletions * Number(task.reward || 1)).toFixed(2));
+        }
+
+        if (refundClicks > 0) {
+          const { data: creatorUser } = await supabase.from('users').select('balance').eq('id', task.creator_id).single();
+          if (creatorUser) {
+            const newCreatorBalance = Number((Number(creatorUser.balance || 0) + refundClicks).toFixed(2));
+            await supabase.from('users').update({ balance: newCreatorBalance }).eq('id', task.creator_id);
+          }
+        }
+      }
+
+      await supabase.from('tasks').update({ status: 'cancelled' }).eq('id', taskId);
+
+      return res.status(200).json({ success: true, message: 'Campaña eliminada y saldo reembolsado correctamente.' });
+    }
+
+    // =======================================================
     // MÓDULO: PAGOS (GRAM BILLETERAS + TELEGRAM STARS)
     // =======================================================
 
-    // 1. GENERAR UNA WALLET DE PAGO ÚNICA (GRAM)
     if (action === 'generate-payment-wallet') {
       const { packageId, price, clicks } = req.body;
       const targetId = String(userId);
@@ -220,7 +261,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, wallet: publicAddress, intentId: newIntent.id });
     }
 
-    // 2. VERIFICAR PAGO LLEGADO (GRAM)
     if (action === 'verify-crypto-payment') {
       const { intentId, clicks } = req.body;
       const targetId = String(userId);
@@ -263,29 +303,26 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // 3. GENERAR FACTURA DE TELEGRAM STARS (⭐)
     if (action === 'generate-stars-invoice') {
       const { packageId, stars, clicks } = req.body;
       const targetId = String(userId);
       const uniquePayload = `STARS_${targetId}_PKG${packageId}_${Date.now()}`;
 
-      // Registramos la intención de pago
       await supabase.from('payment_intents').insert([{
         user_id: targetId,
         package_id: packageId,
         expected_amount: stars,
-        public_wallet: 'Telegram Stars', // Etiqueta
-        encrypted_private_key: uniquePayload, // Lo usamos como identificador seguro
+        public_wallet: 'Telegram Stars',
+        encrypted_private_key: uniquePayload,
         status: 'pending'
       }]);
 
-      // Formato oficial requerido por la API de Telegram para Stars
       const invoiceData = {
         title: `Recarga: ${clicks} CLICKs`,
         description: `Impulsa tus canales y bots con tráfico real en el ecosistema.`,
         payload: uniquePayload,
-        provider_token: "", // OBLIGATORIO DEJAR VACÍO PARA TELEGRAM STARS
-        currency: "XTR", // Moneda Oficial de Telegram Stars
+        provider_token: "",
+        currency: "XTR",
         prices: [{ label: `Paquete ${clicks} CLICKs`, amount: parseInt(stars) }]
       };
 
@@ -301,7 +338,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. CONFIRMAR PAGO EXITOSO CON STARS (CLIENT-SIDE)
     if (action === 'confirm-stars-payment') {
       const { intentId, clicks } = req.body;
       const targetId = String(userId);
@@ -311,7 +347,6 @@ export default async function handler(req, res) {
 
       if (!intent) return res.status(400).json({ success: false, error: 'Pago no encontrado o ya procesado.' });
 
-      // Dar la recompensa
       const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
       const newBalance = Number((Number(dbUser.balance || 0) + clicks).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
