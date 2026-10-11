@@ -418,15 +418,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
+        // EN TU ARCHIVO api/index.js
     if (action === 'get-tasks') {
       const targetId = String(userId);
+      // Traemos todas las tareas activas
       const { data: allTasks } = await supabase.from('tasks').select('*').eq('status', 'active').order('created_at', { ascending: false });
+      
+      // Traemos las tareas que este usuario ya completó
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
 
-      const availableTasks = (allTasks || []).filter(t => !completedIds.has(String(t.id)) && Number(t.completions_done || 0) < Number(t.completions_total));
-      return res.status(200).json({ success: true, tasks: availableTasks });
+      // Mapeamos para decirle al frontend cuáles ya están completadas
+      const mappedTasks = (allTasks || []).map(t => ({
+        ...t,
+        is_completed: completedIds.has(String(t.id))
+      }));
+      
+      return res.status(200).json({ success: true, tasks: mappedTasks });
     }
+
 
     if (action === 'complete-task') {
       const { taskId } = req.body;
