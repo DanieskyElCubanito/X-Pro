@@ -315,7 +315,7 @@ export default function PublishTab({ userData, setUserData }) {
         </div>
       )}
 
-      {/* MODAL BOTÓN */}
+              {/* MODAL BOTÓN */}
       {showButtonModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
           <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff' }}>
@@ -329,9 +329,32 @@ export default function PublishTab({ userData, setUserData }) {
               <input style={neonStyles.input} value={buttonConfig.text} onChange={(e) => setButtonConfig({ ...buttonConfig, text: e.target.value })} placeholder="Ej. 🚀 Entrar al Enlace" />
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>ENLACE (URL) OBLIGATORIO</label>
               <input style={neonStyles.input} value={buttonConfig.url} onChange={(e) => setButtonConfig({ ...buttonConfig, url: e.target.value })} placeholder="https://t.me/..." />
+            </div>
+
+            {/* SECCIÓN DE BOTONES DE COLORES RESTAURADA */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900', display: 'block', marginBottom: '8px' }}>COLOR DEL BOTÓN</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'default' })} 
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'default' || !buttonConfig.style ? '2px solid #fff' : 'none', background: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}>
+                </button>
+                <button 
+                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'primary' })} 
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'primary' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00f0ff, #0088ff)', cursor: 'pointer' }}>
+                </button>
+                <button 
+                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'success' })} 
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'success' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00ffaa, #00bb77)', cursor: 'pointer' }}>
+                </button>
+                <button 
+                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'danger' })} 
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'danger' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #ff1493, #d80073)', cursor: 'pointer' }}>
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
