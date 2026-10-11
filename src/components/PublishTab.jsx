@@ -334,29 +334,34 @@ export default function PublishTab({ userData, setUserData }) {
               <input style={neonStyles.input} value={buttonConfig.url} onChange={(e) => setButtonConfig({ ...buttonConfig, url: e.target.value })} placeholder="https://t.me/..." />
             </div>
 
-            {/* SECCIÓN DE BOTONES DE COLORES RESTAURADA */}
+                        {/* SECCIÓN DE BOTONES DE COLORES CON TEXTO */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900', display: 'block', marginBottom: '8px' }}>COLOR DEL BOTÓN</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button 
                   onClick={() => setButtonConfig({ ...buttonConfig, style: 'default' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'default' || !buttonConfig.style ? '2px solid #fff' : 'none', background: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}>
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'default' || !buttonConfig.style ? '2px solid #fff' : 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>
+                  GRIS
                 </button>
                 <button 
                   onClick={() => setButtonConfig({ ...buttonConfig, style: 'primary' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'primary' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00f0ff, #0088ff)', cursor: 'pointer' }}>
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'primary' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00f0ff, #0088ff)', color: '#fff', fontSize: '11px', fontWeight: '900', textShadow: '0 1px 2px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
+                  AZUL
                 </button>
                 <button 
                   onClick={() => setButtonConfig({ ...buttonConfig, style: 'success' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'success' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00ffaa, #00bb77)', cursor: 'pointer' }}>
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'success' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00ffaa, #00bb77)', color: '#fff', fontSize: '11px', fontWeight: '900', textShadow: '0 1px 2px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
+                  VERDE
                 </button>
                 <button 
                   onClick={() => setButtonConfig({ ...buttonConfig, style: 'danger' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'danger' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #ff1493, #d80073)', cursor: 'pointer' }}>
+                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'danger' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #ff1493, #d80073)', color: '#fff', fontSize: '11px', fontWeight: '900', textShadow: '0 1px 2px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
+                  ROSA
                 </button>
               </div>
             </div>
 
+                
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={handleClearButton} style={{ ...neonStyles.btnLight, flex: 1, borderColor: '#ff1493', color: '#ff1493' }}>BORRAR</button>
               <button onClick={handleSaveButton} style={{ ...neonStyles.btnPrimary, flex: 2 }}>GUARDAR</button>
