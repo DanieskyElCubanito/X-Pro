@@ -313,17 +313,62 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
+    // EN TU ARCHIVO AdsTab.jsx
   const myTasks = tasks.filter(t => t.creator_id === String(userData?.id));
-  const communityTasks = tasks.filter(t => t.creator_id !== String(userData?.id));
+  
+  // Aquí ordenamos: Las NO completadas arriba, y las COMPLETADAS al final
+  const communityTasks = tasks
+    .filter(t => t.creator_id !== String(userData?.id))
+    .sort((a, b) => {
+      if (a.is_completed === b.is_completed) return 0;
+      return a.is_completed ? 1 : -1;
+    });
 
+  // Renderizador inteligente de botones
   const renderTaskButton = (task) => {
     const status = taskStatus[task.id];
-    if (status === 'completed') return <button disabled style={neon.taskButtonDisabled}>✅ COMPLETADA</button>;
-    if (status === 'waiting') return <button disabled style={neon.taskButtonDisabled}>ESPERANDO ({countdown[task.id] || 0}s)</button>;
-    if (status === 'ready') return <button onClick={() => handleCheckTask(task)} style={neon.taskButtonCheck}>✅ COMPROBAR</button>;
-    if (status === 'verifying') return <button disabled style={neon.taskButtonDisabled}>VALIDANDO...</button>;
-    return <button onClick={() => handleStartTask(task)} style={neon.taskButton}>{`+${Number(task.reward).toFixed(2)} CLICK`}</button>;
+
+    // SI LA TAREA YA VINO COMO COMPLETADA DESDE LA BASE DE DATOS
+    if (task.is_completed || status === 'completed') {
+      return (
+        <button disabled style={neon.taskButtonDisabled}>
+          ✅ COMPLETADA
+        </button>
+      );
+    }
+
+    if (status === 'waiting') {
+      return (
+        <button disabled style={neon.taskButtonDisabled}>
+          ESPERANDO ({countdown[task.id] || 0}s)
+        </button>
+      );
+    }
+
+    if (status === 'ready') {
+      return (
+        <button onClick={() => handleCheckTask(task)} style={neon.taskButtonCheck}>
+          ✅ COMPROBAR
+        </button>
+      );
+    }
+
+    if (status === 'verifying') {
+       return (
+        <button disabled style={neon.taskButtonDisabled}>
+          VALIDANDO...
+        </button>
+      );
+    }
+
+    // Por defecto (no iniciada)
+    return (
+      <button onClick={() => handleStartTask(task)} style={neon.taskButton}>
+        {`+${Number(task.reward).toFixed(2)} CLICK`}
+      </button>
+    );
   };
+
 
   return (
     <div style={{ color: '#ffffff', paddingBottom: '20px' }}>
