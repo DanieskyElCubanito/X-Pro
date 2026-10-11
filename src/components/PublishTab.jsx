@@ -74,6 +74,41 @@ export default function PublishTab({ userData, setUserData }) {
   const COST_PER_GROUP = 10;
   const totalCost = selectedGroups.length * COST_PER_GROUP;
 
+  // 👇 1. PEGA ESTE BLOQUE AQUÍ 👇
+  const [availableGroups, setAvailableGroups] = useState(INITIAL_GROUPS);
+
+  useEffect(() => {
+    const fetchRealMembers = async () => {
+      try {
+        const res = await fetch('/api', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get-group-stats',
+            groupIds: INITIAL_GROUPS.map(g => g.id)
+          })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.stats) {
+          setAvailableGroups(INITIAL_GROUPS.map(grp => {
+            const count = data.stats[grp.id];
+            if (count) {
+              const formatted = count >= 1000 ? (count / 1000).toFixed(1).replace('.0', '') + 'K' : count;
+              return { ...grp, members: `${formatted} miembros` };
+            }
+            return { ...grp, members: "No disponible" };
+          }));
+        }
+      } catch (e) {
+        console.error("Error al cargar contador de miembros");
+      }
+    };
+    
+    fetchRealMembers();
+  }, []);
+  // 👆 FIN DEL BLOQUE NUEVO 👆
+
   const handleToggleGroup = (groupId) => {
     setSelectedGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
   };
