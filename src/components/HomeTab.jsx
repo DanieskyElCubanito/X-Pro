@@ -18,7 +18,7 @@ const neon = {
   howStepIcon: (bgColor, textColor, glowColor) => ({ width: '44px', height: '44px', background: bgColor, color: textColor, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '900', flexShrink: 0, boxShadow: `0 0 15px ${glowColor}` }),
   howStepText: { fontSize: '14px', fontWeight: '800', lineHeight: '1.3', color: '#ffffff' },
   dashedDivider: { border: 'none', borderTop: '2px dashed rgba(255, 65, 180, 0.4)', margin: '6px 0' },
-  
+
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100000 },
   modalContent: { width: '100%', height: '70vh', background: 'linear-gradient(180deg, rgba(46, 16, 77, 0.95), rgba(20, 8, 38, 1))', borderTop: '2px solid #00f0ff', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px 20px', display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 30px rgba(0, 240, 255, 0.2)' },
   historyItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: 'rgba(15, 5, 28, 0.8)', borderRadius: '12px', border: '1px solid rgba(138, 43, 226, 0.5)', marginBottom: '8px' }
@@ -26,7 +26,8 @@ const neon = {
 
 export default function HomeTab({ userData, setActiveTab }) {
   const [showHistory, setShowHistory] = useState(false);
-  const [History, setHistory] = useState([]);
+  // CORRECCIÓN 1: 'history' todo en minúscula
+  const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const clickBalance = Number(userData?.balance || 0).toFixed(2);
@@ -38,7 +39,7 @@ export default function HomeTab({ userData, setActiveTab }) {
     setLoadingHistory(true);
     try {
       const res = await botApi.getHistory(userData.id);
-      if (res.success) setHistory(res.history);
+      if (res.success) setHistory(res.history || []);
     } catch (e) {
       toast.error("Error al cargar historial");
     } finally {
@@ -47,6 +48,7 @@ export default function HomeTab({ userData, setActiveTab }) {
   };
 
   const formatDate = (isoString) => {
+    if (!isoString) return '';
     const d = new Date(isoString);
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   };
@@ -96,7 +98,7 @@ export default function HomeTab({ userData, setActiveTab }) {
         </div>
       </div>
 
-            {/* MODAL DE HISTORIAL ACTUALIZADO */}
+      {/* MODAL DE HISTORIAL */}
       {showHistory && (
         <div className="fade-in" style={neon.modalOverlay} onClick={() => setShowHistory(false)}>
           <div style={neon.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -106,43 +108,41 @@ export default function HomeTab({ userData, setActiveTab }) {
               </h3>
               <button onClick={() => setShowHistory(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>✕</button>
             </div>
-            
+
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
               {loadingHistory ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: '#00f0ff', fontWeight: 'bold' }}>Cargando transacciones...</div>
-              ) : history.length === 0 ? (
+              ) : (!history || history.length === 0) ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: '#ff99dd', fontWeight: 'bold' }}>Aún no hay movimientos recientes.</div>
               ) : (
-                history.map((item) => (
-                  <div key={item.id} style={{ ...neon.historyItem, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '14px', gap: '8px' }}>
-                    
+                history.map((item, index) => (
+                  <div key={item.id || index} style={{ ...neon.historyItem, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '14px', gap: '8px' }}>
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, paddingRight: '12px' }}>
                         <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>
-                          {item.title}
+                          {item.title || "Transacción"}
                         </div>
-                        
-                        {/* Nueva descripción del historial */}
+
                         {item.description && (
                           <div style={{ color: '#ff99dd', fontSize: '11px', lineHeight: '1.4' }}>
                             {item.description}
                           </div>
                         )}
-                        
+
                         <div style={{ color: '#8a2be2', fontSize: '10px', marginTop: '6px', fontWeight: 'bold' }}>
-                          {new Date(item.created_at).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          {item.created_at ? new Date(item.created_at).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
                         </div>
                       </div>
 
-                      {/* Monto dinámico con colores */}
                       <div style={{ 
-                        color: Number(item.amount) > 0 ? '#00ffaa' : Number(item.amount) < 0 ? '#ff1493' : '#00f0ff', 
+                        color: Number(item.amount || 0) > 0 ? '#00ffaa' : Number(item.amount || 0) < 0 ? '#ff1493' : '#00f0ff', 
                         fontSize: '16px', 
                         fontWeight: '900', 
-                        textShadow: Number(item.amount) > 0 ? '0 0 5px rgba(0,255,170,0.5)' : 'none',
+                        textShadow: Number(item.amount || 0) > 0 ? '0 0 5px rgba(0,255,170,0.5)' : 'none',
                         whiteSpace: 'nowrap'
                       }}>
-                        {Number(item.amount) > 0 ? '+' : ''}{Number(item.amount) === 0 ? '-' : Number(item.amount).toFixed(2)} CLICK
+                        {Number(item.amount || 0) > 0 ? '+' : ''}{Number(item.amount || 0) === 0 ? '-' : Number(item.amount || 0).toFixed(2)} CLICK
                       </div>
                     </div>
 
