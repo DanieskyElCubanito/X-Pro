@@ -120,6 +120,78 @@ export default async function handler(req, res) {
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
     // =======================================================
+    // MÓDULO DE PUBLICACIÓN DE ANUNCIOS EN CANALES/GRUPOS
+    // =======================================================
+    if (action === 'publish-post') {
+      const { userId: pubUserId, chatId, text, link, photoData, buttonConfig } = req.body;
+      const targetId = String(pubUserId);
+      const COST_PER_GROUP = 10;
+
+      // Verificar y descontar saldo
+      const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
+      if (!dbUser || Number(dbUser.balance || 0) < COST_PER_GROUP) {
+        return res.status(400).json({ success: false, error: 'Saldo insuficiente para publicar.' });
+      }
+
+      // Construir el teclado en línea (Estilos Nativos Telegram)
+      let inline_keyboard = [];
+      
+      if (buttonConfig && buttonConfig.url) {
+        let btn = {
+          text: buttonConfig.text || "Abrir Enlace",
+          url: buttonConfig.url
+        };
+        if (buttonConfig.style && buttonConfig.style !== 'default') {
+          btn.style = buttonConfig.style;
+        }
+        if (buttonConfig.icon_custom_emoji_id) {
+          btn.icon_custom_emoji_id = buttonConfig.icon_custom_emoji_id;
+        }
+        inline_keyboard.push([btn]);
+      } else if (link) {
+        inline_keyboard.push([{ text: "Abrir App", url: link }]);
+      }
+
+      // Preparar payload a Telegram
+      let payload = {
+        chat_id: chatId,
+        parse_mode: "HTML",
+      };
+      
+      if (inline_keyboard.length > 0) {
+        payload.reply_markup = { inline_keyboard };
+      }
+
+      let tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+      if (photoData && photoData.startsWith('data:image')) {
+         tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
+         payload.photo = photoData;
+         payload.caption = text;
+      } else {
+         payload.text = text;
+      }
+
+      // Enviar a Telegram
+      const tgRes = await fetch(tgEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const tgData = await tgRes.json();
+      
+      if (!tgData.ok) {
+        return res.status(400).json({ success: false, error: tgData.description }); // Muestra error real (ej. Chat not found)
+      }
+
+      // Descontar saldo y guardar éxito
+      const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
+      await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
+
+      return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    // =======================================================
     // MÓDULO: PAGOS (GRAM BILLETERAS + TELEGRAM STARS)
     // =======================================================
 
@@ -225,7 +297,6 @@ export default async function handler(req, res) {
       try {
         const response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, invoiceData);
         if (response.data.ok) {
-          // Devuelve el enlace 'https://t.me/...'
           return res.status(200).json({ success: true, invoiceUrl: response.data.result, intentId: uniquePayload });
         } else {
           throw new Error(response.data.description);
