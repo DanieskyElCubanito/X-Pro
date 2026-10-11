@@ -62,7 +62,8 @@ export default function PublishTab({ userData, setUserData }) {
 
   const [postText, setPostText] = useState('');
   const [imageUrl, setImageUrl] = useState(''); 
-  const [buttonConfig, setButtonConfig] = useState({ text: 'Abrir App', url: '', color: 'default' });
+  // Estado actualizado para coincidir con la API de Telegram
+  const [buttonConfig, setButtonConfig] = useState({ text: 'Abrir App', url: '', style: 'default', emojiId: '' });
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const [showButtonModal, setShowButtonModal] = useState(false);
@@ -70,8 +71,6 @@ export default function PublishTab({ userData, setUserData }) {
   const fileInputRef = useRef(null);
 
   const balance = Number(userData?.balance || 0);
-  
-  // Costo ajustado a 10 CLICK por publicación para balancear la economía de la app.
   const COST_PER_GROUP = 10;
   const totalCost = selectedGroups.length * COST_PER_GROUP;
 
@@ -101,6 +100,14 @@ export default function PublishTab({ userData, setUserData }) {
     setIsPublishing(true);
     const tid = toast.loading("Transmitiendo señal...");
 
+    // Preparamos el botón limpiando los valores vacíos para la API
+    const finalButtonConfig = buttonConfig.url ? {
+      text: buttonConfig.text,
+      url: buttonConfig.url,
+      style: buttonConfig.style !== 'default' ? buttonConfig.style : undefined,
+      icon_custom_emoji_id: buttonConfig.emojiId ? buttonConfig.emojiId : undefined
+    } : null;
+
     try {
       for (const chatId of selectedGroups) {
         const response = await fetch('/api', {
@@ -111,9 +118,8 @@ export default function PublishTab({ userData, setUserData }) {
             userId: userData?.id,
             chatId: chatId,
             text: postText,
-            link: buttonConfig.url || 'https://t.me/ClickNetworkbot/app',
             photoData: imageUrl || null,
-            buttonConfig: buttonConfig.url ? buttonConfig : null
+            buttonConfig: finalButtonConfig
           })
         });
 
@@ -123,7 +129,7 @@ export default function PublishTab({ userData, setUserData }) {
       }
 
       toast.success("¡Campaña Transmitida con Éxito!", { id: tid });
-      setPostText(''); setImageUrl(''); setButtonConfig({ text: 'Abrir App', url: '', color: 'default' }); setSelectedGroups([]); setStep(1);
+      setPostText(''); setImageUrl(''); setButtonConfig({ text: 'Abrir App', url: '', style: 'default', emojiId: '' }); setSelectedGroups([]); setStep(1);
     } catch (err) {
       toast.error(err.message || "Error de red", { id: tid });
     } finally {
@@ -161,10 +167,10 @@ export default function PublishTab({ userData, setUserData }) {
               <div style={neonStyles.card}>
                 <textarea
                   style={{ ...neonStyles.input, height: '115px', resize: 'none', border: 'none', background: 'transparent', padding: 0, fontSize: '15px' }}
-                  placeholder="Escribe tu anuncio aquí..."
-                  maxLength={500} value={postText} onChange={(e) => setPostText(e.target.value)}
+                  placeholder="Escribe tu anuncio en formato HTML (ej. <b>Negrita</b>)..."
+                  maxLength={1000} value={postText} onChange={(e) => setPostText(e.target.value)}
                 />
-                <div style={{ textAlign: 'right', fontSize: '11px', color: '#ff99dd', marginTop: '6px', fontWeight: 'bold' }}>{postText.length} / 500</div>
+                <div style={{ textAlign: 'right', fontSize: '11px', color: '#ff99dd', marginTop: '6px', fontWeight: 'bold' }}>{postText.length} / 1000</div>
                 <button onClick={handleNextStep1} style={{ ...neonStyles.btnPrimary, marginTop: '14px' }}>SIGUIENTE PASO ➔</button>
               </div>
 
@@ -186,13 +192,13 @@ export default function PublishTab({ userData, setUserData }) {
                 <button onClick={() => setStep(1)} style={{ ...neonStyles.btnLight, padding: '6px 12px' }}>◀</button>
                 <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>Configuración Multimedia</h3>
               </div>
-              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Añade una foto desde tu galería y configura un botón interactivo.</p>
+              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Añade una foto desde tu galería y configura un botón interactivo premium.</p>
 
               <div onClick={() => fileInputRef.current.click()} style={neonStyles.cardInteractive}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ fontSize: '28px' }}>🖼️</div>
                   <div>
-                    <div style={{ fontWeight: '900', color: '#ffffff', fontSize: '15px' }}>Imagen del Dispositivo</div>
+                    <div style={{ fontWeight: '900', color: '#ffffff', fontSize: '15px' }}>Imagen del Anuncio</div>
                     <div style={{ fontSize: '12px', color: imageUrl ? '#00f0ff' : '#aaa' }}>{imageUrl ? 'Imagen adjuntada ✓' : 'Subir desde la Galería'}</div>
                   </div>
                 </div>
@@ -205,7 +211,7 @@ export default function PublishTab({ userData, setUserData }) {
                   <div style={{ fontSize: '28px' }}>🔘</div>
                   <div>
                     <div style={{ fontWeight: '900', color: '#ffffff', fontSize: '15px' }}>Botón Interactivo</div>
-                    <div style={{ fontSize: '12px', color: buttonConfig.url ? '#ff41b4' : '#aaa' }}>{buttonConfig.url ? `Texto: "${buttonConfig.text}"` : 'Añadir Enlace (Opcional)'}</div>
+                    <div style={{ fontSize: '12px', color: buttonConfig.url ? '#ff41b4' : '#aaa' }}>{buttonConfig.url ? `Configurado: "${buttonConfig.text}"` : 'Añadir Enlace y Estilo'}</div>
                   </div>
                 </div>
                 <div style={{ color: '#ff41b4', fontWeight: '900', fontSize: '18px' }}>➔</div>
@@ -249,22 +255,23 @@ export default function PublishTab({ userData, setUserData }) {
             <div className="fade-in">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <button onClick={() => setStep(3)} style={{ ...neonStyles.btnLight, padding: '6px 12px' }}>◀</button>
-                <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>Vista Previa</h3>
+                <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>Vista Previa en Telegram</h3>
               </div>
 
               <div style={neonStyles.card}>
-                <div style={{ fontSize: '11px', color: '#00f0ff', fontWeight: '900', marginBottom: '8px' }}>TU ANUNCIO:</div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', marginBottom: '12px', color: '#fff', lineHeight: '1.4' }}>{postText}</div>
-                {imageUrl && <div style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '8px' }}>🖼️ Imagen cargada desde dispositivo</div>}
+                <div style={{ fontSize: '11px', color: '#00f0ff', fontWeight: '900', marginBottom: '8px' }}>POST:</div>
+                <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', marginBottom: '12px', color: '#fff', lineHeight: '1.4' }} dangerouslySetInnerHTML={{ __html: postText.replace(/\n/g, '<br/>') }} />
+                
+                {imageUrl && <div style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '12px' }}>🖼️ [Imagen Adjunta]</div>}
 
                 {buttonConfig.url && (
                   <div style={{
-                    display: 'inline-block', padding: '8px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: '900',
-                    background: buttonConfig.color === 'primary' ? '#00f0ff' : buttonConfig.color === 'success' ? '#00ffaa' : buttonConfig.color === 'danger' ? '#ff1493' : '#262626',
-                    color: buttonConfig.color === 'default' ? '#fff' : '#050214',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    padding: '12px 18px', borderRadius: '12px', fontSize: '14px', fontWeight: '900',
+                    background: buttonConfig.style === 'primary' ? '#2F6EA5' : buttonConfig.style === 'success' ? '#2F9C5A' : buttonConfig.style === 'danger' ? '#D14343' : '#2F3A4C',
+                    color: '#ffffff', textTransform: 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
                   }}>
-                    {buttonConfig.text} 🔗
+                    {buttonConfig.emojiId && <span>✨</span>} {buttonConfig.text}
                   </div>
                 )}
               </div>
@@ -291,10 +298,10 @@ export default function PublishTab({ userData, setUserData }) {
         </div>
       )}
 
-      {/* ================= MODAL BOTÓN (Colores de Telegram) ================= */}
+      {/* ================= MODAL BOTÓN (Colores e Iconos Nativos) ================= */}
       {showButtonModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
-          <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff' }}>
+          <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ margin: 0, fontWeight: '900', color: '#00f0ff', fontSize: '17px' }}>Configurar Botón</h3>
               <button onClick={() => setShowButtonModal(false)} style={{ ...neonStyles.btnLight, padding: '4px 10px', color: '#fff', borderColor: '#ff1493' }}>✕</button>
@@ -305,27 +312,34 @@ export default function PublishTab({ userData, setUserData }) {
               <input style={neonStyles.input} value={buttonConfig.text} onChange={(e) => setButtonConfig({ ...buttonConfig, text: e.target.value })} placeholder="Ej. Entrar al Enlace" />
             </div>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>ENLACE (URL)</label>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>ENLACE (URL) OBLIGATORIO</label>
               <input style={neonStyles.input} value={buttonConfig.url} onChange={(e) => setButtonConfig({ ...buttonConfig, url: e.target.value })} placeholder="https://t.me/..." />
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>COLOR DEL BOTÓN</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>ID EMOJI PREMIUM (OPCIONAL)</label>
+              <input style={neonStyles.input} value={buttonConfig.emojiId} onChange={(e) => setButtonConfig({ ...buttonConfig, emojiId: e.target.value })} placeholder="Ej: 5474667187258006816" />
+              <p style={{ margin: '4px 0 0 0', fontSize: '10px', color: '#aaa' }}>Pega el ID numérico del emoji de Telegram.</p>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900' }}>ESTILO EN TELEGRAM</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '6px' }}>
                 {[
-                  { id: 'default', label: 'Gris', bg: '#262626' },
-                  { id: 'primary', label: 'Cian', bg: '#00f0ff' },
-                  { id: 'success', label: 'Neón', bg: '#00ffaa' },
-                  { id: 'danger', label: 'Rosa', bg: '#ff1493' }
+                  { id: 'default', label: 'Normal (Gris)', bg: '#2F3A4C' },
+                  { id: 'primary', label: 'Primary (Azul)', bg: '#2F6EA5' },
+                  { id: 'success', label: 'Success (Verde)', bg: '#2F9C5A' },
+                  { id: 'danger', label: 'Danger (Rojo)', bg: '#D14343' }
                 ].map((c) => (
                   <button
-                    key={c.id} onClick={() => setButtonConfig({ ...buttonConfig, color: c.id })}
+                    key={c.id} onClick={() => setButtonConfig({ ...buttonConfig, style: c.id })}
                     style={{
-                      padding: '8px 2px', fontSize: '10px', fontWeight: '900',
-                      backgroundColor: c.bg, color: c.id === 'default' ? '#fff' : '#050214',
-                      border: buttonConfig.color === c.id ? '2px solid #ffffff' : '2px solid transparent',
-                      borderRadius: '10px', cursor: 'pointer', boxShadow: buttonConfig.color === c.id ? `0 0 10px ${c.bg}` : 'none',
+                      padding: '10px 4px', fontSize: '11px', fontWeight: '900',
+                      backgroundColor: c.bg, color: '#ffffff',
+                      border: buttonConfig.style === c.id ? '2px solid #00f0ff' : '2px solid transparent',
+                      borderRadius: '10px', cursor: 'pointer',
+                      boxShadow: buttonConfig.style === c.id ? `0 0 10px rgba(0, 240, 255, 0.5)` : 'none',
                       transition: 'all 0.2s'
                     }}
                   >
