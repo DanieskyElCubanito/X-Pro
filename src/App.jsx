@@ -173,7 +173,7 @@ function App() {
   }, []);
 
   const handleShare = () => {
-    const inviteLink = `https://t.me/ReffRobot/app?startapp=${userData?.id}`;
+    const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userData?.id}`;
     // Cambiado 'PT' por 'CLICK'
     const text = "⚡ ¡Entra a la red, publica en grupos y gana Puntos (CLICK) gratis! 🚀";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
