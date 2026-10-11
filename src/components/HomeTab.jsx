@@ -18,7 +18,6 @@ const neon = {
   howStepIcon: (bgColor, textColor, glowColor) => ({ width: '44px', height: '44px', background: bgColor, color: textColor, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '900', flexShrink: 0, boxShadow: `0 0 15px ${glowColor}` }),
   howStepText: { fontSize: '14px', fontWeight: '800', lineHeight: '1.3', color: '#ffffff' },
   dashedDivider: { border: 'none', borderTop: '2px dashed rgba(255, 65, 180, 0.4)', margin: '6px 0' },
-  btnClick: { width: '100%', background: 'linear-gradient(180deg, #ff1493 0%, #d80073 100%)', color: '#ffffff', border: 'none', borderRadius: '20px', boxShadow: '0 6px 0 #8b004b, 0 10px 20px rgba(255, 20, 147, 0.4)', padding: '16px', fontSize: '15px', fontWeight: '900', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer', marginBottom: '12px' },
   
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100000 },
   modalContent: { width: '100%', height: '70vh', background: 'linear-gradient(180deg, rgba(46, 16, 77, 0.95), rgba(20, 8, 38, 1))', borderTop: '2px solid #00f0ff', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px 20px', display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 30px rgba(0, 240, 255, 0.2)' },
@@ -93,18 +92,9 @@ export default function HomeTab({ userData, setActiveTab }) {
         <hr style={neon.dashedDivider} />
         <div style={neon.howStep}>
           <div style={neon.howStepIcon('#ff1493', '#ffffff', 'rgba(255, 20, 147, 0.4)')}>💎</div>
-          <div style={neon.howStepText}>Usa el botón de abajo para ir al mercado de tráfico.</div>
+          <div style={neon.howStepText}>Usa el menú inferior para ir al mercado de tráfico.</div>
         </div>
       </div>
-
-      <button onClick={() => setActiveTab ? setActiveTab('tasks') : toast('Toca ⚡ MERCADO abajo.', {icon: '⚡'})} style={neon.btnClick}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>+</span> IR AL MERCADO 1x1
-        </div>
-        <span style={{ fontSize: '10px', color: '#ffb3d9', fontWeight: 'bold', textTransform: 'none' }}>
-          Crea campañas o gana CLICKs
-        </span>
-      </button>
 
       {/* MODAL DE HISTORIAL */}
       {showHistory && (
