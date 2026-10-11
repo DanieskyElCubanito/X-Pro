@@ -32,9 +32,13 @@ export const botApi = {
   getTasks: (userId) => postAction('get-tasks', { userId }),
   completeTask: (userId, taskId) => postAction('complete-task', { userId, taskId }),
 
-  // --- NUEVAS RUTAS DE PASARELA DE PAGO (BILLETERAS ÚNICAS) ---
+  // --- RUTAS BILLETERAS ÚNICAS (GRAM) ---
   generatePaymentWallet: (payload) => postAction('generate-payment-wallet', payload),
-  verifyCryptoPayment: (payload) => postAction('verify-crypto-payment', payload)
+  verifyCryptoPayment: (payload) => postAction('verify-crypto-payment', payload),
+
+  // --- NUEVAS RUTAS: TELEGRAM STARS (⭐) ---
+  generateStarsInvoice: (payload) => postAction('generate-stars-invoice', payload),
+  confirmStarsPayment: (payload) => postAction('confirm-stars-payment', payload)
 };
 
 export default botApi;
