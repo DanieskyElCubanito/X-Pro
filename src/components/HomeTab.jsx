@@ -3,9 +3,6 @@ import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
-// 👇 TU DIRECCIÓN REAL DE LA RED TON 👇
-const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I"; 
-
 const neon = {
   container: { display: 'flex', flexDirection: 'column', width: '100%' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
@@ -44,22 +41,26 @@ const METHODS = [
   { id: 'gram', name: 'GRAM', icon: '💎', desc: 'Moneda nativa de la Red TON', color: '#00f0ff' }
 ];
 
-export default function HomeTab({ userData, setActiveTab }) {
+// Agregado setUserData en los parámetros para poder actualizar el saldo
+export default function HomeTab({ userData, setUserData, setActiveTab }) {
   const [showHistory, setShowHistory] = useState(false);
   const [realHistory, setRealHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Estados de la pasarela
   const [showCryptoGateway, setShowCryptoGateway] = useState(false);
   const [payStep, setPayStep] = useState(1); 
   const [selectedPack, setSelectedPack] = useState(PACKAGES[0]);
   const [selectedMethod, setSelectedMethod] = useState(METHODS[0]);
 
+  // Estados para Billeteras Únicas Generadas
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [tempWallet, setTempWallet] = useState('');
+  const [intentId, setIntentId] = useState(null);
+
   const clickBalance = Number(userData?.balance || 0).toFixed(2);
   const globalClicks = userData?.global_clicks || '0';
   const clicksReceived = userData?.clicks_received || '0';
-
-  // Memo de pago: Es vital para saber quién pagó. Será el ID del usuario.
-  const paymentMemo = userData?.id ? String(userData.id) : 'RECARGA';
 
   const openHistory = async () => {
     setShowHistory(true);
@@ -79,23 +80,45 @@ export default function HomeTab({ userData, setActiveTab }) {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   };
 
-  const copyWallet = () => {
-    navigator.clipboard.writeText(MY_WALLET);
-    toast.success("Wallet copiada al portapapeles");
+  // Función que intercepta el paso 2 y llama al backend para crear la billetera
+  const handleProceedToPay = async () => {
+    if (selectedMethod.id === 'gram') {
+      setIsGenerating(true);
+      const tid = toast.loading("Generando tu billetera única de pago...");
+      try {
+        const res = await botApi.generatePaymentWallet({
+          userId: userData.id,
+          packageId: selectedPack.id,
+          price: selectedPack.priceGram,
+          clicks: selectedPack.clicks
+        });
+        
+        if (res.success) {
+          setTempWallet(res.wallet);
+          setIntentId(res.intentId);
+          toast.dismiss(tid);
+          setPayStep(3);
+        }
+      } catch (e) {
+        toast.error(e.message || "Error al conectar con la blockchain. Reintenta.", { id: tid });
+      } finally {
+        setIsGenerating(false);
+      }
+    } else {
+      setPayStep(3); // Para Stars pasa directo al paso 3
+    }
   };
 
-  const copyMemo = () => {
-    navigator.clipboard.writeText(paymentMemo);
-    toast.success("Comentario copiado. ¡Pégalo en tu billetera!");
+  const copyWallet = () => {
+    navigator.clipboard.writeText(tempWallet);
+    toast.success("Billetera copiada al portapapeles");
   };
 
   const openTonkeeper = () => {
-    // 1e9 convierte los GRAM/TON a nano-gram para la blockchain
     const amountStr = selectedPack.priceGram * 1e9; 
-    
-    // URL oficial de transferencia de TON con el MEMO incluido
-    const url = `ton://transfer/${MY_WALLET}?amount=${amountStr}&text=${paymentMemo}`;
-    
+    // Ya no requerimos MEMO, la billetera es única
+    const url = `ton://transfer/${tempWallet}?amount=${amountStr}`;
+
     try {
       WebApp.openLink(url);
     } catch (error) {
@@ -103,11 +126,28 @@ export default function HomeTab({ userData, setActiveTab }) {
     }
   };
 
-  const handleSimulateVerify = () => {
-    const tid = toast.loading("Buscando transacción en la blockchain...");
-    setTimeout(() => {
-      toast.error("No se detectó el pago. Reintenta en 1 minuto o contacta a soporte si ya enviaste los fondos.", { id: tid });
-    }, 4000);
+  // Función de Verificación Real en Blockchain
+  const handleVerifyPayment = async () => {
+    const tid = toast.loading("Verificando transacción en la blockchain...");
+    try {
+      const res = await botApi.verifyCryptoPayment({
+        userId: userData.id,
+        intentId: intentId,
+        clicks: selectedPack.clicks
+      });
+
+      if (res.success) {
+        toast.success(`¡Pago Exitoso! Añadimos ${selectedPack.clicks} CLICKs a tu saldo.`, { id: tid, duration: 4000 });
+        // Actualizamos el saldo visualmente
+        if (setUserData) {
+          setUserData(prev => ({ ...prev, balance: res.balance }));
+        }
+        setShowCryptoGateway(false);
+        setPayStep(1);
+      }
+    } catch (e) {
+      toast.error(e.message || "Aún no detectamos el pago. Si ya enviaste los fondos, espera 1 minuto y vuelve a presionar.", { id: tid, duration: 6000 });
+    }
   };
 
   const handleStarsPayment = async () => {
@@ -119,7 +159,7 @@ export default function HomeTab({ userData, setActiveTab }) {
 
   return (
     <div className="fade-in" style={neon.container}>
-      
+
       {/* Esto asegura que las notificaciones salgan por encima de todo */}
       <Toaster containerStyle={{ zIndex: 9999999 }} />
 
@@ -237,7 +277,9 @@ export default function HomeTab({ userData, setActiveTab }) {
                     </div>
                   </div>
                 ))}
-                <button onClick={() => setPayStep(3)} style={{ width: '100%', padding: '14px', marginTop: '10px', background: 'linear-gradient(90deg, #ff1493, #d80073)', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px' }}>PROCEDER AL PAGO ➔</button>
+                <button onClick={handleProceedToPay} disabled={isGenerating} style={{ width: '100%', padding: '14px', marginTop: '10px', background: 'linear-gradient(90deg, #ff1493, #d80073)', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px' }}>
+                  {isGenerating ? 'GENERANDO BILLETERA...' : 'PROCEDER AL PAGO ➔'}
+                </button>
               </div>
             )}
 
@@ -264,25 +306,22 @@ export default function HomeTab({ userData, setActiveTab }) {
                   </div>
                 ) : (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ background: 'rgba(255, 20, 147, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid #ff1493', textAlign: 'center' }}>
-                      <span style={{ color: '#ff99dd', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>⚠️ Comentario Obligatorio (MEMO)</span>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', background: '#0a0314', padding: '8px 12px', borderRadius: '8px' }}>
-                        <span style={{ color: '#fff', fontWeight: '900', fontSize: '14px', letterSpacing: '1px' }}>{paymentMemo}</span>
-                        <button onClick={copyMemo} style={{ background: 'transparent', border: 'none', color: '#ff1493', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>COPIAR</button>
-                      </div>
-                      <p style={{ color: '#ffb3d9', fontSize: '10px', margin: '6px 0 0 0' }}>Si omites este comentario, perderás tus fondos.</p>
-                    </div>
                     
+                    <div style={{ background: 'rgba(0, 240, 255, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid #00f0ff', textAlign: 'center' }}>
+                      <span style={{ color: '#00f0ff', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>🛡️ Billetera Única Segura</span>
+                      <p style={{ color: '#fff', fontSize: '11px', margin: '6px 0 0 0' }}>Esta dirección fue generada exclusivamente para ti. Envía el monto exacto y verificaremos tu pago automáticamente.</p>
+                    </div>
+
                     <div style={{ background: '#0a0314', padding: '16px', borderRadius: '12px', border: '1px dashed #00f0ff', wordBreak: 'break-all', textAlign: 'center', color: '#fff', fontFamily: 'monospace', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <span style={{color: '#00f0ff', fontSize: '10px', fontWeight: 'bold'}}>TU WALLET DE RECEPCIÓN</span>
-                      {MY_WALLET}
+                      {tempWallet}
                     </div>
-                    
+
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={copyWallet} style={{ flex: 1, padding: '12px', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', border: '1px solid #00f0ff', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>📋 COPIAR BILLETERA</button>
+                      <button onClick={copyWallet} style={{ flex: 1, padding: '12px', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', border: '1px solid #00f0ff', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>📋 COPIAR DIRECCIÓN</button>
                       <button onClick={openTonkeeper} style={{ flex: 1, padding: '12px', background: '#0088cc', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '12px' }}>💎 ABRIR TONKEEPER</button>
                     </div>
-                    <button onClick={handleSimulateVerify} style={{ width: '100%', padding: '16px', marginTop: 'auto', background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', boxShadow: '0 6px 0 #007744' }}>
+                    
+                    <button onClick={handleVerifyPayment} style={{ width: '100%', padding: '16px', marginTop: 'auto', background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', boxShadow: '0 6px 0 #007744' }}>
                       ✅ YA PAGUÉ, VERIFICAR
                     </button>
                   </div>
