@@ -3,7 +3,6 @@ import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
-// 👇 TU DIRECCIÓN REAL DE LA RED TON 👇
 const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I"; 
 
 const neon = {
@@ -28,19 +27,17 @@ const neon = {
   actionBtn: { width: '100%', padding: '16px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', cursor: 'pointer', transition: 'all 0.1s', textTransform: 'uppercase' }
 };
 
-// Mantenemos los iconos viejos por si hay tareas creadas antes con esos nombres
 const TaskIcons = {
-  channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>,
-  group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
-  bot: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="16" y1="16" x2="16.01" y2="16" /></svg>,
-  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
-  // Fallbacks antiguos
+  group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+  bot: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="16" y1="16" x2="16.01" y2="16" /></svg>,
+  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
+  // Fallbacks
+  channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /></svg>,
   airdrop: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /></svg>,
   mining: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2.5l7 7" /><path d="M21 9l-7-7" /></svg>,
   miniapp: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /></svg>
 };
 
-// 🌟 NUEVO MENÚ REDUCIDO (Solo 3 opciones para mayor conversión)
 const TASK_TYPES = [
   { id: 'bot', icon: TaskIcons.bot('#ffe600'), title: 'Bots & Mini Apps', desc: 'Usuarios inician tu bot o app', color: '#ffe600', autoName: 'Iniciar Bot/App' },
   { id: 'channel', icon: TaskIcons.group('#00ffaa'), title: 'Canales & Grupos', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Chat' },
@@ -71,12 +68,36 @@ export default function AdsTab({ userData, setUserData }) {
   const [tempWallet, setTempWallet] = useState('');
   const [intentId, setIntentId] = useState(null);
 
+  // 🌟 ESTADO DE PRECIO EN VIVO (Mantenemos 5.00 como fallback seguro si no hay internet)
+  const [liveGramUsd, setLiveGramUsd] = useState(5.00); 
+
   const balance = Number(userData?.balance || 0);
 
-  // --- MOTOR DE PRECIOS ---
+  // ==========================================
+  // OBTENER PRECIO REAL DE COINGECKO AL CARGAR
+  // ==========================================
+  useEffect(() => {
+    const fetchLivePrice = async () => {
+      try {
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd');
+        const data = await res.json();
+        if (data && data['the-open-network'] && data['the-open-network'].usd) {
+          setLiveGramUsd(data['the-open-network'].usd);
+        }
+      } catch (error) {
+        console.error("No se pudo obtener el precio en vivo de CoinGecko:", error);
+      }
+    };
+    fetchLivePrice();
+  }, []);
+
+  // --- MOTOR DE PRECIOS AUTOMATIZADO ---
   const totalClicksCost = completions * rewardPerClick;
   const usdPrice = totalClicksCost * 0.0025; 
-  const gramPrice = (usdPrice / 1.48).toFixed(2); 
+  
+  // Calcula GRAM basándose en el precio real del mercado
+  const gramPrice = (usdPrice / liveGramUsd).toFixed(2); 
+  
   const starsPrice = Math.ceil(usdPrice * 50);
 
   useEffect(() => {
@@ -107,7 +128,6 @@ export default function AdsTab({ userData, setUserData }) {
     const val = targetUrl.trim();
     if (!val) return toast.error("Ingresa tu enlace.");
     
-    // Ahora 'channel' representa tanto canales como grupos para el backend
     if (taskType === 'channel') {
       const isTelegramLink = val.startsWith('@') || val.includes('t.me/') || val.includes('telegram.me/');
       if (!isTelegramLink) return toast.error("Debe ser un enlace válido de Telegram.");
