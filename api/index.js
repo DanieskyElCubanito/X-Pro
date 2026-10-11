@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 import WebSocket from 'ws';
+// Importaciones para TON
+import { TonClient, WalletContractV4, internal } from '@ton/ton';
+import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 
 const supabase = createClient(
   "https://shfogfihzkwmusarhlxv.supabase.co",
@@ -16,6 +19,18 @@ const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 const BOT_ID = BOT_TOKEN.split(':')[0];
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
+// El ID del Admin al que le enviaremos las Keys
+const MAIN_ADMIN_ID = '8968109534'; 
+// TU WALLET PRINCIPAL (A donde irá todo el dinero al final)
+const MY_MASTER_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I";
+
+// Cliente TON conectado a Toncenter (Mainnet)
+const tonClient = new TonClient({
+  endpoint: 'https://toncenter.com/api/v2/jsonRPC',
+  // Si consigues una API Key de toncenter, ponla aquí para que no te limiten. Si no, funciona igual con límites bajos.
+  // apiKey: 'TU_API_KEY_OPCIONAL' 
+});
+
 function extractTelegramUsername(url) {
   let val = url.trim();
   if (val.startsWith('@')) return val;
@@ -30,6 +45,19 @@ async function fetchWithTimeout(url, options = {}, timeout = 5000) {
   const response = await fetch(url, { ...options, signal: controller.signal });
   clearTimeout(id);
   return response;
+}
+
+// Envía mensaje directo al Admin por Telegram
+async function notifyAdmin(message) {
+  try {
+    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      chat_id: MAIN_ADMIN_ID,
+      text: message,
+      parse_mode: 'HTML'
+    });
+  } catch (e) {
+    console.error("No se pudo notificar al admin", e.message);
+  }
 }
 
 async function checkMembership(userId, chatId) {
@@ -93,6 +121,123 @@ export default async function handler(req, res) {
     const { user, action, userId, start_param, previousAccountDetected } = req.body; 
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
+
+    // =======================================================
+    // NUEVO MÓDULO: PAGOS TON/GRAM (BILLETERAS DERIVADAS)
+    // =======================================================
+
+    // 1. GENERAR UNA WALLET DE PAGO ÚNICA
+    if (action === 'generate-payment-wallet') {
+      const { packageId, price, clicks } = req.body;
+      const targetId = String(userId);
+
+      // Creamos un nuevo par de llaves (Mnemonic de 24 palabras)
+      const mnemonics = await mnemonicNew();
+      const keyPair = await mnemonicToPrivateKey(mnemonics);
+      
+      // Creamos una Wallet V4R2 (La más común y económica en TON)
+      const workchain = 0; 
+      const wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
+      const publicAddress = wallet.address.toString({ urlSafe: true, bounceable: false });
+      
+      // Convertimos el array de palabras a un string para guardarlo
+      const secretWords = mnemonics.join(" ");
+
+      // Guardamos en Supabase
+      const { data: newIntent, error } = await supabase.from('payment_intents').insert([{
+        user_id: targetId,
+        package_id: packageId,
+        expected_amount: price,
+        public_wallet: publicAddress,
+        encrypted_private_key: secretWords,
+        status: 'pending'
+      }]).select().single();
+
+      if (error) throw new Error("Error al guardar intención de pago.");
+
+      // NOTIFICAR AL ADMIN 😜
+      const usernameDisplay = user?.username ? `@${user.username}` : `ID: ${targetId}`;
+      const msg = `💰 <b>Nueva Orden Creada</b>\n\n👤 Usuario: ${usernameDisplay}\n📦 Paquete: ${clicks} CLICK\n💎 Monto Esperado: ${price} GRAM\n\n📌 <b>Wallet Generada:</b>\n<code>${publicAddress}</code>\n\n🔑 <b>Key (24 palabras):</b>\n<span class="tg-spoiler"><code>${secretWords}</code></span>`;
+      await notifyAdmin(msg);
+
+      return res.status(200).json({ success: true, wallet: publicAddress, intentId: newIntent.id });
+    }
+
+    // 2. VERIFICAR SI EL PAGO LLEGÓ Y HACER EL BARRIDO
+    if (action === 'verify-crypto-payment') {
+      const { intentId, clicks } = req.body;
+      const targetId = String(userId);
+
+      // Buscamos la orden pendiente
+      const { data: intent } = await supabase.from('payment_intents')
+        .select('*')
+        .eq('id', intentId)
+        .eq('user_id', targetId)
+        .eq('status', 'pending')
+        .single();
+
+      if (!intent) {
+        return res.status(400).json({ success: false, error: 'Orden de pago no encontrada o ya procesada.' });
+      }
+
+      // Verificamos el saldo en la blockchain de TON
+      const balanceNano = await tonClient.getBalance(intent.public_wallet);
+      const balanceGram = Number(balanceNano) / 1e9; // Convertimos de Nano a Gram
+
+      if (balanceGram < intent.expected_amount) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Aún no detectamos el pago completo. Saldo actual de la wallet: ${balanceGram.toFixed(4)} GRAM. Esperando: ${intent.expected_amount} GRAM.` 
+        });
+      }
+
+      // ¡EL PAGO LLEGÓ! -> Sumamos los CLICKs al usuario
+      const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
+      const newBalance = Number((Number(dbUser.balance || 0) + clicks).toFixed(2));
+      await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
+      await supabase.from('payment_intents').update({ status: 'completed' }).eq('id', intentId);
+
+      // 🧹 BARRIDO (SWEEP): Mandamos el dinero a la wallet del ADMIN
+      try {
+        const mnemonics = intent.encrypted_private_key.split(" ");
+        const keyPair = await mnemonicToPrivateKey(mnemonics);
+        const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
+        const contract = tonClient.open(wallet);
+
+        // Obtenemos el número de secuencia (seqno) para autorizar la transacción
+        const seqno = await contract.getSeqno();
+
+        // En TON, si envías con flag 128, se envía TODO el balance de la wallet menos la comisión de red.
+        await contract.sendTransfer({
+          seqno: seqno || 0,
+          secretKey: keyPair.secretKey,
+          messages: [
+            internal({
+              to: MY_MASTER_WALLET,
+              value: 0n, // Cero, porque el flag 128 anula esto y manda todo
+              bounce: false,
+              body: "Barrido Automático ClickApp"
+            })
+          ],
+          sendMode: 128 // FLAG MÁGICO: "Envía todo y vacía la billetera"
+        });
+        
+        await notifyAdmin(`✅ <b>¡PAGO COMPLETADO!</b>\n\n👤 ID: ${targetId}\n💎 Monto: ${balanceGram} GRAM\n\n🚀 <i>Iniciando barrido automático a tu Master Wallet...</i>`);
+
+      } catch (sweepError) {
+        // Si el barrido falla (ej: por red saturada), el usuario igual recibió sus CLICKs.
+        // El admin puede vaciar la wallet luego usando las 24 palabras.
+        console.error("Error en barrido:", sweepError);
+        await notifyAdmin(`⚠️ <b>PAGO RECIBIDO PERO FALLÓ EL BARRIDO AUTOMÁTICO</b>\n\n👤 ID: ${targetId}\n💎 Monto en wallet temporal: ${balanceGram} GRAM\n\nVacía esta wallet manualmente usando la Key (24 palabras) que te envié al crearla.`);
+      }
+
+      return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    // =======================================================
+    // FIN MÓDULO PAGOS
+    // =======================================================
+
 
     if (action === 'verify-admin') {
       const chatId = extractTelegramUsername(req.body.url);
@@ -233,7 +378,7 @@ export default async function handler(req, res) {
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id, created_at').eq('user_id', targetId).order('created_at', { ascending: false }).limit(15);
 
       let history = [];
-      
+
       if (myTasks) {
         myTasks.forEach(t => history.push({
           id: `out_${t.id}`, type: 'spend', title: `Campaña: ${t.title}`, 
@@ -244,7 +389,7 @@ export default async function handler(req, res) {
       if (completedRows && completedRows.length > 0) {
         const taskIds = completedRows.map(r => r.task_id);
         const { data: tasksInfo } = await supabase.from('tasks').select('id, title, reward').in('id', taskIds);
-        
+
         completedRows.forEach(r => {
           const tInfo = tasksInfo?.find(ti => String(ti.id) === String(r.task_id));
           history.push({
