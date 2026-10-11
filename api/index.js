@@ -170,6 +170,14 @@ export default async function handler(req, res) {
       const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
 
+      // REGISTRAR EN EL HISTORIAL
+      await supabase.from('history_logs').insert([{
+        user_id: targetId,
+        title: '📢 Publicación de Campaña',
+        description: `Has pagado por enviar una publicación directa.`,
+        amount: -COST_PER_GROUP
+      }]);
+
       // 5. REGISTRAR CON TIPO 'group' PARA QUE SALGA CON LA ETIQUETA CORRECTA EN EL MERCADO
       await supabase.from('tasks').insert([{
         creator_id: targetId,
@@ -192,7 +200,7 @@ export default async function handler(req, res) {
     if (action === 'get-group-stats') {
       const { groupIds } = req.body;
       const stats = {};
-      
+
       for (const chatId of groupIds) {
         try {
           const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`;
@@ -205,7 +213,7 @@ export default async function handler(req, res) {
           console.error(`Error obteniendo miembros de ${chatId}`);
         }
       }
-      
+
       return res.status(200).json({ success: true, stats });
     }
 
@@ -237,10 +245,6 @@ export default async function handler(req, res) {
     }
 
     // =======================================================
-    // MÓDULO: ELIMINAR CAMPAÑA / TAREA (CON REEMBOLSO INTERNO EN CLICK)
-    // =======================================================
-    
-          // =======================================================
     // ELIMINAR TAREA (Y REGISTRAR EN EL HISTORIAL)
     // =======================================================
     if (action === 'delete-task') {
@@ -251,15 +255,15 @@ export default async function handler(req, res) {
       const { data: task, error: taskErr } = await supabase.from('tasks').select('*').eq('id', taskId).single();
       if (taskErr || !task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
 
-      // 2. Validar permisos de seguridad estrictos
+      // 2. Validar permisos
       const isOwner = String(task.creator_id) === targetId;
       const authorizedAdmin = ADMIN_IDS.includes(targetId);
-      
+
       if (!isOwner && (!isAdminAction || !authorizedAdmin)) {
         return res.status(403).json({ success: false, error: 'No tienes permisos para eliminar esta campaña.' });
       }
 
-      // 3. Reembolso matemático exacto según el tipo de tarea
+      // 3. Reembolso matemático
       let refundClicks = 0;
       if (task.status === 'active') {
         const remainingCompletions = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
@@ -279,7 +283,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // 4. REGISTRAR LA ACCIÓN EN EL HISTORIAL (TRANSPARENCIA TOTAL)
+      // 4. REGISTRAR LA ACCIÓN EN EL HISTORIAL
       const logTitle = authorizedAdmin && !isOwner ? '🚫 Campaña eliminada por Admin' : '🗑️ Campaña cancelada';
       const logDesc = authorizedAdmin && !isOwner
         ? `Un administrador ha eliminado tu campaña "${task.title}". Se han reembolsado ${refundClicks} CLICK a tu saldo.`
@@ -292,33 +296,15 @@ export default async function handler(req, res) {
         amount: refundClicks
       }]);
 
-      // 5. Eliminar la tarea finalmente de la base de datos
+      // 5. Eliminar tarea
       await supabase.from('tasks').delete().eq('id', taskId);
 
-      return res.status(200).json({ success: true, message: 'Campaña eliminada y saldo reembolsado correctamente.', refunded: refundClicks });
+      return res.status(200).json({ success: true, message: 'Campaña eliminada y saldo reembolsado.', refunded: refundClicks });
     }
-
-    // =======================================================
-    // OBTENER HISTORIAL COMPLETO SIN LÍMITES
-    // =======================================================
-    if (action === 'get-history') {
-      const { userId: targetUserId } = req.body;
-      
-      // Traemos TODO el historial, ordenado desde el más reciente al más antiguo
-      const { data: history } = await supabase
-        .from('history_logs')
-        .select('*')
-        .eq('user_id', String(targetUserId))
-        .order('created_at', { ascending: false }); 
-        
-      return res.status(200).json({ success: true, history: history || [] });
-    }
-
 
     // =======================================================
     // MÓDULO: PAGOS (GRAM BILLETERAS + TELEGRAM STARS)
     // =======================================================
-
     if (action === 'generate-payment-wallet') {
       const { packageId, price, clicks } = req.body;
       const targetId = String(userId);
@@ -368,6 +354,14 @@ export default async function handler(req, res) {
       const newBalance = Number((Number(dbUser.balance || 0) + clicks).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
       await supabase.from('payment_intents').update({ status: 'completed' }).eq('id', intentId);
+
+      // REGISTRAR EN HISTORIAL
+      await supabase.from('history_logs').insert([{
+        user_id: targetId,
+        title: '💎 Recarga con GRAM',
+        description: `Has recargado ${intent.expected_amount} GRAM exitosamente.`,
+        amount: clicks
+      }]);
 
       try {
         const mnemonics = intent.encrypted_private_key.split(" ");
@@ -439,15 +433,22 @@ export default async function handler(req, res) {
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
       await supabase.from('payment_intents').update({ status: 'completed' }).eq('id', intent.id);
 
+      // REGISTRAR EN HISTORIAL
+      await supabase.from('history_logs').insert([{
+        user_id: targetId,
+        title: '⭐ Recarga con Stars',
+        description: `Has recargado ${intent.expected_amount} Stars exitosamente.`,
+        amount: clicks
+      }]);
+
       await notifyAdmin(`⭐ <b>¡PAGO CON STARS RECIBIDO!</b>\n\n👤 Usuario ID: ${targetId}\n🌟 Monto: ${intent.expected_amount} Stars\n⚡ Entregados: ${clicks} CLICKs`);
 
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
     // =======================================================
-    // RESTO DEL CÓDIGO (Tareas, Historial, Verificación)
+    // TAREAS
     // =======================================================
-
     if (action === 'verify-admin') {
       const chatId = extractTelegramUsername(req.body.url);
       if (!chatId) return res.status(400).json({ success: false, error: 'Enlace público inválido.' });
@@ -475,28 +476,32 @@ export default async function handler(req, res) {
       }]).select().single();
 
       if (error) throw error;
+
+      // REGISTRAR EN EL HISTORIAL
+      await supabase.from('history_logs').insert([{
+        user_id: targetId,
+        title: '🚀 Nueva Campaña Creada',
+        description: `Has creado la campaña "${title}" para conseguir ${count} referidos.`,
+        amount: -totalCost
+      }]);
+
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
-        // EN TU ARCHIVO api/index.js
     if (action === 'get-tasks') {
       const targetId = String(userId);
-      // Traemos todas las tareas activas
       const { data: allTasks } = await supabase.from('tasks').select('*').eq('status', 'active').order('created_at', { ascending: false });
-      
-      // Traemos las tareas que este usuario ya completó
+
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
 
-      // Mapeamos para decirle al frontend cuáles ya están completadas
       const mappedTasks = (allTasks || []).map(t => ({
         ...t,
         is_completed: completedIds.has(String(t.id))
       }));
-      
+
       return res.status(200).json({ success: true, tasks: mappedTasks });
     }
-
 
     if (action === 'complete-task') {
       const { taskId } = req.body;
@@ -531,6 +536,14 @@ export default async function handler(req, res) {
 
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
 
+      // REGISTRAR EN EL HISTORIAL
+      await supabase.from('history_logs').insert([{
+        user_id: targetId,
+        title: `✅ Tarea Completada`,
+        description: `Recompensa por completar la tarea "${task.title}".`,
+        amount: rewardAmount
+      }]);
+
       if (dbUser.referred_by) {
         const commissionAmount = Number((rewardAmount * 0.20).toFixed(2));
         const { data: referrer } = await supabase.from('users').select('id, balance, referral_earnings, total_earnings').eq('id', dbUser.referred_by).maybeSingle();
@@ -552,6 +565,38 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
+    if (action === 'claim-bonus') {
+      const { data: u } = await supabase.from('users').select('balance, total_earnings').eq('id', String(userId)).single();
+      const newBalance = Number((Number(u.balance || 0) + 0.5).toFixed(2));
+      const newTotal = Number((Number(u.total_earnings || 0) + 0.5).toFixed(2));
+      
+      await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', String(userId));
+      
+      // REGISTRAR EN HISTORIAL
+      await supabase.from('history_logs').insert([{
+        user_id: String(userId),
+        title: '📺 Bono por anuncio',
+        description: 'Completaste la visualización de un anuncio patrocinado.',
+        amount: 0.50
+      }]);
+
+      return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    // =======================================================
+    // HISTORIAL Y USUARIOS
+    // =======================================================
+    if (action === 'get-history') {
+      const targetId = String(userId);
+      const { data: history } = await supabase
+        .from('history_logs')
+        .select('*')
+        .eq('user_id', targetId)
+        .order('created_at', { ascending: false }); 
+
+      return res.status(200).json({ success: true, history: history || [] });
+    }
+
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
       if (!targetId) return res.status(400).json({ success: false, error: 'ID missing' });
@@ -569,14 +614,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined });
     }
 
-    if (action === 'claim-bonus') {
-      const { data: u } = await supabase.from('users').select('balance, total_earnings').eq('id', String(userId)).single();
-      const newBalance = Number((Number(u.balance || 0) + 0.5).toFixed(2));
-      const newTotal = Number((Number(u.total_earnings || 0) + 0.5).toFixed(2));
-      await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', String(userId));
-      return res.status(200).json({ success: true, balance: newBalance });
-    }
-
     if (action === 'get-referrals') {
       const targetId = String(userId);
       let { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
@@ -591,38 +628,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, referrals: lv1 || [], earnings: dbUser?.referral_earnings || 0 });
     }
 
-    if (action === 'get-history') {
-      const targetId = String(userId);
-      const { data: myTasks } = await supabase.from('tasks').select('id, title, total_cost, created_at').eq('creator_id', targetId).order('created_at', { ascending: false }).limit(15);
-      const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id, created_at').eq('user_id', targetId).order('created_at', { ascending: false }).limit(15);
-
-      let history = [];
-
-      if (myTasks) {
-        myTasks.forEach(t => history.push({
-          id: `out_${t.id}`, type: 'spend', title: `Campaña: ${t.title}`, 
-          amount: `-${Number(t.total_cost || 0).toFixed(2)}`, date: t.created_at
-        }));
-      }
-
-      if (completedRows && completedRows.length > 0) {
-        const taskIds = completedRows.map(r => r.task_id);
-        const { data: tasksInfo } = await supabase.from('tasks').select('id, title, reward').in('id', taskIds);
-
-        completedRows.forEach(r => {
-          const tInfo = tasksInfo?.find(ti => String(ti.id) === String(r.task_id));
-          history.push({
-            id: `in_${r.task_id}_${r.created_at}`, type: 'earn', 
-            title: tInfo ? `Tú completaste: ${tInfo.title}` : 'Tarea Completada', 
-            amount: `+${Number(tInfo?.reward || 1).toFixed(2)}`, date: r.created_at
-          });
-        });
-      }
-
-      history.sort((a, b) => new Date(b.date) - new Date(a.date));
-      return res.status(200).json({ success: true, history: history.slice(0, 20) });
-    }
-
+    // =======================================================
+    // LÓGICA GENERAL DE USUARIO AL ENTRAR
+    // =======================================================
     const targetUser = user || { id: userId };
     const targetId = String(targetUser?.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
