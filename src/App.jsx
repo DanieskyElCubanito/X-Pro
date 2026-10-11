@@ -188,7 +188,7 @@ function App() {
         `}</style>
         <div style={neonTheme.loaderGlow}></div>
         <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>
-          CARGANDO MUNDO NEÓN...
+          CARGANDO Click Network...
         </p>
       </div>
     );
