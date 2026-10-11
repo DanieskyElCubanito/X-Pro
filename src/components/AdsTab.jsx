@@ -11,8 +11,7 @@ const neon = {
   cardInteractive: { background: 'linear-gradient(135deg, rgba(38, 14, 66, 0.9), rgba(18, 7, 36, 0.9))', border: '2px solid #8a2be2', borderRadius: '20px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)', transition: 'all 0.2s ease' },
   btnPrimary: { width: '100%', padding: '14px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', textTransform: 'uppercase', letterSpacing: '0.5px' },
   btnSecondary: { width: '100%', padding: '14px', background: 'transparent', color: '#ff99dd', border: '2px dashed #ff41b4', borderRadius: '16px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 65, 180, 0.2)', textTransform: 'uppercase' },
-  btnAction: { width: '40px', height: '40px', background: '#0055ff', color: '#ffffff', border: 'none', borderRadius: '12px', fontWeight: '900', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 0 #0033aa' },
-  input: { width: '100%', background: '#ffffff', border: '2px solid #000000', borderRadius: '16px', padding: '14px 16px', fontSize: '18px', fontWeight: '900', color: '#000000', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  input: { width: '100%', background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', borderRadius: '16px', padding: '14px 16px', fontSize: '15px', color: '#ffffff', outline: 'none', boxSizing: 'border-box' },
   progressBox: { display: 'flex', justifyContent: 'center', gap: '8px', margin: '15px 0 25px 0' },
   progressStep: (active) => ({ width: '40px', height: '6px', background: active ? 'linear-gradient(90deg, #ff1493, #00f0ff)' : 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', boxShadow: active ? '0 0 10px #00f0ff' : 'none', transition: 'all 0.3s ease' }),
   taskCard: { background: 'linear-gradient(145deg, #10061e, #1a0b33)', border: '1.5px solid rgba(138, 43, 226, 0.5)', borderRadius: '20px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.4), inset 0 2px 10px rgba(138, 43, 226, 0.1)' },
@@ -20,11 +19,14 @@ const neon = {
   taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
   taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap' },
   
-  calcContainer: { background: '#f4f6f9', border: '3px solid #000', borderRadius: '24px', padding: '20px', color: '#000' },
-  pillButton: (active) => ({ flex: 1, padding: '10px 0', fontSize: '14px', fontWeight: '900', borderRadius: '20px', cursor: 'pointer', transition: 'all 0.2s', background: active ? '#6b9cff' : '#ffffff', color: '#000000', border: '2px solid #000000', boxShadow: active ? '0 0 0 2px #000' : 'none' }),
-  label: { fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#666', marginBottom: '8px', display: 'block', letterSpacing: '0.5px' },
-  summaryBox: { background: '#6b9cff', border: '2px solid #000', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', boxShadow: '4px 4px 0 #000' },
-  actionBtn: { width: '100%', padding: '16px', background: '#0055ff', color: '#fff', border: '2px solid #000', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '4px 4px 0 #000', cursor: 'pointer', transition: 'all 0.1s' }
+  // ESTILOS DE CALCULADORA CYBERPUNK (Rediseño exacto)
+  calcContainer: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #8a2be2', borderRadius: '24px', padding: '20px', color: '#ffffff', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.15)' },
+  pillButton: (active) => ({ flex: 1, padding: '10px 0', fontSize: '14px', fontWeight: '900', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s', background: active ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 'rgba(15, 5, 28, 0.8)', color: active ? '#050214' : '#ffffff', border: active ? 'none' : '1px solid #8a2be2', boxShadow: active ? '0 0 10px rgba(0, 240, 255, 0.5)' : 'none' }),
+  label: { fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#ff99dd', marginBottom: '8px', display: 'block', letterSpacing: '0.5px' },
+  btnActionCalc: { width: '45px', height: '45px', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', border: '2px solid #00f0ff', borderRadius: '12px', fontWeight: '900', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  inputCalc: { flex: 1, background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', borderRadius: '12px', padding: '10px', fontSize: '18px', fontWeight: '900', color: '#fff', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  summaryBox: { background: 'linear-gradient(90deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.1))', border: '1px dashed #00f0ff', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', boxShadow: 'inset 0 0 10px rgba(0, 240, 255, 0.1)' },
+  actionBtn: { width: '100%', padding: '16px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', cursor: 'pointer', transition: 'all 0.1s', textTransform: 'uppercase' }
 };
 
 const TaskIcons = {
@@ -61,25 +63,25 @@ export default function AdsTab({ userData, setUserData }) {
   // Estados Calculadora
   const [completions, setCompletions] = useState(100);
   const [rewardPerClick, setRewardPerClick] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState('balance');
+  const [paymentMethod, setPaymentMethod] = useState('balance'); // 'balance', 'gram', 'stars'
 
-  // Estados Pasarela
+  // Estados Checkout (Reemplaza la calculadora)
+  const [checkoutView, setCheckoutView] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tempWallet, setTempWallet] = useState('');
   const [intentId, setIntentId] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const balance = Number(userData?.balance || 0);
 
-  // --- MOTOR DE PRECIOS BASADO EN USD ---
-  // El precio base es $0.0025 USD por Click
+  // --- MOTOR DE PRECIOS ---
+  // Precio base dinámico calculado en dólares: $0.0025 por Click (Ej: 100 Clicks = $0.25 USD)
   const totalClicksCost = completions * rewardPerClick;
   const usdPrice = totalClicksCost * 0.0025; 
   
-  // Tasa de cambio estática asumida (1 GRAM = $1.48 USD)
+  // 1 GRAM = $1.48 USD aprox (Cálculo estático por ahora)
   const gramPrice = (usdPrice / 1.48).toFixed(2); 
   
-  // Precio en Stars (1 Star = $0.02 USD -> usdPrice / 0.02 = usdPrice * 50)
+  // 1 Star = $0.02 USD
   const starsPrice = Math.ceil(usdPrice * 50);
 
   useEffect(() => {
@@ -161,7 +163,7 @@ export default function AdsTab({ userData, setUserData }) {
       toast.success("¡Campaña activada con éxito!", { id: tid });
       
       setTaskType(null); setTargetUrl(''); setBotToken(''); setCompletions(100);
-      setCurrentStepIndex(0); setShowPaymentModal(false); setView('activity'); 
+      setCurrentStepIndex(0); setCheckoutView(false); setView('activity'); 
     } catch (err) {
       toast.error(err.message || "Error al procesar la campaña.", { id: tid });
     } finally {
@@ -176,7 +178,7 @@ export default function AdsTab({ userData, setUserData }) {
       const res = await botApi.generatePaymentWallet({
         userId: userData.id,
         packageId: 0, 
-        price: gramPrice, // Precio dinámico según USD
+        price: gramPrice, 
         clicks: totalClicksCost
       });
       
@@ -184,7 +186,7 @@ export default function AdsTab({ userData, setUserData }) {
         setTempWallet(res.wallet);
         setIntentId(res.intentId);
         toast.dismiss(tid);
-        setShowPaymentModal(true); 
+        setCheckoutView(true); // Cambia la interfaz a la pantalla de pago
       }
     } catch (e) {
       toast.error(e.message || "Error conectando a la blockchain.", { id: tid });
@@ -247,6 +249,13 @@ export default function AdsTab({ userData, setUserData }) {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Vuelve a la calculadora cancelando la intención de pago
+  const cancelCheckout = () => {
+    setCheckoutView(false);
+    setIntentId(null);
+    setTempWallet('');
   };
 
   const handleWatchAd = () => {
@@ -417,11 +426,11 @@ export default function AdsTab({ userData, setUserData }) {
         <div className="fade-in">
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            {currentStepIndex > 0 ? (
+            {currentStepIndex > 0 && !checkoutView ? (
               <button onClick={prevStep} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>◀</button>
             ) : <div />}
             <div style={{ fontSize: '12px', fontWeight: '900', color: '#00f0ff', letterSpacing: '1px' }}>PASO {currentStepIndex + 1} DE {totalSteps}</div>
-            <button onClick={() => { setView('list'); setTaskType(null); setCurrentStepIndex(0); setCompletions(100); }} style={{ background: '#ff1493', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>✕</button>
+            <button onClick={() => { setView('list'); setTaskType(null); setCurrentStepIndex(0); setCompletions(100); setCheckoutView(false); }} style={{ background: '#ff1493', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>✕</button>
           </div>
           <div style={neon.progressBox}>{stepsFlow.map((step, idx) => <div key={idx} style={neon.progressStep(idx <= currentStepIndex)} />)}</div>
 
@@ -450,7 +459,7 @@ export default function AdsTab({ userData, setUserData }) {
               <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#ffe600', marginBottom: '16px', textTransform: 'uppercase' }}>Pega tu Enlace</h3>
               <div style={neon.card}>
                 <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4', fontWeight: 'bold' }}>Ingresa la URL pública de tu proyecto o tu enlace de afiliado.</p>
-                <input style={{...neon.input, background: 'rgba(15, 5, 28, 0.8)', color: '#fff', borderColor: '#8a2be2'}} placeholder="https://t.me/..." value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />
+                <input style={neon.input} placeholder="https://t.me/..." value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />
               </div>
               <button onClick={handleVerifyUrl} disabled={isVerifying} style={neon.btnPrimary}>
                 {isVerifying ? 'VERIFICANDO RED...' : 'VALIDAR ENLACE ➔'}
@@ -462,7 +471,7 @@ export default function AdsTab({ userData, setUserData }) {
             <div className="fade-in">
               <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#ffe600', marginBottom: '16px', textTransform: 'uppercase' }}>Token del Bot</h3>
               <div style={{...neon.card, borderColor: '#ff41b4'}}>
-                <input style={{...neon.input, background: 'rgba(15, 5, 28, 0.8)', color: '#fff', borderColor: '#ff41b4'}} placeholder="Ej: 123456:ABC-DEF1234..." value={botToken} onChange={(e) => setBotToken(e.target.value)} />
+                <input style={{...neon.input, borderColor: '#ff41b4'}} placeholder="Ej: 123456:ABC-DEF1234..." value={botToken} onChange={(e) => setBotToken(e.target.value)} />
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={nextStep} style={{...neon.btnSecondary, flex: 1, border: '1px solid #8a2be2', color: '#8a2be2'}}>OMITIR</button>
@@ -471,85 +480,88 @@ export default function AdsTab({ userData, setUserData }) {
             </div>
           )}
 
-          {/* CALCULADORA DE TRÁFICO IDÉNTICA A LA FOTO CON MOTOR EN USD */}
+          {/* CALCULADORA (Y PANTALLA DE PAGO EN EL MISMO PASO) */}
           {currentStepId === 'budget' && (
             <div className="fade-in" style={neon.calcContainer}>
-              <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.5px' }}>¿Cuánto tráfico?</h2>
               
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                <button onClick={() => setCompletions(100)} style={neon.pillButton(completions === 100)}>100</button>
-                <button onClick={() => setCompletions(500)} style={neon.pillButton(completions === 500)}>500</button>
-                <button onClick={() => setCompletions(1000)} style={neon.pillButton(completions === 1000)}>1K</button>
-                <button onClick={() => setCompletions(5000)} style={neon.pillButton(completions === 5000)}>5K</button>
-              </div>
+              {checkoutView ? (
+                // --- PANTALLA DE PAGO INTEGRADA ---
+                <div className="fade-in">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#00f0ff', textTransform: 'uppercase' }}>Pago Seguro</h3>
+                    <button onClick={cancelCheckout} style={{ background: 'rgba(255, 65, 180, 0.2)', border: '1px solid #ff1493', borderRadius: '10px', width: '30px', height: '30px', color: '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>✕</button>
+                  </div>
 
-              <span style={neon.label}>Cuántas Completaciones</span>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <button onClick={() => setCompletions(p => Math.max(10, p - 10))} style={neon.btnAction}>-</button>
-                <input type="number" value={completions} onChange={(e) => setCompletions(Number(e.target.value))} style={neon.input} />
-                <button onClick={() => setCompletions(p => p + 10)} style={neon.btnAction}>+</button>
-              </div>
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '900', color: '#ff99dd', textTransform: 'uppercase' }}>Envía exactamente</div>
+                    <div style={{ fontSize: '36px', fontWeight: '900', color: '#00f0ff', margin: '8px 0', textShadow: '0 0 15px rgba(0,240,255,0.5)' }}>{gramPrice} GRAM</div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#ffffff' }}>A tu billetera generada:</div>
+                  </div>
 
-              <span style={neon.label}>Click por Completar</span>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <button onClick={() => setRewardPerClick(p => Math.max(1, p - 1))} style={neon.btnAction}>-</button>
-                <input type="number" value={rewardPerClick} onChange={(e) => setRewardPerClick(Number(e.target.value))} style={neon.input} />
-                <button onClick={() => setRewardPerClick(p => p + 1)} style={neon.btnAction}>+</button>
-              </div>
+                  <div style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '16px', border: '1px dashed #ff1493', wordBreak: 'break-all', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', fontWeight: 'bold', marginBottom: '20px', color: '#ffffff' }}>
+                    {tempWallet}
+                  </div>
 
-              <div style={{ display: 'flex', background: '#fff', borderRadius: '12px', border: '2px solid #000', overflow: 'hidden', marginBottom: '16px' }}>
-                <button onClick={() => setPaymentMethod('balance')} style={{ flex: 1, padding: '10px', border: 'none', background: paymentMethod === 'balance' ? '#000' : 'transparent', color: paymentMethod === 'balance' ? '#fff' : '#000', fontWeight: '900', cursor: 'pointer' }}>MI SALDO</button>
-                <button onClick={() => setPaymentMethod('gram')} style={{ flex: 1, padding: '10px', borderLeft: '2px solid #000', borderRight: '2px solid #000', background: paymentMethod === 'gram' ? '#000' : 'transparent', color: paymentMethod === 'gram' ? '#fff' : '#000', fontWeight: '900', cursor: 'pointer' }}>GRAM</button>
-                <button onClick={() => setPaymentMethod('stars')} style={{ flex: 1, padding: '10px', border: 'none', background: paymentMethod === 'stars' ? '#000' : 'transparent', color: paymentMethod === 'stars' ? '#fff' : '#000', fontWeight: '900', cursor: 'pointer' }}>STARS</button>
-              </div>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <button onClick={copyWallet} style={{ flex: 1, padding: '14px', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', border: '2px solid #00f0ff', borderRadius: '12px', fontWeight: '900', fontSize: '13px', cursor: 'pointer' }}>📋 COPIAR</button>
+                    <button onClick={openTonkeeper} style={{ flex: 1, padding: '14px', background: 'linear-gradient(90deg, #00f0ff, #0088ff)', color: '#050214', border: 'none', borderRadius: '12px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,240,255,0.4)' }}>💎 TONKEEPER</button>
+                  </div>
 
-              <div style={neon.summaryBox}>
-                <div>
-                  <div style={{ fontWeight: '900', fontSize: '14px', marginBottom: '2px' }}>Pagas</div>
-                  <div style={{ fontSize: '10px', fontWeight: '800', opacity: 0.8 }}>Presupuesto: {totalClicksCost} CLICK</div>
+                  <button onClick={handleVerifyGramPayment} style={{ width: '100%', padding: '16px', background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '0 6px 0 #007744', cursor: 'pointer' }}>
+                    ✅ YA PAGUÉ, VERIFICAR
+                  </button>
                 </div>
-                <div style={{ fontWeight: '900', fontSize: '16px', textAlign: 'right' }}>
-                  {paymentMethod === 'balance' && `${totalClicksCost} CLICK`}
-                  {paymentMethod === 'gram' && `${gramPrice} GRAM • $${usdPrice.toFixed(2)}`}
-                  {paymentMethod === 'stars' && `${starsPrice} ⭐ • $${usdPrice.toFixed(2)}`}
-                </div>
-              </div>
+              ) : (
+                // --- CALCULADORA ---
+                <div className="fade-in">
+                  <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.5px', color: '#ffffff' }}>¿Cuánto tráfico?</h2>
+                  
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                    <button onClick={() => setCompletions(100)} style={neon.pillButton(completions === 100)}>100</button>
+                    <button onClick={() => setCompletions(500)} style={neon.pillButton(completions === 500)}>500</button>
+                    <button onClick={() => setCompletions(1000)} style={neon.pillButton(completions === 1000)}>1K</button>
+                    <button onClick={() => setCompletions(5000)} style={neon.pillButton(completions === 5000)}>5K</button>
+                  </div>
 
-              <button onClick={handleCheckout} disabled={isGenerating} style={neon.actionBtn}>
-                {isGenerating ? 'PROCESANDO...' : '+ Crear y pagar'}
-              </button>
+                  <span style={neon.label}>Cuántas Completaciones</span>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <button onClick={() => setCompletions(p => Math.max(10, p - 10))} style={neon.btnActionCalc}>-</button>
+                    <input type="number" value={completions} onChange={(e) => setCompletions(Number(e.target.value) || 0)} style={neon.inputCalc} />
+                    <button onClick={() => setCompletions(p => p + 10)} style={neon.btnActionCalc}>+</button>
+                  </div>
+
+                  <span style={neon.label}>Click por Completar</span>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <button onClick={() => setRewardPerClick(p => Math.max(1, p - 1))} style={neon.btnActionCalc}>-</button>
+                    <input type="number" value={rewardPerClick} onChange={(e) => setRewardPerClick(Number(e.target.value) || 0)} style={neon.inputCalc} />
+                    <button onClick={() => setRewardPerClick(p => p + 1)} style={neon.btnActionCalc}>+</button>
+                  </div>
+
+                  <div style={{ display: 'flex', background: 'rgba(15, 5, 28, 0.8)', borderRadius: '12px', border: '2px solid #8a2be2', overflow: 'hidden', marginBottom: '20px' }}>
+                    <button onClick={() => setPaymentMethod('balance')} style={{ flex: 1, padding: '12px', border: 'none', background: paymentMethod === 'balance' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'balance' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>MI SALDO</button>
+                    <button onClick={() => setPaymentMethod('gram')} style={{ flex: 1, padding: '12px', borderLeft: '1px solid #8a2be2', borderRight: '1px solid #8a2be2', background: paymentMethod === 'gram' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'gram' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>GRAM</button>
+                    <button onClick={() => setPaymentMethod('stars')} style={{ flex: 1, padding: '12px', border: 'none', background: paymentMethod === 'stars' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'stars' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>STARS</button>
+                  </div>
+
+                  <div style={neon.summaryBox}>
+                    <div>
+                      <div style={{ fontWeight: '900', fontSize: '14px', marginBottom: '4px', color: '#ffffff' }}>Pagas</div>
+                      <div style={{ fontSize: '10px', fontWeight: '800', opacity: 0.8, color: '#ff99dd' }}>Presupuesto: {totalClicksCost} CLICK</div>
+                    </div>
+                    <div style={{ fontWeight: '900', fontSize: '16px', textAlign: 'right', color: '#00f0ff' }}>
+                      {paymentMethod === 'balance' && `${totalClicksCost} CLICK`}
+                      {paymentMethod === 'gram' && `${gramPrice} GRAM • $${usdPrice.toFixed(2)}`}
+                      {paymentMethod === 'stars' && `${starsPrice} ⭐ • $${usdPrice.toFixed(2)}`}
+                    </div>
+                  </div>
+
+                  <button onClick={handleCheckout} disabled={isGenerating} style={neon.actionBtn}>
+                    {isGenerating ? 'PROCESANDO...' : '+ Crear y pagar'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-
-      {showPaymentModal && (
-        <div className="fade-in" style={{...neon.modalOverlay, zIndex: 100000}}>
-          <div style={{...neon.modalContent, height: 'auto', background: '#f4f6f9', color: '#000', border: '3px solid #000', borderRadius: '24px 24px 0 0'}}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>PAGO SEGURO</h3>
-              <button onClick={() => setShowPaymentModal(false)} style={{ background: '#ff1493', border: '2px solid #000', borderRadius: '10px', width: '30px', height: '30px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>✕</button>
-            </div>
-
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '900', color: '#666', textTransform: 'uppercase' }}>Envía exactamente</div>
-              <div style={{ fontSize: '32px', fontWeight: '900', color: '#0055ff', margin: '4px 0' }}>{gramPrice} GRAM</div>
-              <div style={{ fontSize: '13px', fontWeight: '800' }}>A tu billetera generada:</div>
-            </div>
-
-            <div style={{ background: '#fff', padding: '16px', borderRadius: '16px', border: '2px dashed #0055ff', wordBreak: 'break-all', textAlign: 'center', fontFamily: 'monospace', fontSize: '13px', fontWeight: 'bold', marginBottom: '16px' }}>
-              {tempWallet}
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-              <button onClick={copyWallet} style={{ flex: 1, padding: '12px', background: '#e0e8ff', color: '#0055ff', border: '2px solid #0055ff', borderRadius: '12px', fontWeight: '900', fontSize: '12px', cursor: 'pointer' }}>📋 COPIAR</button>
-              <button onClick={openTonkeeper} style={{ flex: 1, padding: '12px', background: '#0055ff', color: '#fff', border: '2px solid #000', borderRadius: '12px', fontWeight: '900', fontSize: '12px', cursor: 'pointer' }}>💎 TONKEEPER</button>
-            </div>
-
-            <button onClick={handleVerifyGramPayment} style={neon.actionBtn}>
-              ✅ YA PAGUÉ, VERIFICAR
-            </button>
-          </div>
         </div>
       )}
 
