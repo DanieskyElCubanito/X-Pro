@@ -15,7 +15,7 @@ const supabase = createClient(
   }
 );
 
-const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
+const BOT_TOKEN = "8954086426:AAGNgUtmREvFLI2SAapaOroLuiy6_05nRlM";
 const BOT_ID = BOT_TOKEN.split(':')[0];
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
