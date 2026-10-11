@@ -4,6 +4,7 @@ import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
 const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I";
+const ADMIN_ID = '8968109534'; // ID de administrador
 
 const neon = {
   card: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #00f0ff', borderRadius: '24px', padding: '20px', marginBottom: '16px', boxShadow: '0 8px 24px rgba(0, 240, 255, 0.15)' },
@@ -30,13 +31,14 @@ const neon = {
 
 const TaskIcons = {
   group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+  channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, // Mismo icono para canal y grupo
   bot: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="16" y1="16" x2="16.01" y2="16" /></svg>,
   promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>
 };
 
 const TASK_TYPES = [
   { id: 'bot', icon: TaskIcons.bot('#ffe600'), title: 'Bots & Mini Apps', desc: 'Usuarios inician tu bot o app', color: '#ffe600', autoName: 'Iniciar Bot/App' },
-  { id: 'channel', icon: TaskIcons.group('#00ffaa'), title: 'Canales & Grupos', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Chat' },
+  { id: 'channel', icon: TaskIcons.channel('#00ffaa'), title: 'Canales & Grupos', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Chat' },
   { id: 'promo', icon: TaskIcons.promo('#ff1493'), title: 'Vistas & Promos', desc: 'Consigue referidos o tráfico', color: '#ff1493', autoName: 'Visitar Promo' }
 ];
 
@@ -66,10 +68,15 @@ export default function AdsTab({ userData, setUserData }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [tempWallet, setTempWallet] = useState('');
   const [intentId, setIntentId] = useState(null);
+  
+  // Modales de Edición
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
 
   const [liveGramUsd, setLiveGramUsd] = useState(5.00);
 
   const balance = Number(userData?.balance || 0);
+  const isAdmin = String(userData?.id) === ADMIN_ID;
 
   // MOTOR DE PRECIOS AUTOMATIZADO
   useEffect(() => {
@@ -99,7 +106,7 @@ export default function AdsTab({ userData, setUserData }) {
   // Manejo del contador de 5 segundos
   useEffect(() => {
     const activeTasks = Object.keys(taskStatus).filter(id => taskStatus[id] === 'waiting');
-    
+
     if (activeTasks.length > 0) {
       const timer = setInterval(() => {
         setCountdown(prev => {
@@ -301,7 +308,7 @@ export default function AdsTab({ userData, setUserData }) {
   // 2. EL USUARIO PRESIONA COMPROBAR
   const handleCheckTask = async (task) => {
     const tid = toast.loading("Verificando tarea...");
-    
+
     // Cambiamos a verificando para que no pueda dar clic varias veces
     setTaskStatus(prev => ({ ...prev, [task.id]: 'verifying' }));
 
@@ -310,7 +317,7 @@ export default function AdsTab({ userData, setUserData }) {
       if (res.success) {
         toast.success(`+${res.reward} CLICK`, { id: tid });
         if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
-        
+
         // Marcamos como completada (el botón dirá COMPLETADA)
         setTaskStatus(prev => ({ ...prev, [task.id]: 'completed' }));
       } else {
@@ -342,6 +349,77 @@ export default function AdsTab({ userData, setUserData }) {
         finally { setAdLoading(false); }
       }).catch(() => { toast.error("Cancelado.", { id: tid }); setAdLoading(false); });
   };
+  
+  // FUNCIONES DE EDICIÓN Y ELIMINACIÓN
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("¿Estás seguro de eliminar esta campaña? El saldo no gastado será reembolsado.")) return;
+    const tid = toast.loading("Eliminando campaña...");
+    try {
+      const res = await fetch('/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete-task',
+          taskId: taskId,
+          requestingUserId: userData.id,
+          isAdminAction: isAdmin
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Campaña eliminada.", { id: tid });
+        fetchTasks();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      toast.error(err.message || "Error al eliminar.", { id: tid });
+    }
+  };
+
+  const handleOpenEdit = (task) => {
+    setEditingTask({ id: task.id, title: task.title, url: task.url });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    const tid = toast.loading("Guardando cambios...");
+    try {
+      const res = await fetch('/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'edit-task',
+          taskId: editingTask.id,
+          requestingUserId: userData.id,
+          newTitle: editingTask.title,
+          newUrl: editingTask.url,
+          isAdminAction: isAdmin
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Campaña actualizada.", { id: tid });
+        setShowEditModal(false);
+        fetchTasks();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      toast.error(err.message || "Error al actualizar.", { id: tid });
+    }
+  };
+
+  // Función auxiliar para obtener la etiqueta correcta basada en el tipo de tarea
+  const getTaskLabel = (type) => {
+    switch (type) {
+      case 'group':
+      case 'channel': return '📢 Canales & Grupos';
+      case 'bot': return '🤖 Bots & Mini Apps';
+      case 'promo': return '⚡ Vistas & Promos';
+      default: return '⚡ Tarea';
+    }
+  };
 
   const myTasks = tasks.filter(t => t.creator_id === String(userData?.id));
   const communityTasks = tasks.filter(t => t.creator_id !== String(userData?.id));
@@ -349,7 +427,7 @@ export default function AdsTab({ userData, setUserData }) {
   // Función auxiliar para renderizar el botón correcto según el estado de la tarea
   const renderTaskButton = (task) => {
     const status = taskStatus[task.id];
-    
+
     if (status === 'completed') {
       return (
         <button disabled style={neon.taskButtonDisabled}>
@@ -357,7 +435,7 @@ export default function AdsTab({ userData, setUserData }) {
         </button>
       );
     }
-    
+
     if (status === 'waiting') {
       return (
         <button disabled style={neon.taskButtonDisabled}>
@@ -373,7 +451,7 @@ export default function AdsTab({ userData, setUserData }) {
         </button>
       );
     }
-    
+
     if (status === 'verifying') {
        return (
         <button disabled style={neon.taskButtonDisabled}>
@@ -438,15 +516,26 @@ export default function AdsTab({ userData, setUserData }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {communityTasks.map((task) => (
-                <div key={task.id} style={neon.taskCard}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={neon.taskIconBox}>{TaskIcons[task.type] ? TaskIcons[task.type]('#00f0ff') : TaskIcons.promo('#00f0ff')}</div>
-                    <div>
-                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>{task.title}</div>
-                      <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{task.completions_done} / {task.completions_total} referidos</div>
+                <div key={task.id} style={{ ...neon.taskCard, flexDirection: 'column', alignItems: 'stretch' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={neon.taskIconBox}>{TaskIcons[task.type] ? TaskIcons[task.type]('#00f0ff') : TaskIcons.promo('#00f0ff')}</div>
+                      <div>
+                        <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>{task.title}</div>
+                        <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{getTaskLabel(task.type)} • {task.completions_done} / {task.completions_total}</div>
+                      </div>
                     </div>
+                    {renderTaskButton(task)}
                   </div>
-                  {renderTaskButton(task)}
+                  
+                  {/* BOTÓN DE ELIMINAR PARA ADMINISTRADOR EN EL MERCADO */}
+                  {isAdmin && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'right' }}>
+                      <button onClick={() => handleDeleteTask(task.id)} style={{ background: '#ff1493', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        🗑️ Eliminar Tarea (Admin)
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -494,9 +583,20 @@ export default function AdsTab({ userData, setUserData }) {
                         <span style={{ color: '#ff41b4' }}>Progreso</span>
                         <span style={{ color: '#fff' }}>{task.completions_done} / {task.completions_total} referidos</span>
                       </div>
-                      <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
                         <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, #ff1493, #ff66cc)', boxShadow: '0 0 10px #ff1493', transition: 'width 0.3s ease' }}></div>
                       </div>
+                      
+                      {/* BOTONES DE EDICIÓN Y ELIMINACIÓN PARA EL CREADOR */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <button onClick={() => handleOpenEdit(task)} style={{ background: '#00f0ff', color: '#050214', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                          ✏️ Editar
+                        </button>
+                        <button onClick={() => handleDeleteTask(task.id)} style={{ background: '#ff1493', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+
                     </div>
                   </div>
                 )
@@ -645,6 +745,27 @@ export default function AdsTab({ userData, setUserData }) {
               )}
             </div>
           )}
+        </div>
+      )}
+      
+      {/* MODAL EDITAR TAREA */}
+      {showEditModal && editingTask && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
+          <div style={{ ...neon.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#ffe600' }}>
+            <h3 style={{ margin: '0 0 14px 0', color: '#ffe600', fontSize: '17px', fontWeight: '900' }}>Editar Campaña</h3>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={neon.label}>TÍTULO</label>
+              <input style={neon.input} value={editingTask.title} onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })} />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={neon.label}>ENLACE (URL)</label>
+              <input style={neon.input} value={editingTask.url} onChange={(e) => setEditingTask({ ...editingTask, url: e.target.value })} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowEditModal(false)} style={{ ...neon.btnSecondary, flex: 1 }}>CANCELAR</button>
+              <button onClick={handleSaveEdit} style={{ ...neon.btnPrimary, flex: 2, background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', boxShadow: '0 6px 0 #cc8800' }}>ACTUALIZAR</button>
+            </div>
+          </div>
         </div>
       )}
 
