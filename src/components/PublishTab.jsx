@@ -111,7 +111,7 @@ export default function PublishTab({ userData, setUserData }) {
             userId: userData?.id,
             chatId: chatId,
             text: postText,
-            link: buttonConfig.url || 'https://t.me/ReffRobot/app',
+            link: buttonConfig.url || 'https://t.me/ClickNetworkbot/app',
             photoData: imageUrl || null,
             buttonConfig: buttonConfig.url ? buttonConfig : null
           })
