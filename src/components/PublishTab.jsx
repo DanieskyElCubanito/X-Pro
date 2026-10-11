@@ -62,8 +62,7 @@ export default function PublishTab({ userData, setUserData }) {
 
   const [postText, setPostText] = useState('');
   const [imageUrl, setImageUrl] = useState(''); 
-  // Estado actualizado para coincidir con la API de Telegram
-  const [buttonConfig, setButtonConfig] = useState({ text: 'Abrir App', url: '', style: 'default', emojiId: '' });
+  const [buttonConfig, setButtonConfig] = useState({ text: '', url: '', style: 'default', emojiId: '' });
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const [showButtonModal, setShowButtonModal] = useState(false);
@@ -88,6 +87,37 @@ export default function PublishTab({ userData, setUserData }) {
     }
   };
 
+  // --- LÓGICA DE VALIDACIÓN DEL BOTÓN ---
+  const handleSaveButton = () => {
+    // Si el usuario escribió un texto pero no puso enlace
+    if (buttonConfig.text && !buttonConfig.url) {
+      return toast.error("Debes ingresar un enlace válido para el botón.");
+    }
+
+    // Si el usuario puso un enlace, validar el formato
+    if (buttonConfig.url) {
+      const urlPattern = /^(https?:\/\/|t\.me\/).+/i;
+      if (!urlPattern.test(buttonConfig.url)) {
+        return toast.error("El enlace debe comenzar con http://, https:// o t.me/");
+      }
+      
+      // Si el usuario olvidó poner el texto pero puso enlace, le damos uno por defecto
+      if (!buttonConfig.text.trim()) {
+         setButtonConfig(prev => ({ ...prev, text: "Abrir Enlace" }));
+      }
+    }
+
+    setShowButtonModal(false);
+    toast.success("Botón guardado");
+  };
+
+  const handleClearButton = () => {
+    setButtonConfig({ text: '', url: '', style: 'default', emojiId: '' });
+    setShowButtonModal(false);
+    toast.success("Botón eliminado");
+  };
+  // ----------------------------------------
+
   const handleNextStep1 = () => { if (!postText.trim()) return toast.error("Escribe un mensaje para continuar."); setStep(2); };
   const handleNextStep2 = () => setStep(3);
   const handleNextStep3 = () => {
@@ -100,9 +130,8 @@ export default function PublishTab({ userData, setUserData }) {
     setIsPublishing(true);
     const tid = toast.loading("Transmitiendo señal...");
 
-    // Preparamos el botón limpiando los valores vacíos para la API
     const finalButtonConfig = buttonConfig.url ? {
-      text: buttonConfig.text,
+      text: buttonConfig.text || "Abrir Enlace",
       url: buttonConfig.url,
       style: buttonConfig.style !== 'default' ? buttonConfig.style : undefined,
       icon_custom_emoji_id: buttonConfig.emojiId ? buttonConfig.emojiId : undefined
@@ -119,7 +148,8 @@ export default function PublishTab({ userData, setUserData }) {
             chatId: chatId,
             text: postText,
             photoData: imageUrl || null,
-            buttonConfig: finalButtonConfig
+            buttonConfig: finalButtonConfig,
+            link: buttonConfig.url || null // Compatibilidad hacia atrás
           })
         });
 
@@ -129,7 +159,7 @@ export default function PublishTab({ userData, setUserData }) {
       }
 
       toast.success("¡Campaña Transmitida con Éxito!", { id: tid });
-      setPostText(''); setImageUrl(''); setButtonConfig({ text: 'Abrir App', url: '', style: 'default', emojiId: '' }); setSelectedGroups([]); setStep(1);
+      setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default', emojiId: '' }); setSelectedGroups([]); setStep(1);
     } catch (err) {
       toast.error(err.message || "Error de red", { id: tid });
     } finally {
@@ -192,7 +222,7 @@ export default function PublishTab({ userData, setUserData }) {
                 <button onClick={() => setStep(1)} style={{ ...neonStyles.btnLight, padding: '6px 12px' }}>◀</button>
                 <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>Configuración Multimedia</h3>
               </div>
-              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Añade una foto desde tu galería y configura un botón interactivo premium.</p>
+              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Añade una foto desde tu galería y/o un botón. (Ambos son opcionales)</p>
 
               <div onClick={() => fileInputRef.current.click()} style={neonStyles.cardInteractive}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -202,7 +232,10 @@ export default function PublishTab({ userData, setUserData }) {
                     <div style={{ fontSize: '12px', color: imageUrl ? '#00f0ff' : '#aaa' }}>{imageUrl ? 'Imagen adjuntada ✓' : 'Subir desde la Galería'}</div>
                   </div>
                 </div>
-                <div style={{ color: '#00f0ff', fontWeight: '900', fontSize: '18px' }}>➔</div>
+                {imageUrl && (
+                  <button onClick={(e) => { e.stopPropagation(); setImageUrl(''); }} style={{ background: 'transparent', border: 'none', color: '#ff1493', fontWeight: 'bold', fontSize: '14px' }}>✕</button>
+                )}
+                {!imageUrl && <div style={{ color: '#00f0ff', fontWeight: '900', fontSize: '18px' }}>➔</div>}
               </div>
               <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
 
@@ -211,7 +244,7 @@ export default function PublishTab({ userData, setUserData }) {
                   <div style={{ fontSize: '28px' }}>🔘</div>
                   <div>
                     <div style={{ fontWeight: '900', color: '#ffffff', fontSize: '15px' }}>Botón Interactivo</div>
-                    <div style={{ fontSize: '12px', color: buttonConfig.url ? '#ff41b4' : '#aaa' }}>{buttonConfig.url ? `Configurado: "${buttonConfig.text}"` : 'Añadir Enlace y Estilo'}</div>
+                    <div style={{ fontSize: '12px', color: buttonConfig.url ? '#ff41b4' : '#aaa' }}>{buttonConfig.url ? `Configurado: "${buttonConfig.text}"` : 'Añadir Enlace (Opcional)'}</div>
                   </div>
                 </div>
                 <div style={{ color: '#ff41b4', fontWeight: '900', fontSize: '18px' }}>➔</div>
@@ -271,7 +304,7 @@ export default function PublishTab({ userData, setUserData }) {
                     background: buttonConfig.style === 'primary' ? '#2F6EA5' : buttonConfig.style === 'success' ? '#2F9C5A' : buttonConfig.style === 'danger' ? '#D14343' : '#2F3A4C',
                     color: '#ffffff', textTransform: 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
                   }}>
-                    {buttonConfig.emojiId && <span>✨</span>} {buttonConfig.text}
+                    {buttonConfig.emojiId && <span>✨</span>} {buttonConfig.text || "Abrir Enlace"}
                   </div>
                 )}
               </div>
@@ -349,7 +382,10 @@ export default function PublishTab({ userData, setUserData }) {
               </div>
             </div>
 
-            <button onClick={() => setShowButtonModal(false)} style={neonStyles.btnPrimary}>GUARDAR BOTÓN</button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleClearButton} style={{ ...neonStyles.btnLight, flex: 1, borderColor: '#ff1493', color: '#ff1493' }}>BORRAR</button>
+              <button onClick={handleSaveButton} style={{ ...neonStyles.btnPrimary, flex: 2 }}>GUARDAR</button>
+            </div>
           </div>
         </div>
       )}
