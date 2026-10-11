@@ -73,7 +73,7 @@ function ShareTab({ stats, userId, totalReferralEarnings }) {
 
   const n1 = referralsList.length;
   const totalEarned = parseFloat(earnings).toFixed(2);
-  const inviteLink = `https://t.me/ReffRobot/app?startapp=${userId}`;
+  const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userId}`;
 
   const handleCopy = () => {
     if (!userId) return toast.error("Error: ID no encontrado.");
