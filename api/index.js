@@ -19,16 +19,13 @@ const BOT_TOKEN = "8948808471:AAGRcUzysgMptMe5tY-X6SZQirUDLmI94q8";
 const BOT_ID = BOT_TOKEN.split(':')[0];
 const ADMIN_IDS = ['8968109534', '8892196101'];
 
-// El ID del Admin al que le enviaremos las Keys
+// El ID del Admin al que le enviaremos los reportes
 const MAIN_ADMIN_ID = '8968109534'; 
-// TU WALLET PRINCIPAL (A donde irá todo el dinero al final)
 const MY_MASTER_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I";
 
-// Cliente TON conectado a Toncenter (Mainnet)
+// Cliente TON conectado a Toncenter
 const tonClient = new TonClient({
-  endpoint: 'https://toncenter.com/api/v2/jsonRPC',
-  // Si consigues una API Key de toncenter, ponla aquí para que no te limiten. Si no, funciona igual con límites bajos.
-  // apiKey: 'TU_API_KEY_OPCIONAL' 
+  endpoint: 'https://toncenter.com/api/v2/jsonRPC'
 });
 
 function extractTelegramUsername(url) {
@@ -123,27 +120,21 @@ export default async function handler(req, res) {
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
     // =======================================================
-    // NUEVO MÓDULO: PAGOS TON/GRAM (BILLETERAS DERIVADAS)
+    // MÓDULO: PAGOS (GRAM BILLETERAS + TELEGRAM STARS)
     // =======================================================
 
-    // 1. GENERAR UNA WALLET DE PAGO ÚNICA
+    // 1. GENERAR UNA WALLET DE PAGO ÚNICA (GRAM)
     if (action === 'generate-payment-wallet') {
       const { packageId, price, clicks } = req.body;
       const targetId = String(userId);
 
-      // Creamos un nuevo par de llaves (Mnemonic de 24 palabras)
       const mnemonics = await mnemonicNew();
       const keyPair = await mnemonicToPrivateKey(mnemonics);
-      
-      // Creamos una Wallet V4R2 (La más común y económica en TON)
       const workchain = 0; 
       const wallet = WalletContractV4.create({ workchain, publicKey: keyPair.publicKey });
       const publicAddress = wallet.address.toString({ urlSafe: true, bounceable: false });
-      
-      // Convertimos el array de palabras a un string para guardarlo
       const secretWords = mnemonics.join(" ");
 
-      // Guardamos en Supabase
       const { data: newIntent, error } = await supabase.from('payment_intents').insert([{
         user_id: targetId,
         package_id: packageId,
@@ -155,89 +146,119 @@ export default async function handler(req, res) {
 
       if (error) throw new Error("Error al guardar intención de pago.");
 
-      // NOTIFICAR AL ADMIN 😜
       const usernameDisplay = user?.username ? `@${user.username}` : `ID: ${targetId}`;
-      const msg = `💰 <b>Nueva Orden Creada</b>\n\n👤 Usuario: ${usernameDisplay}\n📦 Paquete: ${clicks} CLICK\n💎 Monto Esperado: ${price} GRAM\n\n📌 <b>Wallet Generada:</b>\n<code>${publicAddress}</code>\n\n🔑 <b>Key (24 palabras):</b>\n<span class="tg-spoiler"><code>${secretWords}</code></span>`;
+      const msg = `💰 <b>Nueva Orden GRAM</b>\n\n👤 Usuario: ${usernameDisplay}\n📦 Paquete: ${clicks} CLICK\n💎 Monto Esperado: ${price} GRAM\n\n📌 <b>Wallet Generada:</b>\n<code>${publicAddress}</code>`;
       await notifyAdmin(msg);
 
       return res.status(200).json({ success: true, wallet: publicAddress, intentId: newIntent.id });
     }
 
-    // 2. VERIFICAR SI EL PAGO LLEGÓ Y HACER EL BARRIDO
+    // 2. VERIFICAR PAGO LLEGADO (GRAM)
     if (action === 'verify-crypto-payment') {
       const { intentId, clicks } = req.body;
       const targetId = String(userId);
 
-      // Buscamos la orden pendiente
       const { data: intent } = await supabase.from('payment_intents')
-        .select('*')
-        .eq('id', intentId)
-        .eq('user_id', targetId)
-        .eq('status', 'pending')
-        .single();
+        .select('*').eq('id', intentId).eq('user_id', targetId).eq('status', 'pending').single();
 
-      if (!intent) {
-        return res.status(400).json({ success: false, error: 'Orden de pago no encontrada o ya procesada.' });
-      }
+      if (!intent) return res.status(400).json({ success: false, error: 'Orden de pago no encontrada o procesada.' });
 
-      // Verificamos el saldo en la blockchain de TON
       const balanceNano = await tonClient.getBalance(intent.public_wallet);
-      const balanceGram = Number(balanceNano) / 1e9; // Convertimos de Nano a Gram
+      const balanceGram = Number(balanceNano) / 1e9; 
 
       if (balanceGram < intent.expected_amount) {
-        return res.status(400).json({ 
-          success: false, 
-          error: `Aún no detectamos el pago completo. Saldo actual de la wallet: ${balanceGram.toFixed(4)} GRAM. Esperando: ${intent.expected_amount} GRAM.` 
-        });
+        return res.status(400).json({ success: false, error: `Saldo actual: ${balanceGram.toFixed(4)} GRAM. Esperando: ${intent.expected_amount} GRAM.` });
       }
 
-      // ¡EL PAGO LLEGÓ! -> Sumamos los CLICKs al usuario
       const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
       const newBalance = Number((Number(dbUser.balance || 0) + clicks).toFixed(2));
       await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
       await supabase.from('payment_intents').update({ status: 'completed' }).eq('id', intentId);
 
-      // 🧹 BARRIDO (SWEEP): Mandamos el dinero a la wallet del ADMIN
       try {
         const mnemonics = intent.encrypted_private_key.split(" ");
         const keyPair = await mnemonicToPrivateKey(mnemonics);
         const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
         const contract = tonClient.open(wallet);
-
-        // Obtenemos el número de secuencia (seqno) para autorizar la transacción
         const seqno = await contract.getSeqno();
 
-        // En TON, si envías con flag 128, se envía TODO el balance de la wallet menos la comisión de red.
         await contract.sendTransfer({
           seqno: seqno || 0,
           secretKey: keyPair.secretKey,
-          messages: [
-            internal({
-              to: MY_MASTER_WALLET,
-              value: 0n, // Cero, porque el flag 128 anula esto y manda todo
-              bounce: false,
-              body: "Barrido Automático ClickApp"
-            })
-          ],
-          sendMode: 128 // FLAG MÁGICO: "Envía todo y vacía la billetera"
+          messages: [ internal({ to: MY_MASTER_WALLET, value: 0n, bounce: false, body: "Barrido Automático" }) ],
+          sendMode: 128 
         });
-        
-        await notifyAdmin(`✅ <b>¡PAGO COMPLETADO!</b>\n\n👤 ID: ${targetId}\n💎 Monto: ${balanceGram} GRAM\n\n🚀 <i>Iniciando barrido automático a tu Master Wallet...</i>`);
-
+        await notifyAdmin(`✅ <b>¡PAGO GRAM COMPLETADO!</b>\n\n👤 ID: ${targetId}\n💎 Monto: ${balanceGram} GRAM\n\n🚀 <i>Barrido iniciado a Master Wallet...</i>`);
       } catch (sweepError) {
-        // Si el barrido falla (ej: por red saturada), el usuario igual recibió sus CLICKs.
-        // El admin puede vaciar la wallet luego usando las 24 palabras.
-        console.error("Error en barrido:", sweepError);
-        await notifyAdmin(`⚠️ <b>PAGO RECIBIDO PERO FALLÓ EL BARRIDO AUTOMÁTICO</b>\n\n👤 ID: ${targetId}\n💎 Monto en wallet temporal: ${balanceGram} GRAM\n\nVacía esta wallet manualmente usando la Key (24 palabras) que te envié al crearla.`);
+        await notifyAdmin(`⚠️ <b>FALLÓ BARRIDO AUTOMÁTICO</b>\n\n👤 ID: ${targetId}\n💎 Monto en wallet: ${balanceGram} GRAM\n\nClave:\n<code>${intent.encrypted_private_key}</code>`);
       }
 
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // =======================================================
-    // FIN MÓDULO PAGOS
-    // =======================================================
+    // 3. GENERAR FACTURA DE TELEGRAM STARS (⭐)
+    if (action === 'generate-stars-invoice') {
+      const { packageId, stars, clicks } = req.body;
+      const targetId = String(userId);
+      const uniquePayload = `STARS_${targetId}_PKG${packageId}_${Date.now()}`;
 
+      // Registramos la intención de pago
+      await supabase.from('payment_intents').insert([{
+        user_id: targetId,
+        package_id: packageId,
+        expected_amount: stars,
+        public_wallet: 'Telegram Stars', // Etiqueta
+        encrypted_private_key: uniquePayload, // Lo usamos como identificador seguro
+        status: 'pending'
+      }]);
+
+      // Formato oficial requerido por la API de Telegram para Stars
+      const invoiceData = {
+        title: `Recarga: ${clicks} CLICKs`,
+        description: `Impulsa tus canales y bots con tráfico real en el ecosistema.`,
+        payload: uniquePayload,
+        provider_token: "", // OBLIGATORIO DEJAR VACÍO PARA TELEGRAM STARS
+        currency: "XTR", // Moneda Oficial de Telegram Stars
+        prices: [{ label: `Paquete ${clicks} CLICKs`, amount: parseInt(stars) }]
+      };
+
+      try {
+        const response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, invoiceData);
+        if (response.data.ok) {
+          // Devuelve el enlace 'https://t.me/...'
+          return res.status(200).json({ success: true, invoiceUrl: response.data.result, intentId: uniquePayload });
+        } else {
+          throw new Error(response.data.description);
+        }
+      } catch (err) {
+        return res.status(400).json({ success: false, error: "Error conectando a Telegram." });
+      }
+    }
+
+    // 4. CONFIRMAR PAGO EXITOSO CON STARS (CLIENT-SIDE)
+    if (action === 'confirm-stars-payment') {
+      const { intentId, clicks } = req.body;
+      const targetId = String(userId);
+
+      const { data: intent } = await supabase.from('payment_intents')
+        .select('*').eq('encrypted_private_key', intentId).eq('user_id', targetId).eq('status', 'pending').single();
+
+      if (!intent) return res.status(400).json({ success: false, error: 'Pago no encontrado o ya procesado.' });
+
+      // Dar la recompensa
+      const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
+      const newBalance = Number((Number(dbUser.balance || 0) + clicks).toFixed(2));
+      await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
+      await supabase.from('payment_intents').update({ status: 'completed' }).eq('id', intent.id);
+
+      await notifyAdmin(`⭐ <b>¡PAGO CON STARS RECIBIDO!</b>\n\n👤 Usuario ID: ${targetId}\n🌟 Monto: ${intent.expected_amount} Stars\n⚡ Entregados: ${clicks} CLICKs`);
+
+      return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    // =======================================================
+    // RESTO DEL CÓDIGO (Tareas, Historial, Verificación)
+    // =======================================================
 
     if (action === 'verify-admin') {
       const chatId = extractTelegramUsername(req.body.url);
