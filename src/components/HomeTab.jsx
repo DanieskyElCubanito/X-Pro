@@ -96,7 +96,7 @@ export default function HomeTab({ userData, setActiveTab }) {
         </div>
       </div>
 
-      {/* MODAL DE HISTORIAL */}
+            {/* MODAL DE HISTORIAL ACTUALIZADO */}
       {showHistory && (
         <div className="fade-in" style={neon.modalOverlay} onClick={() => setShowHistory(false)}>
           <div style={neon.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -106,21 +106,46 @@ export default function HomeTab({ userData, setActiveTab }) {
               </h3>
               <button onClick={() => setShowHistory(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>✕</button>
             </div>
+            
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
               {loadingHistory ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: '#00f0ff', fontWeight: 'bold' }}>Cargando transacciones...</div>
-              ) : realHistory.length === 0 ? (
+              ) : history.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: '#ff99dd', fontWeight: 'bold' }}>Aún no hay movimientos recientes.</div>
               ) : (
-                realHistory.map((item) => (
-                  <div key={item.id} style={neon.historyItem}>
-                    <div>
-                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{item.title}</div>
-                      <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{formatDate(item.date)}</div>
+                history.map((item) => (
+                  <div key={item.id} style={{ ...neon.historyItem, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '14px', gap: '8px' }}>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, paddingRight: '12px' }}>
+                        <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>
+                          {item.title}
+                        </div>
+                        
+                        {/* Nueva descripción del historial */}
+                        {item.description && (
+                          <div style={{ color: '#ff99dd', fontSize: '11px', lineHeight: '1.4' }}>
+                            {item.description}
+                          </div>
+                        )}
+                        
+                        <div style={{ color: '#8a2be2', fontSize: '10px', marginTop: '6px', fontWeight: 'bold' }}>
+                          {new Date(item.created_at).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+
+                      {/* Monto dinámico con colores */}
+                      <div style={{ 
+                        color: Number(item.amount) > 0 ? '#00ffaa' : Number(item.amount) < 0 ? '#ff1493' : '#00f0ff', 
+                        fontSize: '16px', 
+                        fontWeight: '900', 
+                        textShadow: Number(item.amount) > 0 ? '0 0 5px rgba(0,255,170,0.5)' : 'none',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {Number(item.amount) > 0 ? '+' : ''}{Number(item.amount) === 0 ? '-' : Number(item.amount).toFixed(2)} CLICK
+                      </div>
                     </div>
-                    <div style={{ color: item.type === 'earn' ? '#00ffaa' : '#ffe600', fontSize: '16px', fontWeight: '900', textShadow: item.type === 'earn' ? '0 0 5px rgba(0,255,170,0.5)' : 'none' }}>
-                      {item.amount}
-                    </div>
+
                   </div>
                 ))
               )}
