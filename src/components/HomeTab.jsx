@@ -38,7 +38,7 @@ export default function HomeTab({ userData, setActiveTab }) {
     setLoadingHistory(true);
     try {
       const res = await botApi.getHistory(userData.id);
-      if (res.success) setRealHistory(res.history);
+      if (res.success) setHistory(res.history);
     } catch (e) {
       toast.error("Error al cargar historial");
     } finally {
