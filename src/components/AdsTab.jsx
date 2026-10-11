@@ -19,7 +19,7 @@ const neon = {
   taskIconBox: { width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 240, 255, 0.3)', flexShrink: 0 },
   taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
   taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap' },
-  // ESTILOS NUEVOS PARA LA CALCULADORA (Estilo retro/flat)
+  
   calcContainer: { background: '#f4f6f9', border: '3px solid #000', borderRadius: '24px', padding: '20px', color: '#000' },
   pillButton: (active) => ({ flex: 1, padding: '10px 0', fontSize: '14px', fontWeight: '900', borderRadius: '20px', cursor: 'pointer', transition: 'all 0.2s', background: active ? '#6b9cff' : '#ffffff', color: '#000000', border: '2px solid #000000', boxShadow: active ? '0 0 0 2px #000' : 'none' }),
   label: { fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#666', marginBottom: '8px', display: 'block', letterSpacing: '0.5px' },
@@ -58,10 +58,10 @@ export default function AdsTab({ userData, setUserData }) {
   const [botToken, setBotToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   
-  // Estados Calculadora (Paso 4 y 5)
+  // Estados Calculadora
   const [completions, setCompletions] = useState(100);
   const [rewardPerClick, setRewardPerClick] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState('balance'); // 'balance', 'gram', 'stars'
+  const [paymentMethod, setPaymentMethod] = useState('balance');
 
   // Estados Pasarela
   const [isGenerating, setIsGenerating] = useState(false);
@@ -71,11 +71,16 @@ export default function AdsTab({ userData, setUserData }) {
 
   const balance = Number(userData?.balance || 0);
 
-  // Cálculos de precios (Ejemplo: 1000 Clicks = 1.8 GRAM)
+  // --- MOTOR DE PRECIOS BASADO EN USD ---
+  // El precio base es $0.0025 USD por Click
   const totalClicksCost = completions * rewardPerClick;
-  const gramPrice = (totalClicksCost * 0.0018).toFixed(2); // 0.0018 GRAM por Click aprox
-  const usdPrice = (gramPrice * 1.48).toFixed(2); // Asumiendo GRAM a $1.48
-  const starsPrice = Math.ceil(totalClicksCost * 0.5); // 0.5 Stars por Click aprox
+  const usdPrice = totalClicksCost * 0.0025; 
+  
+  // Tasa de cambio estática asumida (1 GRAM = $1.48 USD)
+  const gramPrice = (usdPrice / 1.48).toFixed(2); 
+  
+  // Precio en Stars (1 Star = $0.02 USD -> usdPrice / 0.02 = usdPrice * 50)
+  const starsPrice = Math.ceil(usdPrice * 50);
 
   useEffect(() => {
     if (userData?.id && (view === 'list' || view === 'activity')) fetchTasks();
@@ -129,19 +134,17 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // Botón "Crear y Pagar"
   const handleCheckout = () => {
     if (paymentMethod === 'balance') {
       if (balance < totalClicksCost) return toast.error(`Saldo insuficiente. Necesitas ${totalClicksCost} CLICK.`);
-      handleCreateTaskPaid(); // Paga directo del saldo
+      handleCreateTaskPaid(); 
     } else if (paymentMethod === 'gram') {
-      generateGramWallet(); // Abre el modal de la pasarela GRAM
+      generateGramWallet(); 
     } else if (paymentMethod === 'stars') {
-      handleStarsPayment(); // Abre el modal nativo de Stars
+      handleStarsPayment(); 
     }
   };
 
-  // Creación final de la tarea en BDD
   const handleCreateTaskPaid = async () => {
     setIsGenerating(true);
     const tid = toast.loading("Publicando campaña...");
@@ -166,15 +169,14 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // --- PASARELA GRAM ---
   const generateGramWallet = async () => {
     setIsGenerating(true);
     const tid = toast.loading("Generando billetera única...");
     try {
       const res = await botApi.generatePaymentWallet({
         userId: userData.id,
-        packageId: 0, // 0 indica que es pago directo de campaña
-        price: gramPrice,
+        packageId: 0, 
+        price: gramPrice, // Precio dinámico según USD
         clicks: totalClicksCost
       });
       
@@ -182,7 +184,7 @@ export default function AdsTab({ userData, setUserData }) {
         setTempWallet(res.wallet);
         setIntentId(res.intentId);
         toast.dismiss(tid);
-        setShowPaymentModal(true); // Muestra el código QR/Wallet
+        setShowPaymentModal(true); 
       }
     } catch (e) {
       toast.error(e.message || "Error conectando a la blockchain.", { id: tid });
@@ -208,7 +210,6 @@ export default function AdsTab({ userData, setUserData }) {
       const res = await botApi.verifyCryptoPayment({ userId: userData.id, intentId: intentId, clicks: totalClicksCost });
       if (res.success) {
         toast.success(`Pago Exitoso.`, { id: tid });
-        // Si el pago es exitoso, creamos la campaña
         await handleCreateTaskPaid(); 
       }
     } catch (e) {
@@ -216,7 +217,6 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // --- PASARELA STARS ---
   const handleStarsPayment = async () => {
     setIsGenerating(true);
     const tid = toast.loading("Generando factura...");
@@ -234,7 +234,7 @@ export default function AdsTab({ userData, setUserData }) {
               const confirmRes = await botApi.confirmStarsPayment({ userId: userData.id, intentId: res.intentId, clicks: totalClicksCost });
               if (confirmRes.success) {
                 toast.success(`Pago exitoso.`, { id: confirmTid });
-                await handleCreateTaskPaid(); // Creamos la campaña
+                await handleCreateTaskPaid(); 
               }
             } catch (err) { toast.error("Error al acreditar.", { id: confirmTid }); }
           } else {
@@ -249,7 +249,6 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // --- ACCIONES GENERALES ---
   const handleWatchAd = () => {
     if (typeof window.showGiga !== 'function') return toast.error("Servidor no disponible.");
     if (adLoading) return;
@@ -414,9 +413,6 @@ export default function AdsTab({ userData, setUserData }) {
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* WIZARD DE CREACIÓN DE TAREAS Y PAGOS (REDISEÑADO)            */}
-      {/* ============================================================ */}
       {view === 'wizard' && (
         <div className="fade-in">
           
@@ -475,12 +471,11 @@ export default function AdsTab({ userData, setUserData }) {
             </div>
           )}
 
-          {/* CALCULADORA DE TRÁFICO IDÉNTICA A LA FOTO */}
+          {/* CALCULADORA DE TRÁFICO IDÉNTICA A LA FOTO CON MOTOR EN USD */}
           {currentStepId === 'budget' && (
             <div className="fade-in" style={neon.calcContainer}>
               <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.5px' }}>¿Cuánto tráfico?</h2>
               
-              {/* BOTONES PÍLDORA (100, 500, 1K, 5K) */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                 <button onClick={() => setCompletions(100)} style={neon.pillButton(completions === 100)}>100</button>
                 <button onClick={() => setCompletions(500)} style={neon.pillButton(completions === 500)}>500</button>
@@ -488,7 +483,6 @@ export default function AdsTab({ userData, setUserData }) {
                 <button onClick={() => setCompletions(5000)} style={neon.pillButton(completions === 5000)}>5K</button>
               </div>
 
-              {/* INPUT: CUÁNTAS COMPLETACIONES */}
               <span style={neon.label}>Cuántas Completaciones</span>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                 <button onClick={() => setCompletions(p => Math.max(10, p - 10))} style={neon.btnAction}>-</button>
@@ -496,7 +490,6 @@ export default function AdsTab({ userData, setUserData }) {
                 <button onClick={() => setCompletions(p => p + 10)} style={neon.btnAction}>+</button>
               </div>
 
-              {/* INPUT: CLICK POR COMPLETAR */}
               <span style={neon.label}>Click por Completar</span>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                 <button onClick={() => setRewardPerClick(p => Math.max(1, p - 1))} style={neon.btnAction}>-</button>
@@ -504,14 +497,12 @@ export default function AdsTab({ userData, setUserData }) {
                 <button onClick={() => setRewardPerClick(p => p + 1)} style={neon.btnAction}>+</button>
               </div>
 
-              {/* SELECTOR DE PAGO (Botones minimalistas) */}
               <div style={{ display: 'flex', background: '#fff', borderRadius: '12px', border: '2px solid #000', overflow: 'hidden', marginBottom: '16px' }}>
                 <button onClick={() => setPaymentMethod('balance')} style={{ flex: 1, padding: '10px', border: 'none', background: paymentMethod === 'balance' ? '#000' : 'transparent', color: paymentMethod === 'balance' ? '#fff' : '#000', fontWeight: '900', cursor: 'pointer' }}>MI SALDO</button>
                 <button onClick={() => setPaymentMethod('gram')} style={{ flex: 1, padding: '10px', borderLeft: '2px solid #000', borderRight: '2px solid #000', background: paymentMethod === 'gram' ? '#000' : 'transparent', color: paymentMethod === 'gram' ? '#fff' : '#000', fontWeight: '900', cursor: 'pointer' }}>GRAM</button>
                 <button onClick={() => setPaymentMethod('stars')} style={{ flex: 1, padding: '10px', border: 'none', background: paymentMethod === 'stars' ? '#000' : 'transparent', color: paymentMethod === 'stars' ? '#fff' : '#000', fontWeight: '900', cursor: 'pointer' }}>STARS</button>
               </div>
 
-              {/* CAJA DE RESUMEN AZUL */}
               <div style={neon.summaryBox}>
                 <div>
                   <div style={{ fontWeight: '900', fontSize: '14px', marginBottom: '2px' }}>Pagas</div>
@@ -519,12 +510,11 @@ export default function AdsTab({ userData, setUserData }) {
                 </div>
                 <div style={{ fontWeight: '900', fontSize: '16px', textAlign: 'right' }}>
                   {paymentMethod === 'balance' && `${totalClicksCost} CLICK`}
-                  {paymentMethod === 'gram' && `${gramPrice} GRAM • $${usdPrice}`}
-                  {paymentMethod === 'stars' && `${starsPrice} ⭐`}
+                  {paymentMethod === 'gram' && `${gramPrice} GRAM • $${usdPrice.toFixed(2)}`}
+                  {paymentMethod === 'stars' && `${starsPrice} ⭐ • $${usdPrice.toFixed(2)}`}
                 </div>
               </div>
 
-              {/* BOTÓN FINAL DE CREAR Y PAGAR */}
               <button onClick={handleCheckout} disabled={isGenerating} style={neon.actionBtn}>
                 {isGenerating ? 'PROCESANDO...' : '+ Crear y pagar'}
               </button>
@@ -533,7 +523,6 @@ export default function AdsTab({ userData, setUserData }) {
         </div>
       )}
 
-      {/* MODAL EMERGENTE SOLO PARA PAGO CON GRAM (Billetera Única) */}
       {showPaymentModal && (
         <div className="fade-in" style={{...neon.modalOverlay, zIndex: 100000}}>
           <div style={{...neon.modalContent, height: 'auto', background: '#f4f6f9', color: '#000', border: '3px solid #000', borderRadius: '24px 24px 0 0'}}>
