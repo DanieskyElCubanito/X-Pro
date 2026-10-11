@@ -3,6 +3,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 import { botApi } from '../api/botApi';
 
+const MY_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I"; 
+
 const neon = {
   container: { display: 'flex', flexDirection: 'column', width: '100%' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
@@ -41,7 +43,6 @@ const METHODS = [
   { id: 'gram', name: 'GRAM', icon: '💎', desc: 'Moneda nativa de la Red TON', color: '#00f0ff' }
 ];
 
-// Agregado setUserData en los parámetros para poder actualizar el saldo
 export default function HomeTab({ userData, setUserData, setActiveTab }) {
   const [showHistory, setShowHistory] = useState(false);
   const [realHistory, setRealHistory] = useState([]);
@@ -80,7 +81,7 @@ export default function HomeTab({ userData, setUserData, setActiveTab }) {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   };
 
-  // Función que intercepta el paso 2 y llama al backend para crear la billetera
+  // Función que intercepta el paso 2 y llama al backend para crear la billetera o avanzar a Stars
   const handleProceedToPay = async () => {
     if (selectedMethod.id === 'gram') {
       setIsGenerating(true);
@@ -116,32 +117,18 @@ export default function HomeTab({ userData, setUserData, setActiveTab }) {
 
   const openTonkeeper = () => {
     const amountStr = selectedPack.priceGram * 1e9; 
-    // Ya no requerimos MEMO, la billetera es única
     const url = `ton://transfer/${tempWallet}?amount=${amountStr}`;
-
-    try {
-      WebApp.openLink(url);
-    } catch (error) {
-      toast.error("Tu dispositivo no encontró una billetera compatible instalada.");
-    }
+    try { WebApp.openLink(url); } catch (error) { toast.error("Tu dispositivo no encontró una billetera compatible instalada."); }
   };
 
-  // Función de Verificación Real en Blockchain
+  // Función de Verificación Real en Blockchain (GRAM)
   const handleVerifyPayment = async () => {
     const tid = toast.loading("Verificando transacción en la blockchain...");
     try {
-      const res = await botApi.verifyCryptoPayment({
-        userId: userData.id,
-        intentId: intentId,
-        clicks: selectedPack.clicks
-      });
-
+      const res = await botApi.verifyCryptoPayment({ userId: userData.id, intentId: intentId, clicks: selectedPack.clicks });
       if (res.success) {
         toast.success(`¡Pago Exitoso! Añadimos ${selectedPack.clicks} CLICKs a tu saldo.`, { id: tid, duration: 4000 });
-        // Actualizamos el saldo visualmente
-        if (setUserData) {
-          setUserData(prev => ({ ...prev, balance: res.balance }));
-        }
+        if (setUserData) setUserData(prev => ({ ...prev, balance: res.balance }));
         setShowCryptoGateway(false);
         setPayStep(1);
       }
@@ -150,17 +137,50 @@ export default function HomeTab({ userData, setUserData, setActiveTab }) {
     }
   };
 
+  // 🌟 NUEVA FUNCIÓN DE TELEGRAM STARS: Se comunica con Telegram y espera respuesta
   const handleStarsPayment = async () => {
-    const tid = toast.loading("Conectando con Telegram...");
-    setTimeout(() => {
-      toast.error("El servidor backend aún no tiene la ruta para generar facturas de Stars. Contáctate con el desarrollador.", { id: tid, duration: 5000 });
-    }, 2000);
+    setIsGenerating(true);
+    const tid = toast.loading("Generando factura segura...");
+    try {
+      const res = await botApi.generateStarsInvoice({
+        userId: userData.id,
+        packageId: selectedPack.id,
+        stars: selectedPack.priceStars,
+        clicks: selectedPack.clicks
+      });
+
+      if (res.success) {
+        toast.dismiss(tid);
+        // Despierta la ventana de pago nativa de Telegram Stars
+        WebApp.openInvoice(res.invoiceUrl, async (status) => {
+          if (status === 'paid') {
+            const confirmTid = toast.loading("Confirmando acreditación...");
+            try {
+              const confirmRes = await botApi.confirmStarsPayment({ userId: userData.id, intentId: res.intentId, clicks: selectedPack.clicks });
+              if (confirmRes.success) {
+                toast.success(`¡Recarga Exitosa de ${selectedPack.clicks} CLICKs!`, { id: confirmTid, duration: 4000 });
+                if (setUserData) setUserData(prev => ({ ...prev, balance: confirmRes.balance }));
+                setShowCryptoGateway(false);
+                setPayStep(1);
+              }
+            } catch (err) { toast.error("Error al acreditar el saldo. Contacta a soporte.", { id: confirmTid }); }
+          } else if (status === 'failed') {
+            toast.error("El pago fue rechazado por Telegram.");
+          } else if (status === 'cancelled') {
+            toast.error("Has cancelado el pago.");
+          }
+        });
+      }
+    } catch (e) {
+      toast.error(e.message || "No se pudo conectar con la red de Telegram.", { id: tid });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
     <div className="fade-in" style={neon.container}>
 
-      {/* Esto asegura que las notificaciones salgan por encima de todo */}
       <Toaster containerStyle={{ zIndex: 9999999 }} />
 
       <div style={neon.header}>
@@ -278,7 +298,7 @@ export default function HomeTab({ userData, setUserData, setActiveTab }) {
                   </div>
                 ))}
                 <button onClick={handleProceedToPay} disabled={isGenerating} style={{ width: '100%', padding: '14px', marginTop: '10px', background: 'linear-gradient(90deg, #ff1493, #d80073)', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px' }}>
-                  {isGenerating ? 'GENERANDO BILLETERA...' : 'PROCEDER AL PAGO ➔'}
+                  {isGenerating ? 'GENERANDO...' : 'PROCEDER AL PAGO ➔'}
                 </button>
               </div>
             )}
@@ -298,15 +318,14 @@ export default function HomeTab({ userData, setUserData, setActiveTab }) {
                 {selectedMethod.id === 'stars' ? (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
                     <p style={{ textAlign: 'center', color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', fontWeight: 'bold' }}>
-                      Se generará una factura segura mediante la API oficial de Telegram.
+                      Presiona el botón para abrir la pasarela oficial y segura de Telegram.
                     </p>
-                    <button onClick={handleStarsPayment} style={{ width: '100%', padding: '16px', background: 'linear-gradient(90deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '0 6px 0 #cc8800' }}>
-                      ⭐ PAGAR {selectedPack.priceStars} STARS
+                    <button onClick={handleStarsPayment} disabled={isGenerating} style={{ width: '100%', padding: '16px', background: 'linear-gradient(90deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '0 6px 0 #cc8800' }}>
+                      {isGenerating ? 'SINTONIZANDO...' : `⭐ PAGAR ${selectedPack.priceStars} STARS`}
                     </button>
                   </div>
                 ) : (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    
                     <div style={{ background: 'rgba(0, 240, 255, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid #00f0ff', textAlign: 'center' }}>
                       <span style={{ color: '#00f0ff', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>🛡️ Billetera Única Segura</span>
                       <p style={{ color: '#fff', fontSize: '11px', margin: '6px 0 0 0' }}>Esta dirección fue generada exclusivamente para ti. Envía el monto exacto y verificaremos tu pago automáticamente.</p>
