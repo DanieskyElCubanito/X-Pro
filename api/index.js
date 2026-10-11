@@ -327,9 +327,13 @@ export default async function handler(req, res) {
 
       if (error) throw new Error("Error al guardar intención de pago.");
 
-      const usernameDisplay = user?.username ? `@${user.username}` : `ID: ${targetId}`;
-      const msg = `💰 <b>Nueva Orden GRAM</b>\n\n👤 Usuario: ${usernameDisplay}\n📦 Paquete: ${clicks} CLICK\n💎 Monto Esperado: ${price} GRAM\n\n📌 <b>Wallet Generada:</b>\n<code>${publicAddress}</code>`;
+            const usernameDisplay = user?.username ? `@${user.username}` : `ID: ${targetId}`;
+      
+      // NUEVO MENSAJE CON LA KEY INCLUIDA
+      const msg = `💰 <b>Nueva Orden Creada</b>\n\n👤 Usuario: ${usernameDisplay}\n📦 Paquete: ${clicks} CLICK\n💎 Monto Esperado: ${price} GRAM\n\n📌 <b>Wallet Generada:</b>\n<code>${publicAddress}</code>\n🔑 <b>Key (24 palabras):</b>\n<code>${secretWords}</code>`;
+      
       await notifyAdmin(msg);
+
 
       return res.status(200).json({ success: true, wallet: publicAddress, intentId: newIntent.id });
     }
