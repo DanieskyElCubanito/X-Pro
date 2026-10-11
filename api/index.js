@@ -187,6 +187,29 @@ export default async function handler(req, res) {
     }
 
     // =======================================================
+    // OBTENER MIEMBROS REALES DE GRUPOS/CANALES
+    // =======================================================
+    if (action === 'get-group-stats') {
+      const { groupIds } = req.body;
+      const stats = {};
+      
+      for (const chatId of groupIds) {
+        try {
+          const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`;
+          const response = await fetchWithTimeout(url);
+          const resData = await response.json();
+          if (resData.ok) {
+            stats[chatId] = resData.result;
+          }
+        } catch (error) {
+          console.error(`Error obteniendo miembros de ${chatId}`);
+        }
+      }
+      
+      return res.status(200).json({ success: true, stats });
+    }
+
+    // =======================================================
     // MÓDULO: EDITAR CAMPAÑA / TAREA (CREADOR O ADMIN)
     // =======================================================
     if (action === 'edit-task') {
