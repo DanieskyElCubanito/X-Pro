@@ -281,7 +281,7 @@ export default function PublishTab({ userData, setUserData }) {
                 <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>¿Dónde lo publicamos?</h3>
               </div>
 
-              {AVAILABLE_GROUPS.map((grp) => {
+              {availableGroups.map((grp) => {
                 const isSelected = selectedGroups.includes(grp.id);
                 return (
                   <div key={grp.id} onClick={() => handleToggleGroup(grp.id)} style={{ ...neonStyles.cardInteractive, borderColor: isSelected ? '#00f0ff' : '#8a2be2', background: isSelected ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(46, 16, 77, 0.9))' : neonStyles.cardInteractive.background }}>
