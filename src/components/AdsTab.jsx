@@ -19,7 +19,6 @@ const neon = {
   taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
   taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap' },
   
-  // ESTILOS DE CALCULADORA CYBERPUNK (Rediseño exacto)
   calcContainer: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #8a2be2', borderRadius: '24px', padding: '20px', color: '#ffffff', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.15)' },
   pillButton: (active) => ({ flex: 1, padding: '10px 0', fontSize: '14px', fontWeight: '900', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s', background: active ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 'rgba(15, 5, 28, 0.8)', color: active ? '#050214' : '#ffffff', border: active ? 'none' : '1px solid #8a2be2', boxShadow: active ? '0 0 10px rgba(0, 240, 255, 0.5)' : 'none' }),
   label: { fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#ff99dd', marginBottom: '8px', display: 'block', letterSpacing: '0.5px' },
@@ -29,22 +28,23 @@ const neon = {
   actionBtn: { width: '100%', padding: '16px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '16px', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', cursor: 'pointer', transition: 'all 0.1s', textTransform: 'uppercase' }
 };
 
+// Mantenemos los iconos viejos por si hay tareas creadas antes con esos nombres
 const TaskIcons = {
   channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>,
   group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
   bot: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="16" y1="16" x2="16.01" y2="16" /></svg>,
-  airdrop: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
-  mining: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M14.5 2.5l7 7" /><path d="M21 9l-7-7" /><path d="M16 11l-9 9a2.12 2.12 0 0 1-3-3l9-9" /><path d="M5 19l4-4" /></svg>,
-  miniapp: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 12h4" /><path d="M8 10v4" /><line x1="15" y1="13" x2="15.01" y2="13" /><line x1="18" y1="11" x2="18.01" y2="11" /></svg>
+  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}80)` }}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
+  // Fallbacks antiguos
+  airdrop: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /></svg>,
+  mining: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2.5l7 7" /><path d="M21 9l-7-7" /></svg>,
+  miniapp: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /></svg>
 };
 
+// 🌟 NUEVO MENÚ REDUCIDO (Solo 3 opciones para mayor conversión)
 const TASK_TYPES = [
-  { id: 'channel', icon: TaskIcons.channel('#00f0ff'), title: 'Canal de Telegram', desc: 'Consigue suscriptores reales', color: '#00f0ff', autoName: 'Suscribirse al Canal' },
-  { id: 'group', icon: TaskIcons.group('#00ffaa'), title: 'Grupo de Telegram', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Grupo' },
-  { id: 'bot', icon: TaskIcons.bot('#ffe600'), title: 'Bot de Telegram', desc: 'Usuarios inician tu bot', color: '#ffe600', autoName: 'Iniciar Bot' },
-  { id: 'airdrop', icon: TaskIcons.airdrop('#ff1493'), title: 'Airdrops & Promos', desc: 'Consigue referidos con tu enlace', color: '#ff1493', autoName: 'Unirse al Airdrop' },
-  { id: 'mining', icon: TaskIcons.mining('#ff99dd'), title: 'Plataformas & Minería', desc: 'Afiliados para sitios Web3', color: '#ff99dd', autoName: 'Registro en Plataforma' },
-  { id: 'miniapp', icon: TaskIcons.miniapp('#8a2be2'), title: 'Juegos & Mini Apps', desc: 'Suma jugadores a tu escuadrón', color: '#8a2be2', autoName: 'Jugar Mini App' }
+  { id: 'bot', icon: TaskIcons.bot('#ffe600'), title: 'Bots & Mini Apps', desc: 'Usuarios inician tu bot o app', color: '#ffe600', autoName: 'Iniciar Bot/App' },
+  { id: 'channel', icon: TaskIcons.group('#00ffaa'), title: 'Canales & Grupos', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Chat' },
+  { id: 'promo', icon: TaskIcons.promo('#ff1493'), title: 'Vistas & Promos', desc: 'Consigue referidos o tráfico', color: '#ff1493', autoName: 'Visitar Promo' }
 ];
 
 export default function AdsTab({ userData, setUserData }) {
@@ -63,9 +63,9 @@ export default function AdsTab({ userData, setUserData }) {
   // Estados Calculadora
   const [completions, setCompletions] = useState(100);
   const [rewardPerClick, setRewardPerClick] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState('balance'); // 'balance', 'gram', 'stars'
+  const [paymentMethod, setPaymentMethod] = useState('balance'); 
 
-  // Estados Checkout (Reemplaza la calculadora)
+  // Estados Checkout
   const [checkoutView, setCheckoutView] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tempWallet, setTempWallet] = useState('');
@@ -74,14 +74,9 @@ export default function AdsTab({ userData, setUserData }) {
   const balance = Number(userData?.balance || 0);
 
   // --- MOTOR DE PRECIOS ---
-  // Precio base dinámico calculado en dólares: $0.0025 por Click (Ej: 100 Clicks = $0.25 USD)
   const totalClicksCost = completions * rewardPerClick;
   const usdPrice = totalClicksCost * 0.0025; 
-  
-  // 1 GRAM = $1.48 USD aprox (Cálculo estático por ahora)
   const gramPrice = (usdPrice / 1.48).toFixed(2); 
-  
-  // 1 Star = $0.02 USD
   const starsPrice = Math.ceil(usdPrice * 50);
 
   useEffect(() => {
@@ -110,9 +105,10 @@ export default function AdsTab({ userData, setUserData }) {
 
   const handleVerifyUrl = async () => {
     const val = targetUrl.trim();
-    if (!val) return toast.error("Ingresa tu enlace de afiliado.");
+    if (!val) return toast.error("Ingresa tu enlace.");
     
-    if (taskType === 'group' || taskType === 'channel') {
+    // Ahora 'channel' representa tanto canales como grupos para el backend
+    if (taskType === 'channel') {
       const isTelegramLink = val.startsWith('@') || val.includes('t.me/') || val.includes('telegram.me/');
       if (!isTelegramLink) return toast.error("Debe ser un enlace válido de Telegram.");
       
@@ -186,7 +182,7 @@ export default function AdsTab({ userData, setUserData }) {
         setTempWallet(res.wallet);
         setIntentId(res.intentId);
         toast.dismiss(tid);
-        setCheckoutView(true); // Cambia la interfaz a la pantalla de pago
+        setCheckoutView(true); 
       }
     } catch (e) {
       toast.error(e.message || "Error conectando a la blockchain.", { id: tid });
@@ -251,7 +247,6 @@ export default function AdsTab({ userData, setUserData }) {
     }
   };
 
-  // Vuelve a la calculadora cancelando la intención de pago
   const cancelCheckout = () => {
     setCheckoutView(false);
     setIntentId(null);
@@ -354,7 +349,7 @@ export default function AdsTab({ userData, setUserData }) {
               {communityTasks.map((task) => (
                 <div key={task.id} style={neon.taskCard}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={neon.taskIconBox}>{TaskIcons[task.type] ? TaskIcons[task.type]('#00f0ff') : TaskIcons.airdrop('#00f0ff')}</div>
+                    <div style={neon.taskIconBox}>{TaskIcons[task.type] ? TaskIcons[task.type]('#00f0ff') : TaskIcons.promo('#00f0ff')}</div>
                     <div>
                       <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>{task.title}</div>
                       <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{task.completions_done} / {task.completions_total} referidos</div>
@@ -398,7 +393,7 @@ export default function AdsTab({ userData, setUserData }) {
                     <div style={{ width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
                         <div style={{...neon.taskIconBox, borderColor: '#ff1493', background: 'rgba(255, 20, 147, 0.1)'}}>
-                          {TaskIcons[task.type] ? TaskIcons[task.type]('#ff1493') : TaskIcons.airdrop('#ff1493')}
+                          {TaskIcons[task.type] ? TaskIcons[task.type]('#ff1493') : TaskIcons.promo('#ff1493')}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{task.title}</div>
@@ -437,16 +432,16 @@ export default function AdsTab({ userData, setUserData }) {
           {currentStepId === 'type' && (
             <div className="fade-in">
               <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#ffe600', marginBottom: '16px', textTransform: 'uppercase' }}>¿Qué vas a impulsar?</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {TASK_TYPES.map((type) => (
                   <div key={type.id} onClick={() => { setTaskType(type.id); nextStep(); }}
-                    style={{ ...neon.cardInteractive, flexDirection: 'column', textAlign: 'center', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '16px 10px', borderColor: taskType === type.id ? type.color : '#8a2be2', background: taskType === type.id ? `linear-gradient(135deg, ${type.color}22, rgba(18, 7, 36, 0.9))` : neon.cardInteractive.background }}>
+                    style={{ ...neon.cardInteractive, borderColor: taskType === type.id ? type.color : '#8a2be2', background: taskType === type.id ? `linear-gradient(135deg, ${type.color}22, rgba(18, 7, 36, 0.9))` : neon.cardInteractive.background }}>
                     <div style={{ width: '44px', height: '44px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {type.icon}
                     </div>
                     <div>
-                      <div style={{ color: '#fff', fontSize: '13px', fontWeight: '900', lineHeight: '1.2' }}>{type.title}</div>
-                      <div style={{ color: '#ff99dd', fontSize: '10px', fontWeight: 'bold', marginTop: '4px' }}>{type.desc}</div>
+                      <div style={{ color: '#fff', fontSize: '15px', fontWeight: '900', lineHeight: '1.2' }}>{type.title}</div>
+                      <div style={{ color: '#ff99dd', fontSize: '11px', fontWeight: 'bold', marginTop: '4px' }}>{type.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -480,7 +475,6 @@ export default function AdsTab({ userData, setUserData }) {
             </div>
           )}
 
-          {/* CALCULADORA (Y PANTALLA DE PAGO EN EL MISMO PASO) */}
           {currentStepId === 'budget' && (
             <div className="fade-in" style={neon.calcContainer}>
               
@@ -538,9 +532,9 @@ export default function AdsTab({ userData, setUserData }) {
                   </div>
 
                   <div style={{ display: 'flex', background: 'rgba(15, 5, 28, 0.8)', borderRadius: '12px', border: '2px solid #8a2be2', overflow: 'hidden', marginBottom: '20px' }}>
-                    <button onClick={() => setPaymentMethod('balance')} style={{ flex: 1, padding: '12px', border: 'none', background: paymentMethod === 'balance' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'balance' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>MI SALDO</button>
-                    <button onClick={() => setPaymentMethod('gram')} style={{ flex: 1, padding: '12px', borderLeft: '1px solid #8a2be2', borderRight: '1px solid #8a2be2', background: paymentMethod === 'gram' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'gram' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>GRAM</button>
-                    <button onClick={() => setPaymentMethod('stars')} style={{ flex: 1, padding: '12px', border: 'none', background: paymentMethod === 'stars' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'stars' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer' }}>STARS</button>
+                    <button onClick={() => setPaymentMethod('balance')} style={{ flex: 1, padding: '12px', border: 'none', background: paymentMethod === 'balance' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'balance' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}>MI SALDO</button>
+                    <button onClick={() => setPaymentMethod('gram')} style={{ flex: 1, padding: '12px', borderLeft: '1px solid #8a2be2', borderRight: '1px solid #8a2be2', background: paymentMethod === 'gram' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'gram' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}>GRAM</button>
+                    <button onClick={() => setPaymentMethod('stars')} style={{ flex: 1, padding: '12px', border: 'none', background: paymentMethod === 'stars' ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: paymentMethod === 'stars' ? '#ffffff' : '#ff99dd', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}>STARS</button>
                   </div>
 
                   <div style={neon.summaryBox}>
@@ -549,7 +543,7 @@ export default function AdsTab({ userData, setUserData }) {
                       <div style={{ fontSize: '10px', fontWeight: '800', opacity: 0.8, color: '#ff99dd' }}>Presupuesto: {totalClicksCost} CLICK</div>
                     </div>
                     <div style={{ fontWeight: '900', fontSize: '16px', textAlign: 'right', color: '#00f0ff' }}>
-                      {paymentMethod === 'balance' && `${totalClicksCost} CLICK`}
+                      {paymentMethod === 'balance' && `${totalClicksCost} CLICK • $0.00`}
                       {paymentMethod === 'gram' && `${gramPrice} GRAM • $${usdPrice.toFixed(2)}`}
                       {paymentMethod === 'stars' && `${starsPrice} ⭐ • $${usdPrice.toFixed(2)}`}
                     </div>
