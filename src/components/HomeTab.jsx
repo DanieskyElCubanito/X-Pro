@@ -26,7 +26,7 @@ const neon = {
 
 export default function HomeTab({ userData, setActiveTab }) {
   const [showHistory, setShowHistory] = useState(false);
-  const [History, setRealHistory] = useState([]);
+  const [History, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const clickBalance = Number(userData?.balance || 0).toFixed(2);
