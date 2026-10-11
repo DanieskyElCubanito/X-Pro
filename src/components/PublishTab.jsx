@@ -51,10 +51,11 @@ const TEMPLATES = [
   { title: 'Red de Tráfico', icon: '⚡', accent: '#ffe600', text: '⚡ Únete a nuestra red. Gana CLICK gratis todos los días completando tareas simples.' }
 ];
 
-const AVAILABLE_GROUPS = [
-  { id: "-1003685621367", name: "@AirdropsCriptoES", members: "10.6K miembros" },
-  { id: "-1004377164928", name: "@TONAirdropsES", members: "25.4K miembros" }
+const INITIAL_GROUPS = [
+  { id: "-1003685621367", name: "@AirdropsCriptoES", members: "Calculando..." },
+  { id: "-1004377164928", name: "@TONAirdropsES", members: "Calculando..." }
 ];
+
 
 export default function PublishTab({ userData, setUserData }) {
   const [activeTab, setActiveTab] = useState('create');
