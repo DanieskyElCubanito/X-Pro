@@ -233,7 +233,6 @@ export default async function handler(req, res) {
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
       const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
 
-      // VERIFICAMOS EN EL HISTORIAL LOS CANALES Y EL CHECK-IN
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: historyLogs } = await supabase.from('history_logs').select('title, description, created_at').eq('user_id', targetId);
       const fixed_completed = [];
@@ -283,9 +282,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
-    // =======================================================
-    // TAREAS FIJAS, CHECK-IN DIARIO Y REUNIÓN SIN RECOMPENSA
-    // =======================================================
     if (action === 'claim-fixed-task') {
       const { taskId } = req.body;
       const targetId = String(userId);
@@ -305,11 +301,7 @@ export default async function handler(req, res) {
         if (recentLog) return res.status(400).json({success: false, error: 'Ya reclamaste tu Check-in hoy.'});
       } else {
         const { data: alreadyDone } = await supabase.from('history_logs').select('id').eq('user_id', targetId).eq('description', `Recompensa por unirte a ${title}.`).maybeSingle();
-        
-        // Si el usuario ya cobró antes, le dejamos pasar sin darle recompensa de nuevo
-        if (alreadyDone) {
-          return res.status(200).json({ success: true, message: 'Unión restaurada', is_rejoin: true });
-        }
+        if (alreadyDone) return res.status(200).json({ success: true, message: 'Unión restaurada', is_rejoin: true });
       }
 
       const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
@@ -362,6 +354,23 @@ export default async function handler(req, res) {
       const targetId = String(userId);
       const { data: history } = await supabase.from('history_logs').select('*').eq('user_id', targetId).order('created_at', { ascending: false }); 
       return res.status(200).json({ success: true, history: history || [] });
+    }
+
+    // BLOQUE RESTAURADO: Obtener referidos
+    if (action === 'get-referrals') {
+      const targetId = String(userId);
+      let { data: lv1 } = await supabase.from('users').select('*').eq('referred_by', targetId);
+      
+      if (lv1 && lv1.length > 0) {
+        for (const refUser of lv1) {
+          if (!refUser.referral_reward_granted) await tryGrantReferralReward(refUser.id);
+        }
+        const refreshed = await supabase.from('users').select('*').eq('referred_by', targetId);
+        lv1 = refreshed.data || lv1;
+      }
+      
+      const { data: dbUser } = await supabase.from('users').select('referral_earnings').eq('id', targetId).maybeSingle();
+      return res.status(200).json({ success: true, referrals: lv1 || [], earnings: dbUser?.referral_earnings || 0 });
     }
 
     if (action === 'verify-human') {
