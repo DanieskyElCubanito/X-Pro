@@ -46,6 +46,9 @@ export default function AdsTab({ userData, setUserData }) {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [adLoading, setAdLoading] = useState(false);
   const [fixedTasksLoading, setFixedTasksLoading] = useState(false);
+  
+  // Novedad: Arreglo local que lleva la cuenta de las tareas fijas hechas.
+  const [fixedCompleted, setFixedCompleted] = useState([]); 
 
   const [taskStatus, setTaskStatus] = useState({}); 
   const [countdown, setCountdown] = useState({});
@@ -80,7 +83,7 @@ export default function AdsTab({ userData, setUserData }) {
         if (data && data['the-open-network'] && data['the-open-network'].usd) {
           setLiveGramUsd(data['the-open-network'].usd);
         }
-      } catch (error) { console.error(error); }
+      } catch (error) {}
     };
     fetchLivePrice();
   }, []);
@@ -114,8 +117,15 @@ export default function AdsTab({ userData, setUserData }) {
   const fetchTasks = async () => {
     setLoadingTasks(true);
     try {
-      const data = await botApi.getTasks(userData?.id);
-      if (data && data.success) setTasks(data.tasks || []);
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-tasks', userId: userData.id })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setTasks(data.tasks || []);
+        setFixedCompleted(data.fixed_completed || []); // Guarda la respuesta del backend
+      }
     } catch (e) { console.error(e); } finally { setLoadingTasks(false); }
   };
 
@@ -141,8 +151,12 @@ export default function AdsTab({ userData, setUserData }) {
       setIsVerifying(true);
       const tid = toast.loading("Verificando permisos...");
       try {
-        const res = await botApi.verifyBotAdmin(val);
-        if (res.success) { toast.success("¡Bot es admin!", { id: tid }); nextStep(); } 
+        const res = await fetch('/api', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'verify-admin', url: val })
+        });
+        const data = await res.json();
+        if (data.success) { toast.success("¡Bot es admin!", { id: tid }); nextStep(); } 
         else { toast.error("El bot no es admin. Añádelo y reintenta.", { id: tid }); }
       } catch (e) { toast.error("Error al verificar.", { id: tid }); } finally { setIsVerifying(false); }
     } else if (taskType === 'bot') {
@@ -168,9 +182,13 @@ export default function AdsTab({ userData, setUserData }) {
     const fixedTitle = TASK_TYPES.find(t => t.id === taskType)?.autoName || 'Nueva Tarea';
 
     try {
-      const res = await botApi.createTask({ creator_id: userData?.id, type: taskType, title: fixedTitle, url: targetUrl, bot_token: botToken || null, completions_total: completions, reward: rewardPerClick });
-      if (!res.success) throw new Error(res.error);
-      if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creator_id: userData?.id, action: 'create-task', type: taskType, title: fixedTitle, url: targetUrl, bot_token: botToken || null, completions_total: completions, reward: rewardPerClick })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
       toast.success("¡Campaña activada con éxito!", { id: tid });
       setTaskType(null); setTargetUrl(''); setBotToken(''); setCompletions(100); setCurrentStepIndex(0); setCheckoutView(false); setView('activity');
     } catch (err) { toast.error(err.message || "Error al procesar.", { id: tid }); } finally { setIsGenerating(false); }
@@ -180,8 +198,12 @@ export default function AdsTab({ userData, setUserData }) {
     setIsGenerating(true);
     const tid = toast.loading("Generando billetera...");
     try {
-      const res = await botApi.generatePaymentWallet({ userId: userData.id, packageId: 0, price: gramPrice, clicks: totalClicksCost });
-      if (res.success) { setTempWallet(res.wallet); setIntentId(res.intentId); toast.dismiss(tid); setCheckoutView(true); }
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate-payment-wallet', userId: userData.id, packageId: 0, price: gramPrice, clicks: totalClicksCost })
+      });
+      const data = await res.json();
+      if (data.success) { setTempWallet(data.wallet); setIntentId(data.intentId); toast.dismiss(tid); setCheckoutView(true); }
     } catch (e) { toast.error("Error conectando a la blockchain.", { id: tid }); } finally { setIsGenerating(false); }
   };
 
@@ -191,8 +213,13 @@ export default function AdsTab({ userData, setUserData }) {
   const handleVerifyGramPayment = async () => {
     const tid = toast.loading("Verificando en la blockchain...");
     try {
-      const res = await botApi.verifyCryptoPayment({ userId: userData.id, intentId: intentId, clicks: totalClicksCost });
-      if (res.success) { toast.success(`Pago Exitoso.`, { id: tid }); await handleCreateTaskPaid(); }
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify-crypto-payment', userId: userData.id, intentId: intentId, clicks: totalClicksCost })
+      });
+      const data = await res.json();
+      if (data.success) { toast.success(`Pago Exitoso.`, { id: tid }); await handleCreateTaskPaid(); }
+      else throw new Error(data.error);
     } catch (e) { toast.error(e.message || "Aún no detectamos el pago.", { id: tid, duration: 6000 }); }
   };
 
@@ -200,15 +227,23 @@ export default function AdsTab({ userData, setUserData }) {
     setIsGenerating(true);
     const tid = toast.loading("Generando factura...");
     try {
-      const res = await botApi.generateStarsInvoice({ userId: userData.id, packageId: 0, stars: starsPrice, clicks: totalClicksCost });
-      if (res.success) {
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate-stars-invoice', userId: userData.id, packageId: 0, stars: starsPrice, clicks: totalClicksCost })
+      });
+      const data = await res.json();
+      if (data.success) {
         toast.dismiss(tid);
-        WebApp.openInvoice(res.invoiceUrl, async (status) => {
+        WebApp.openInvoice(data.invoiceUrl, async (status) => {
           if (status === 'paid') {
             const confirmTid = toast.loading("Confirmando...");
             try {
-              const confirmRes = await botApi.confirmStarsPayment({ userId: userData.id, intentId: res.intentId, clicks: totalClicksCost });
-              if (confirmRes.success) { toast.success(`Pago exitoso.`, { id: confirmTid }); await handleCreateTaskPaid(); }
+              const confirmRes = await fetch('/api', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'confirm-stars-payment', userId: userData.id, intentId: data.intentId, clicks: totalClicksCost })
+              });
+              const confirmData = await confirmRes.json();
+              if (confirmData.success) { toast.success(`Pago exitoso.`, { id: confirmTid }); await handleCreateTaskPaid(); }
             } catch (err) { toast.error("Error al acreditar.", { id: confirmTid }); }
           } else { toast.error("Pago no completado."); }
         });
@@ -236,13 +271,17 @@ export default function AdsTab({ userData, setUserData }) {
     const tid = toast.loading("Verificando tarea...");
     setTaskStatus(prev => ({ ...prev, [task.id]: 'verifying' }));
     try {
-      const res = await botApi.completeTask(userData?.id, task.id);
-      if (res.success) {
-        toast.success(`+${res.reward} CLICK`, { id: tid });
-        if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete-task', userId: userData.id, taskId: task.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`+${data.reward} CLICK`, { id: tid });
+        if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
         setTaskStatus(prev => ({ ...prev, [task.id]: 'completed' }));
       } else {
-        toast.error(res.error || "Aún no has completado la tarea.", { id: tid });
+        toast.error(data.error || "Aún no has completado la tarea.", { id: tid });
         setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' }));
       }
     } catch (e) { toast.error("Error de conexión al verificar.", { id: tid }); setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' })); } 
@@ -262,6 +301,8 @@ export default function AdsTab({ userData, setUserData }) {
         if (data.success) {
           toast.success("+1.00 CLICK", { id: tid });
           if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
+          // Actualización instantánea en la UI para bloquear el botón
+          setFixedCompleted(prev => [...prev, taskId]); 
         } else {
           toast.error(data.error || "Debes unirte al canal primero.", { id: tid });
         }
@@ -277,10 +318,14 @@ export default function AdsTab({ userData, setUserData }) {
     window.showGiga().then(async () => {
         toast.loading("Acreditando +0.50 CLICK...", { id: tid });
         try {
-          const res = await botApi.claimBonus(userData.id);
-          if (res.success) {
+          const res = await fetch('/api', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'claim-bonus', userId: userData.id })
+          });
+          const data = await res.json();
+          if (data.success) {
             toast.success("+0.50 CLICK", { id: tid });
-            if (res.balance !== undefined) setUserData(prev => ({ ...prev, balance: res.balance }));
+            if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
           } else toast.error("Error al procesar el pago.", { id: tid });
         } catch (error) { toast.error("Error de conexión.", { id: tid }); }
         finally { setAdLoading(false); }
@@ -362,7 +407,7 @@ export default function AdsTab({ userData, setUserData }) {
             <button onClick={fetchTasks} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
           </div>
 
-          {/* TAREAS FIJAS DE CANALES (Desbloquear para publicar) */}
+          {/* TAREAS FIJAS DE CANALES (Se bloquean automáticamente al hacerlas) */}
           <div style={{...neon.taskCard, borderColor: '#ffe600', background: 'linear-gradient(145deg, rgba(255, 230, 0, 0.1), #1a0b33)'}}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{...neon.taskIconBox, borderColor: '#ffe600'}}>{TaskIcons.channel('#ffe600')}</div>
@@ -371,7 +416,13 @@ export default function AdsTab({ userData, setUserData }) {
                 <div style={{ color: '#ffe600', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>🔓 Desbloquear para publicar</div>
               </div>
             </div>
-            <button onClick={() => claimFixedTask('channel1', 'https://t.me/AirdropsCriptoES')} disabled={fixedTasksLoading} style={fixedTasksLoading ? neon.taskButtonDisabled : neon.taskButton}>+1.00 CLICK</button>
+            <button 
+              onClick={() => claimFixedTask('channel1', 'https://t.me/AirdropsCriptoES')} 
+              disabled={fixedTasksLoading || fixedCompleted.includes('channel1')} 
+              style={(fixedTasksLoading || fixedCompleted.includes('channel1')) ? neon.taskButtonDisabled : neon.taskButton}
+            >
+              {fixedCompleted.includes('channel1') ? '✅ COMPLETADA' : '+1.00 CLICK'}
+            </button>
           </div>
 
           <div style={{...neon.taskCard, borderColor: '#ffe600', background: 'linear-gradient(145deg, rgba(255, 230, 0, 0.1), #1a0b33)'}}>
@@ -382,7 +433,13 @@ export default function AdsTab({ userData, setUserData }) {
                 <div style={{ color: '#ffe600', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>🔓 Desbloquear para publicar</div>
               </div>
             </div>
-            <button onClick={() => claimFixedTask('channel2', 'https://t.me/TONAirdropsES')} disabled={fixedTasksLoading} style={fixedTasksLoading ? neon.taskButtonDisabled : neon.taskButton}>+1.00 CLICK</button>
+            <button 
+              onClick={() => claimFixedTask('channel2', 'https://t.me/TONAirdropsES')} 
+              disabled={fixedTasksLoading || fixedCompleted.includes('channel2')} 
+              style={(fixedTasksLoading || fixedCompleted.includes('channel2')) ? neon.taskButtonDisabled : neon.taskButton}
+            >
+              {fixedCompleted.includes('channel2') ? '✅ COMPLETADA' : '+1.00 CLICK'}
+            </button>
           </div>
 
           {/* CHECK-IN DIARIO */}
@@ -394,7 +451,13 @@ export default function AdsTab({ userData, setUserData }) {
                 <div style={{ color: '#00ffaa', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>⏳ Check-in Diario</div>
               </div>
             </div>
-            <button onClick={() => claimFixedTask('daily', 'https://t.me/CryptoWeb3Pay')} disabled={fixedTasksLoading} style={fixedTasksLoading ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'}}>+1.00 CLICK</button>
+            <button 
+              onClick={() => claimFixedTask('daily', 'https://t.me/CryptoWeb3Pay')} 
+              disabled={fixedTasksLoading || fixedCompleted.includes('daily')} 
+              style={(fixedTasksLoading || fixedCompleted.includes('daily')) ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'}}
+            >
+              {fixedCompleted.includes('daily') ? '⏳ VUELVE MAÑANA' : '+1.00 CLICK'}
+            </button>
           </div>
 
           {/* ANUNCIO PATROCINADO INFINITO */}
@@ -503,7 +566,6 @@ export default function AdsTab({ userData, setUserData }) {
 
       {view === 'wizard' && (
         <div className="fade-in">
-          {/* El código de Wizard (Paso 1 al 4) se mantiene igual porque el sistema de creación está bien */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             {currentStepIndex > 0 && !checkoutView ? (
               <button onClick={prevStep} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>◀</button>
