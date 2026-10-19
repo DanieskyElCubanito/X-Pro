@@ -16,6 +16,7 @@ const neon = {
   taskCard: { background: 'linear-gradient(145deg, #10061e, #1a0b33)', border: '1.5px solid rgba(138, 43, 226, 0.5)', borderRadius: '20px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.4), inset 0 2px 10px rgba(138, 43, 226, 0.1)' },
   taskIconBox: { width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 240, 255, 0.3)', flexShrink: 0 },
   taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
+  taskButtonRejoin: { background: 'transparent', color: '#ffe600', border: '2px solid #ffe600', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' },
   taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', cursor: 'not-allowed' },
   taskButtonCheck: { background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #007744, 0 6px 15px rgba(0, 255, 170, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
   calcContainer: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #8a2be2', borderRadius: '24px', padding: '20px', color: '#ffffff', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.15)' },
@@ -47,8 +48,8 @@ export default function AdsTab({ userData, setUserData }) {
   const [adLoading, setAdLoading] = useState(false);
   const [fixedTasksLoading, setFixedTasksLoading] = useState(false);
   
-  // Novedad: Arreglo local que lleva la cuenta de las tareas fijas hechas.
   const [fixedCompleted, setFixedCompleted] = useState([]); 
+  const [actualMembership, setActualMembership] = useState({ channel1: false, channel2: false });
 
   const [taskStatus, setTaskStatus] = useState({}); 
   const [countdown, setCountdown] = useState({});
@@ -94,7 +95,10 @@ export default function AdsTab({ userData, setUserData }) {
   const starsPrice = Math.ceil(usdPrice / 0.013);
 
   useEffect(() => {
-    if (userData?.id && (view === 'list' || view === 'activity')) fetchTasks();
+    if (userData?.id && (view === 'list' || view === 'activity')) {
+      fetchTasks();
+      verifyActualMembership();
+    }
   }, [userData?.id, view]);
 
   useEffect(() => {
@@ -114,6 +118,20 @@ export default function AdsTab({ userData, setUserData }) {
     }
   }, [taskStatus]);
 
+  // Vemos en vivo si el usuario sigue metido o no
+  const verifyActualMembership = async () => {
+    try {
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check-channels', userId: userData.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActualMembership({ channel1: data.channel1, channel2: data.channel2 });
+      }
+    } catch (e) {}
+  };
+
   const fetchTasks = async () => {
     setLoadingTasks(true);
     try {
@@ -124,7 +142,7 @@ export default function AdsTab({ userData, setUserData }) {
       const data = await res.json();
       if (data && data.success) {
         setTasks(data.tasks || []);
-        setFixedCompleted(data.fixed_completed || []); // Guarda la respuesta del backend
+        setFixedCompleted(data.fixed_completed || []); 
       }
     } catch (e) { console.error(e); } finally { setLoadingTasks(false); }
   };
@@ -298,11 +316,19 @@ export default function AdsTab({ userData, setUserData }) {
           body: JSON.stringify({ action: 'claim-fixed-task', userId: userData.id, taskId: taskId })
         });
         const data = await res.json();
+        
         if (data.success) {
-          toast.success("+1.00 CLICK", { id: tid });
-          if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
-          // Actualización instantánea en la UI para bloquear el botón
+          if (data.is_rejoin) {
+            toast.success("¡Unión Restaurada!", { id: tid });
+          } else {
+            toast.success("+1.00 CLICK", { id: tid });
+            if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
+          }
+          
           setFixedCompleted(prev => [...prev, taskId]); 
+          if(taskId === 'channel1') setActualMembership(prev => ({...prev, channel1: true}));
+          if(taskId === 'channel2') setActualMembership(prev => ({...prev, channel2: true}));
+          
         } else {
           toast.error(data.error || "Debes unirte al canal primero.", { id: tid });
         }
@@ -383,6 +409,48 @@ export default function AdsTab({ userData, setUserData }) {
     return <button onClick={() => handleStartTask(task)} style={neon.taskButton}>{`+${Number(task.reward).toFixed(2)} CLICK`}</button>;
   };
 
+  // Lógica inteligente para botones fijos
+  const renderFixedButton = (taskId, link) => {
+    const isCheckedInBackend = fixedCompleted.includes(taskId);
+    
+    if (taskId === 'daily') {
+      return (
+        <button 
+          onClick={() => claimFixedTask(taskId, link)} 
+          disabled={fixedTasksLoading || isCheckedInBackend} 
+          style={(fixedTasksLoading || isCheckedInBackend) ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'}}
+        >
+          {isCheckedInBackend ? '⏳ VUELVE MAÑANA' : '+1.00 CLICK'}
+        </button>
+      );
+    }
+
+    const isMemberCurrently = actualMembership[taskId];
+
+    // Si ya le pagamos pero AHORA no está en el grupo
+    if (isCheckedInBackend && !isMemberCurrently) {
+      return (
+        <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading} style={neon.taskButtonRejoin}>
+          VOLVER A ENTRAR
+        </button>
+      );
+    }
+
+    // Si ya le pagamos y AHORA sí está en el grupo
+    if (isCheckedInBackend && isMemberCurrently) {
+      return (
+        <button disabled style={neon.taskButtonDisabled}>✅ COMPLETADA</button>
+      );
+    }
+
+    // Si nunca le hemos pagado
+    return (
+      <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading} style={neon.taskButton}>
+        +1.00 CLICK
+      </button>
+    );
+  };
+
   return (
     <div style={{ color: '#ffffff', paddingBottom: '20px' }}>
       <Toaster containerStyle={{ zIndex: 9999999 }} />
@@ -404,10 +472,9 @@ export default function AdsTab({ userData, setUserData }) {
         <div className="fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 5px' }}>
             <h4 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: '900', textTransform: 'uppercase' }}>Misiones Fijas</h4>
-            <button onClick={fetchTasks} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
+            <button onClick={() => { fetchTasks(); verifyActualMembership(); }} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
           </div>
 
-          {/* TAREAS FIJAS DE CANALES (Se bloquean automáticamente al hacerlas) */}
           <div style={{...neon.taskCard, borderColor: '#ffe600', background: 'linear-gradient(145deg, rgba(255, 230, 0, 0.1), #1a0b33)'}}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{...neon.taskIconBox, borderColor: '#ffe600'}}>{TaskIcons.channel('#ffe600')}</div>
@@ -416,13 +483,7 @@ export default function AdsTab({ userData, setUserData }) {
                 <div style={{ color: '#ffe600', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>🔓 Desbloquear para publicar</div>
               </div>
             </div>
-            <button 
-              onClick={() => claimFixedTask('channel1', 'https://t.me/AirdropsCriptoES')} 
-              disabled={fixedTasksLoading || fixedCompleted.includes('channel1')} 
-              style={(fixedTasksLoading || fixedCompleted.includes('channel1')) ? neon.taskButtonDisabled : neon.taskButton}
-            >
-              {fixedCompleted.includes('channel1') ? '✅ COMPLETADA' : '+1.00 CLICK'}
-            </button>
+            {renderFixedButton('channel1', 'https://t.me/AirdropsCriptoES')}
           </div>
 
           <div style={{...neon.taskCard, borderColor: '#ffe600', background: 'linear-gradient(145deg, rgba(255, 230, 0, 0.1), #1a0b33)'}}>
@@ -433,16 +494,9 @@ export default function AdsTab({ userData, setUserData }) {
                 <div style={{ color: '#ffe600', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>🔓 Desbloquear para publicar</div>
               </div>
             </div>
-            <button 
-              onClick={() => claimFixedTask('channel2', 'https://t.me/TONAirdropsES')} 
-              disabled={fixedTasksLoading || fixedCompleted.includes('channel2')} 
-              style={(fixedTasksLoading || fixedCompleted.includes('channel2')) ? neon.taskButtonDisabled : neon.taskButton}
-            >
-              {fixedCompleted.includes('channel2') ? '✅ COMPLETADA' : '+1.00 CLICK'}
-            </button>
+            {renderFixedButton('channel2', 'https://t.me/TONAirdropsES')}
           </div>
 
-          {/* CHECK-IN DIARIO */}
           <div style={{...neon.taskCard, borderColor: '#00ffaa', background: 'linear-gradient(145deg, rgba(0, 255, 170, 0.1), #1a0b33)'}}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{...neon.taskIconBox, borderColor: '#00ffaa'}}><span style={{fontSize: '24px'}}>🎁</span></div>
@@ -451,16 +505,9 @@ export default function AdsTab({ userData, setUserData }) {
                 <div style={{ color: '#00ffaa', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>⏳ Check-in Diario</div>
               </div>
             </div>
-            <button 
-              onClick={() => claimFixedTask('daily', 'https://t.me/CryptoWeb3Pay')} 
-              disabled={fixedTasksLoading || fixedCompleted.includes('daily')} 
-              style={(fixedTasksLoading || fixedCompleted.includes('daily')) ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'}}
-            >
-              {fixedCompleted.includes('daily') ? '⏳ VUELVE MAÑANA' : '+1.00 CLICK'}
-            </button>
+            {renderFixedButton('daily', 'https://t.me/CryptoWeb3Pay')}
           </div>
 
-          {/* ANUNCIO PATROCINADO INFINITO */}
           <div style={{...neon.taskCard, borderColor: '#ff1493', background: 'linear-gradient(145deg, rgba(255, 20, 147, 0.1), #1a0b33)'}}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{...neon.taskIconBox, borderColor: '#ff1493'}}><span style={{fontSize: '24px'}}>📺</span></div>
@@ -514,7 +561,7 @@ export default function AdsTab({ userData, setUserData }) {
         <div className="fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 5px' }}>
             <h4 style={{ margin: 0, color: '#ff41b4', fontSize: '16px', fontWeight: '900', textTransform: 'uppercase' }}>Tus Campañas Activas</h4>
-            <button onClick={fetchTasks} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
+            <button onClick={() => { fetchTasks(); verifyActualMembership(); }} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄 Actualizar</button>
           </div>
 
           {loadingTasks ? (
@@ -566,6 +613,7 @@ export default function AdsTab({ userData, setUserData }) {
 
       {view === 'wizard' && (
         <div className="fade-in">
+          {/* El código de Wizard (Paso 1 al 4) se mantiene intacto */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             {currentStepIndex > 0 && !checkoutView ? (
               <button onClick={prevStep} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>◀</button>
