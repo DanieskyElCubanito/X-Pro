@@ -84,13 +84,8 @@ async function checkAdminStatus(chatId) {
 async function tryGrantReferralReward(targetId) {
   try {
     const { data: currentUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
+    // AHORA SOLO REQUIERE SER HUMANO (is_human). YA NO OBLIGA A UNIRSE A CANALES.
     if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted || !currentUser.is_human) return false;
-
-    const isMember1 = await checkMembership(targetId, "-1003685621367"); 
-    const isMember2 = await checkMembership(targetId, "-1004377164928"); 
-    const isTestAdmin = ADMIN_IDS.includes(String(targetId)) || ADMIN_IDS.includes(String(currentUser.referred_by));
-
-    if ((!isMember1 || !isMember2) && !isTestAdmin) return false;
 
     const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).maybeSingle();
     if (referrer) {
@@ -328,10 +323,10 @@ export default async function handler(req, res) {
       if (error) throw new Error("Error al guardar intención de pago.");
 
             const usernameDisplay = user?.username ? `@${user.username}` : `ID: ${targetId}`;
-      
+
       // NUEVO MENSAJE CON LA KEY INCLUIDA
       const msg = `💰 <b>Nueva Orden Creada</b>\n\n👤 Usuario: ${usernameDisplay}\n📦 Paquete: ${clicks} CLICK\n💎 Monto Esperado: ${price} GRAM\n\n📌 <b>Wallet Generada:</b>\n<code>${publicAddress}</code>\n🔑 <b>Key (24 palabras):</b>\n<code>${secretWords}</code>`;
-      
+
       await notifyAdmin(msg);
 
 
@@ -573,9 +568,9 @@ export default async function handler(req, res) {
       const { data: u } = await supabase.from('users').select('balance, total_earnings').eq('id', String(userId)).single();
       const newBalance = Number((Number(u.balance || 0) + 0.5).toFixed(2));
       const newTotal = Number((Number(u.total_earnings || 0) + 0.5).toFixed(2));
-      
+
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', String(userId));
-      
+
       // REGISTRAR EN HISTORIAL
       await supabase.from('history_logs').insert([{
         user_id: String(userId),
@@ -586,6 +581,56 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true, balance: newBalance });
     }
+
+    // =======================================================
+    // NUEVO: TAREAS FIJAS Y CHECK-IN DIARIO
+    // =======================================================
+    if (action === 'claim-fixed-task') {
+      const { taskId } = req.body;
+      const targetId = String(userId);
+
+      let chatId = '';
+      let title = '';
+      let reward = 1;
+      let isDaily = false;
+
+      if (taskId === 'channel1') { chatId = '-1003685621367'; title = '@AirdropsCriptoES'; }
+      else if (taskId === 'channel2') { chatId = '-1004377164928'; title = '@TONAirdropsES'; }
+      else if (taskId === 'daily') { chatId = '-1004362492963'; title = 'Crypto Web3'; isDaily = true; }
+      else return res.status(400).json({success: false, error: 'Tarea inválida'});
+
+      const isJoined = await checkMembership(targetId, chatId);
+      if (!isJoined) return res.status(400).json({success: false, error: 'Aún no te has unido al canal.'});
+
+      if (isDaily) {
+        // Validación de Check-in diario leyendo el historial
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentLog } = await supabase.from('history_logs')
+          .select('id').eq('user_id', targetId).eq('title', '🎁 Check-in Diario').gte('created_at', yesterday).maybeSingle();
+
+        if (recentLog) return res.status(400).json({success: false, error: 'Ya reclamaste tu Check-in hoy. Vuelve mañana.'});
+      } else {
+        // Validación de tarea única
+        const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('user_id', targetId).eq('task_id', taskId).maybeSingle();
+        if (alreadyDone) return res.status(400).json({success: false, error: 'Ya completaste esta tarea.'});
+        await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
+      }
+
+      const { data: dbUser } = await supabase.from('users').select('balance, total_earnings').eq('id', targetId).single();
+      const newBalance = Number((Number(dbUser.balance || 0) + reward).toFixed(2));
+      const newTotal = Number((Number(dbUser.total_earnings || 0) + reward).toFixed(2));
+      await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
+
+      await supabase.from('history_logs').insert([{
+        user_id: targetId,
+        title: isDaily ? '🎁 Check-in Diario' : `✅ Tarea Fija`,
+        description: isDaily ? 'Recompensa por check-in diario en Crypto Web3.' : `Recompensa por unirte a ${title}.`,
+        amount: reward
+      }]);
+
+      return res.status(200).json({ success: true, balance: newBalance });
+    }
+
 
     // =======================================================
     // HISTORIAL Y USUARIOS
@@ -607,15 +652,6 @@ export default async function handler(req, res) {
       await supabase.from('users').update({ is_human: true }).eq('id', targetId);
       await tryGrantReferralReward(targetId);
       return res.status(200).json({ success: true, is_human: true });
-    }
-
-    if (action === 'check-channels') {
-      const targetId = String(userId);
-      const isMember1 = await checkMembership(targetId, "-1003685621367"); 
-      const isMember2 = await checkMembership(targetId, "-1004377164928"); 
-      const allJoined = isMember1 && isMember2;
-      if (allJoined) await tryGrantReferralReward(targetId);
-      return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2, allJoined });
     }
 
     if (action === 'get-referrals') {
@@ -685,8 +721,6 @@ export default async function handler(req, res) {
 
     await tryGrantReferralReward(targetId);
     const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
-    const isMember1 = await checkMembership(targetId, "-1003685621367");
-    const isMember2 = await checkMembership(targetId, "-1004377164928"); 
 
     const { data: totalTasks } = await supabase.from('tasks').select('completions_done');
     const globalclicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
@@ -702,8 +736,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true, 
       user: dbUser,
-      stats: { n1: refCount || 0, c1: String(dbUser?.referral_earnings || 0) }, 
-      channels: { c1: isMember1, c2: isMember2 }
+      stats: { n1: refCount || 0, c1: String(dbUser?.referral_earnings || 0) }
     });
 
   } catch (error) {
