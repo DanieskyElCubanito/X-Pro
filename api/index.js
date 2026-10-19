@@ -233,11 +233,14 @@ export default async function handler(req, res) {
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
       const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
 
+      // VERIFICAMOS EN EL HISTORIAL LOS CANALES Y EL CHECK-IN
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: historyLogs } = await supabase.from('history_logs').select('title, description, created_at').eq('user_id', targetId);
       const fixed_completed = [];
       if (historyLogs) {
         historyLogs.forEach(log => {
+          if (log.description && log.description.includes('@AirdropsCriptoES')) fixed_completed.push('channel1');
+          if (log.description && log.description.includes('@TONAirdropsES')) fixed_completed.push('channel2');
           if (log.title === '🎁 Check-in Diario' && log.created_at >= yesterday) fixed_completed.push('daily');
         });
       }
