@@ -233,14 +233,11 @@ export default async function handler(req, res) {
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
       const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
 
-      // NUEVO: Verificamos en el historial qué tareas fijas ya hizo el usuario
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: historyLogs } = await supabase.from('history_logs').select('title, description, created_at').eq('user_id', targetId);
       const fixed_completed = [];
       if (historyLogs) {
         historyLogs.forEach(log => {
-          if (log.description && log.description.includes('@AirdropsCriptoES')) fixed_completed.push('channel1');
-          if (log.description && log.description.includes('@TONAirdropsES')) fixed_completed.push('channel2');
           if (log.title === '🎁 Check-in Diario' && log.created_at >= yesterday) fixed_completed.push('daily');
         });
       }
@@ -284,7 +281,7 @@ export default async function handler(req, res) {
     }
 
     // =======================================================
-    // NUEVO: TAREAS FIJAS Y CHECK-IN DIARIO (+ 20% Referidos)
+    // TAREAS FIJAS, CHECK-IN DIARIO Y REUNIÓN SIN RECOMPENSA
     // =======================================================
     if (action === 'claim-fixed-task') {
       const { taskId } = req.body;
@@ -305,7 +302,11 @@ export default async function handler(req, res) {
         if (recentLog) return res.status(400).json({success: false, error: 'Ya reclamaste tu Check-in hoy.'});
       } else {
         const { data: alreadyDone } = await supabase.from('history_logs').select('id').eq('user_id', targetId).eq('description', `Recompensa por unirte a ${title}.`).maybeSingle();
-        if (alreadyDone) return res.status(400).json({success: false, error: 'Ya completaste esta tarea.'});
+        
+        // Si el usuario ya cobró antes, le dejamos pasar sin darle recompensa de nuevo
+        if (alreadyDone) {
+          return res.status(200).json({ success: true, message: 'Unión restaurada', is_rejoin: true });
+        }
       }
 
       const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
@@ -315,7 +316,6 @@ export default async function handler(req, res) {
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
       await supabase.from('history_logs').insert([{ user_id: targetId, title: isDaily ? '🎁 Check-in Diario' : `✅ Tarea Fija`, description: isDaily ? 'Recompensa por check-in diario.' : `Recompensa por unirte a ${title}.`, amount: reward }]);
 
-      // 20% Comisión de afiliado para el referidor
       if (dbUser.referred_by) {
         const commissionAmount = Number((reward * 0.20).toFixed(2));
         const { data: referrer } = await supabase.from('users').select('*').eq('id', dbUser.referred_by).maybeSingle();
@@ -325,6 +325,13 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ success: true, balance: newBalance });
+    }
+
+    if (action === 'check-channels') {
+      const targetId = String(userId);
+      const isMember1 = await checkMembership(targetId, "-1003685621367"); 
+      const isMember2 = await checkMembership(targetId, "-1004377164928"); 
+      return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2 });
     }
 
     if (action === 'claim-bonus') {
@@ -337,7 +344,6 @@ export default async function handler(req, res) {
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
       await supabase.from('history_logs').insert([{ user_id: targetId, title: '📺 Bono por anuncio', description: 'Visualización de anuncio.', amount: reward }]);
 
-      // 20% Comisión de afiliado para el referidor
       if (dbUser.referred_by) {
         const commissionAmount = Number((reward * 0.20).toFixed(2));
         const { data: referrer } = await supabase.from('users').select('*').eq('id', dbUser.referred_by).maybeSingle();
