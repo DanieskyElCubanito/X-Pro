@@ -19,6 +19,12 @@ const neonStyles = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
     boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)', transition: 'all 0.2s ease'
   },
+  cardLocked: {
+    background: 'linear-gradient(135deg, rgba(38, 14, 66, 0.5), rgba(18, 7, 36, 0.5))',
+    border: '2px dashed #8a2be2', borderRadius: '20px', padding: '14px 18px', marginBottom: '12px',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    opacity: 0.7, position: 'relative', overflow: 'hidden'
+  },
   btnPrimary: {
     width: '100%', padding: '15px', background: 'linear-gradient(180deg, #ff66cc 0%, #ff1493 50%, #d80073 100%)',
     color: '#ffffff', border: 'none', borderRadius: '18px', fontWeight: '900', fontSize: '16px',
@@ -32,6 +38,11 @@ const neonStyles = {
   btnLight: {
     padding: '12px 18px', background: 'rgba(255, 255, 255, 0.08)', color: '#ff99dd',
     border: '2px solid rgba(255, 65, 180, 0.3)', borderRadius: '16px', fontWeight: '800', fontSize: '13px', cursor: 'pointer'
+  },
+  btnUnlock: {
+    padding: '8px 12px', background: 'linear-gradient(90deg, #ffe600, #ffaa00)', color: '#050214',
+    border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '11px', cursor: 'pointer',
+    boxShadow: '0 4px 10px rgba(255, 230, 0, 0.3)', textTransform: 'uppercase'
   },
   input: {
     width: '100%', background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', borderRadius: '16px',
@@ -52,18 +63,17 @@ const TEMPLATES = [
 ];
 
 const INITIAL_GROUPS = [
-  { id: "-1003685621367", name: "@AirdropsCriptoES", members: "Calculando..." },
-  { id: "-1004377164928", name: "@TONAirdropsES", members: "Calculando..." }
+  { id: "-1003685621367", name: "@AirdropsCriptoES", members: "Calculando...", unlockTaskId: 'channel1' },
+  { id: "-1004377164928", name: "@TONAirdropsES", members: "Calculando...", unlockTaskId: 'channel2' }
 ];
 
-
-export default function PublishTab({ userData, setUserData }) {
+export default function PublishTab({ userData, setUserData, setActiveTabGlobal }) {
   const [activeTab, setActiveTab] = useState('create');
   const [step, setStep] = useState(1);
 
   const [postText, setPostText] = useState('');
   const [imageUrl, setImageUrl] = useState(''); 
-  const [buttonConfig, setButtonConfig] = useState({ text: '', url: '' });
+  const [buttonConfig, setButtonConfig] = useState({ text: '', url: '', style: 'default' });
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const [showButtonModal, setShowButtonModal] = useState(false);
@@ -74,13 +84,16 @@ export default function PublishTab({ userData, setUserData }) {
   const COST_PER_GROUP = 10;
   const totalCost = selectedGroups.length * COST_PER_GROUP;
 
-  // 👇 1. PEGA ESTE BLOQUE AQUÍ 👇
   const [availableGroups, setAvailableGroups] = useState(INITIAL_GROUPS);
+  const [unlockedTasks, setUnlockedTasks] = useState([]);
 
   useEffect(() => {
-    const fetchRealMembers = async () => {
+    const fetchStatsAndLocks = async () => {
+      if (!userData?.id) return;
+
       try {
-        const res = await fetch('/api', {
+        // 1. Cargar Estadísticas de Grupos
+        const resStats = await fetch('/api', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -88,11 +101,11 @@ export default function PublishTab({ userData, setUserData }) {
             groupIds: INITIAL_GROUPS.map(g => g.id)
           })
         });
-        const data = await res.json();
-        
-        if (data.success && data.stats) {
+        const dataStats = await resStats.json();
+
+        if (dataStats.success && dataStats.stats) {
           setAvailableGroups(INITIAL_GROUPS.map(grp => {
-            const count = data.stats[grp.id];
+            const count = dataStats.stats[grp.id];
             if (count) {
               const formatted = count >= 1000 ? (count / 1000).toFixed(1).replace('.0', '') + 'K' : count;
               return { ...grp, members: `${formatted} miembros` };
@@ -100,16 +113,52 @@ export default function PublishTab({ userData, setUserData }) {
             return { ...grp, members: "No disponible" };
           }));
         }
+
+        // 2. Cargar Tareas Fijas Completadas para Desbloquear
+        const resLocks = await fetch('/api', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get-tasks', userId: userData.id })
+        });
+        const dataLocks = await resLocks.json();
+
+        // Esta llamada extrae las tareas que el usuario ya hizo
+        // get-tasks también nos sirve para ver si ya hizo 'channel1' y 'channel2'
+        // Como las tareas fijas usan ID de texto, verificamos en user_completed_tasks
+        
+        // Haremos un endpoint ligero en /api para verificar esto si es necesario, 
+        // pero por ahora, si el backend está enviando las tareas completadas...
+        // Nota: Para optimizar, se puede añadir una bandera en userData o 
+        // consultar la tabla `user_completed_tasks`.
+
+        // Vamos a solicitar el historial y ver si "channel1" o "channel2" están allí.
+        const resHistory = await fetch('/api', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ action: 'get-history', userId: userData.id })
+        });
+        const dataHistory = await resHistory.json();
+        
+        if (dataHistory.success && dataHistory.history) {
+            // Buscamos en el historial las descripciones de las tareas fijas
+            const completed = [];
+            dataHistory.history.forEach(log => {
+                if (log.description && log.description.includes('@AirdropsCriptoES')) completed.push('channel1');
+                if (log.description && log.description.includes('@TONAirdropsES')) completed.push('channel2');
+            });
+            setUnlockedTasks(completed);
+        }
+
       } catch (e) {
-        console.error("Error al cargar contador de miembros");
+        console.error("Error cargando datos:", e);
       }
     };
-    
-    fetchRealMembers();
-  }, []);
-  // 👆 FIN DEL BLOQUE NUEVO 👆
 
-  const handleToggleGroup = (groupId) => {
+    fetchStatsAndLocks();
+  }, [userData?.id]);
+
+  const handleToggleGroup = (groupId, isUnlocked) => {
+    if (!isUnlocked) return; // Bloquea si no está desbloqueado
     setSelectedGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
   };
 
@@ -135,7 +184,7 @@ export default function PublishTab({ userData, setUserData }) {
   };
 
   const handleClearButton = () => {
-    setButtonConfig({ text: '', url: '' });
+    setButtonConfig({ text: '', url: '', style: 'default' });
     setShowButtonModal(false);
     toast.success("Botón eliminado");
   };
@@ -179,7 +228,7 @@ export default function PublishTab({ userData, setUserData }) {
       }
 
       toast.success("¡Campaña Transmitida con Éxito!", { id: tid });
-      setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '' }); setSelectedGroups([]); setStep(1);
+      setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default' }); setSelectedGroups([]); setStep(1);
     } catch (err) {
       toast.error(err.message || "Error de red", { id: tid });
     } finally {
@@ -280,23 +329,43 @@ export default function PublishTab({ userData, setUserData }) {
                 <button onClick={() => setStep(2)} style={{ ...neonStyles.btnLight, padding: '6px 12px' }}>◀</button>
                 <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>¿Dónde lo publicamos?</h3>
               </div>
+              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Desbloquea los canales uniéndote a ellos en la sección de Mercado.</p>
 
               {availableGroups.map((grp) => {
-                const isSelected = selectedGroups.includes(grp.id);
+                const isUnlocked = unlockedTasks.includes(grp.unlockTaskId);
+                const isSelected = selectedGroups.includes(grp.id) && isUnlocked;
+                
                 return (
-                  <div key={grp.id} onClick={() => handleToggleGroup(grp.id)} style={{ ...neonStyles.cardInteractive, borderColor: isSelected ? '#00f0ff' : '#8a2be2', background: isSelected ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(46, 16, 77, 0.9))' : neonStyles.cardInteractive.background }}>
+                  <div 
+                    key={grp.id} 
+                    onClick={() => handleToggleGroup(grp.id, isUnlocked)} 
+                    style={isUnlocked 
+                      ? { ...neonStyles.cardInteractive, borderColor: isSelected ? '#00f0ff' : '#8a2be2', background: isSelected ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(46, 16, 77, 0.9))' : neonStyles.cardInteractive.background }
+                      : neonStyles.cardLocked
+                    }
+                  >
                     <div>
-                      <div style={{ fontWeight: '900', fontSize: '15px', color: '#ffffff' }}>{grp.name}</div>
-                      <div style={{ fontSize: '12px', color: '#ff99dd' }}>{grp.members}</div>
+                      <div style={{ fontWeight: '900', fontSize: '15px', color: isUnlocked ? '#ffffff' : '#aaaaaa' }}>
+                        {grp.name} {isUnlocked ? '' : '🔒'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: isUnlocked ? '#ff99dd' : '#777777' }}>
+                        {isUnlocked ? grp.members : 'Requiere unión previa'}
+                      </div>
                     </div>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isSelected ? '#00f0ff' : 'transparent', border: '2px solid #00f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#050214', fontWeight: '900', fontSize: '14px' }}>
-                      {isSelected ? '✓' : ''}
-                    </div>
+                    {isUnlocked ? (
+                       <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isSelected ? '#00f0ff' : 'transparent', border: '2px solid #00f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#050214', fontWeight: '900', fontSize: '14px' }}>
+                         {isSelected ? '✓' : ''}
+                       </div>
+                    ) : (
+                       <button onClick={(e) => { e.stopPropagation(); setActiveTabGlobal && setActiveTabGlobal('tasks'); }} style={neonStyles.btnUnlock}>
+                         Desbloquear
+                       </button>
+                    )}
                   </div>
                 );
               })}
 
-              <div style={{ background: 'linear-gradient(90deg, #ff1493, #8a2be2)', borderRadius: '18px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '14px', marginBottom: '14px', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.3)' }}>
+              <div style={{ background: 'linear-gradient(90deg, #ff1493, #8a2be2)', borderRadius: '18px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '14px', marginBottom: '14px', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.3)', marginTop: '16px' }}>
                 <span>🎯 {selectedGroups.length} seleccionados</span>
                 <span>Costo: {totalCost} CLICK</span>
               </div>
@@ -314,14 +383,17 @@ export default function PublishTab({ userData, setUserData }) {
               <div style={neonStyles.card}>
                 <div style={{ fontSize: '11px', color: '#00f0ff', fontWeight: '900', marginBottom: '8px' }}>POST:</div>
                 <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', marginBottom: '12px', color: '#fff', lineHeight: '1.4' }} dangerouslySetInnerHTML={{ __html: postText.replace(/\n/g, '<br/>') }} />
-                
+
                 {imageUrl && <div style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '12px' }}>🖼️ [Imagen Adjunta]</div>}
 
                 {buttonConfig.url && (
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     padding: '12px 18px', borderRadius: '12px', fontSize: '14px', fontWeight: '900',
-                    background: '#2F3A4C',
+                    background: buttonConfig.style === 'primary' ? 'linear-gradient(90deg, #00f0ff, #0088ff)' : 
+                               buttonConfig.style === 'success' ? 'linear-gradient(90deg, #00ffaa, #00bb77)' : 
+                               buttonConfig.style === 'danger' ? 'linear-gradient(90deg, #ff1493, #d80073)' : 
+                               '#2F3A4C',
                     color: '#ffffff', textTransform: 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
                   }}>
                     {buttonConfig.text || "Abrir Enlace"}
@@ -351,7 +423,7 @@ export default function PublishTab({ userData, setUserData }) {
         </div>
       )}
 
-              {/* MODAL BOTÓN */}
+      {/* MODAL BOTÓN */}
       {showButtonModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
           <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff' }}>
@@ -370,7 +442,7 @@ export default function PublishTab({ userData, setUserData }) {
               <input style={neonStyles.input} value={buttonConfig.url} onChange={(e) => setButtonConfig({ ...buttonConfig, url: e.target.value })} placeholder="https://t.me/..." />
             </div>
 
-                        {/* SECCIÓN DE BOTONES DE COLORES CON TEXTO */}
+            {/* SECCIÓN DE BOTONES DE COLORES CON TEXTO */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900', display: 'block', marginBottom: '8px' }}>COLOR DEL BOTÓN</label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -397,7 +469,6 @@ export default function PublishTab({ userData, setUserData }) {
               </div>
             </div>
 
-                
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={handleClearButton} style={{ ...neonStyles.btnLight, flex: 1, borderColor: '#ff1493', color: '#ff1493' }}>BORRAR</button>
               <button onClick={handleSaveButton} style={{ ...neonStyles.btnPrimary, flex: 2 }}>GUARDAR</button>
