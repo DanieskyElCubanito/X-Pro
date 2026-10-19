@@ -4,82 +4,21 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
 import { botApi } from './api/botApi';
 
-// Subcomponentes importados
 import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';
 import PublishTab from './components/PublishTab';
 import AdsTab from './components/AdsTab';
 import ShareTab from './components/ShareTab';
 import BottomNav from './components/BottomNav';
-import ChannelJoin from './components/ChannelJoin';
 import CaptchaVerification from './components/CaptchaVerification';
 
-// Estilos globales Neón Cyberpunk para App
 const neonTheme = {
-  container: {
-    backgroundColor: '#0a0314',
-    backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)',
-    minHeight: '100vh',
-    height: 'var(--tg-viewport-height, 100vh)', 
-    color: '#ffffff',
-    fontFamily: "'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif",
-    display: 'flex', 
-    flexDirection: 'column',
-    boxSizing: 'border-box'
-  },
-  main: {
-    flex: 1, 
-    maxWidth: '520px',
-    margin: '0 auto',
-    width: '100%', 
-    padding: '16px 16px 110px 16px',
-    boxSizing: 'border-box',
-    overflowY: 'auto', 
-    WebkitOverflowScrolling: 'touch' 
-  },
-  center: {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0a0314',
-    backgroundImage: 'radial-gradient(circle at center, #260b3f 0%, #0a0314 85%)',
-    padding: '24px',
-    textAlign: 'center',
-    boxSizing: 'border-box'
-  },
-  loaderGlow: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '50%',
-    border: '4px solid rgba(255, 65, 180, 0.2)',
-    borderTopColor: '#00f0ff',
-    borderRightColor: '#ff1493',
-    animation: 'spin 0.9s linear infinite',
-    boxShadow: '0 0 25px rgba(0, 240, 255, 0.45)'
-  },
-  errorCard: {
-    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.9), rgba(20, 8, 38, 0.95))',
-    border: '2px solid #ff41b4',
-    borderRadius: '24px',
-    padding: '28px 20px',
-    maxWidth: '340px',
-    boxShadow: '0 0 25px rgba(255, 65, 180, 0.35)'
-  },
-  btnRetry: {
-    marginTop: '20px',
-    padding: '12px 28px',
-    background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)',
-    color: '#050214',
-    border: 'none',
-    borderRadius: '16px',
-    fontWeight: '900',
-    fontSize: '14px',
-    letterSpacing: '0.5px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 0 #0066aa, 0 8px 18px rgba(0, 240, 255, 0.45)'
-  }
+  container: { backgroundColor: '#0a0314', backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)', minHeight: '100vh', height: 'var(--tg-viewport-height, 100vh)', color: '#ffffff', fontFamily: "'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif", display: 'flex', flexDirection: 'column', boxSizing: 'border-box' },
+  main: { flex: 1, maxWidth: '520px', margin: '0 auto', width: '100%', padding: '16px 16px 110px 16px', boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+  center: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0314', backgroundImage: 'radial-gradient(circle at center, #260b3f 0%, #0a0314 85%)', padding: '24px', textAlign: 'center', boxSizing: 'border-box' },
+  loaderGlow: { width: '56px', height: '56px', borderRadius: '50%', border: '4px solid rgba(255, 65, 180, 0.2)', borderTopColor: '#00f0ff', borderRightColor: '#ff1493', animation: 'spin 0.9s linear infinite', boxShadow: '0 0 25px rgba(0, 240, 255, 0.45)' },
+  errorCard: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.9), rgba(20, 8, 38, 0.95))', border: '2px solid #ff41b4', borderRadius: '24px', padding: '28px 20px', maxWidth: '340px', boxShadow: '0 0 25px rgba(255, 65, 180, 0.35)' },
+  btnRetry: { marginTop: '20px', padding: '12px 28px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '14px', letterSpacing: '0.5px', cursor: 'pointer', boxShadow: '0 4px 0 #0066aa, 0 8px 18px rgba(0, 240, 255, 0.45)' }
 };
 
 function App() {
@@ -87,9 +26,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
   const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
-
-  const [mustJoin, setMustJoin] = useState(false);
-  const [channelStatus, setChannelStatus] = useState({ c1: true, c2: true });
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -110,25 +46,12 @@ function App() {
         previousAccount = storedFirstUser;
       }
 
-      const userPayload = {
-        ...teleUser,
-        deviceId: generatedDeviceId, 
-        previousAccountDetected: previousAccount
-      };
-
+      const userPayload = { ...teleUser, deviceId: generatedDeviceId, previousAccountDetected: previousAccount };
       const data = await botApi.verifyUser(userPayload, startParam);
 
       if (data && data.success && data.user) {
         setUserData(data.user);
         setStats(data.stats || { n1: 0, c1: "0.000" });
-
-        let needsToJoin = false;
-        if (data.channels) {
-          setChannelStatus(data.channels);
-          if (data.channels.c1 === false || data.channels.c2 === false) needsToJoin = true;
-        } 
-
-        setMustJoin(needsToJoin || data.mustJoin === true); 
         setStatus('member');
         if (data.user?.is_human) setIsHuman(true);
       } else {
@@ -136,8 +59,7 @@ function App() {
         setStatus('error');
       }
     } catch (err) {
-      const serverError = err.response?.data?.error || err.response?.data?.message || err.message;
-      setErrorMessage(serverError || "Error de conexión de seguridad.");
+      setErrorMessage(err.response?.data?.error || err.response?.data?.message || err.message || "Error de conexión.");
       setStatus('error');
     }
   };
@@ -146,132 +68,58 @@ function App() {
     if (initialized.current) return;
     const initTimer = setTimeout(() => {
       try {
-        WebApp.ready(); 
-        WebApp.expand();
-
-        // FIX UX: Evita que el usuario cierre la app por error al deslizar hacia abajo (Común en Telegram Web Apps)
-        if (WebApp.disableVerticalSwipes) {
-          WebApp.disableVerticalSwipes();
-        }
-
+        WebApp.ready(); WebApp.expand();
+        if (WebApp.disableVerticalSwipes) WebApp.disableVerticalSwipes();
         const user = WebApp.initDataUnsafe?.user;
         const inviterId = WebApp.initDataUnsafe?.start_param;
-
-        if (!user) {
-          setErrorMessage("Debes abrir la app desde Telegram.");
-          setStatus('error');
-          return;
-        }
+        if (!user) { setErrorMessage("Debes abrir la app desde Telegram."); setStatus('error'); return; }
         initialized.current = true;
         verifyUser(user, inviterId);
-      } catch (e) {
-        setErrorMessage("Error al iniciar el SDK de Telegram.");
-        setStatus('error');
-      }
+      } catch (e) { setErrorMessage("Error al iniciar el SDK."); setStatus('error'); }
     }, 150);
     return () => clearTimeout(initTimer);
   }, []);
 
   const handleShare = () => {
     const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userData?.id}`;
-    // Cambiado 'PT' por 'CLICK'
     const text = "⚡ ¡Entra a la red, publica en grupos y gana Puntos (CLICK) gratis! 🚀";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
 
-  // PANTALLA DE CARGA (Loader Neón)
   if (status === 'loading') {
     return (
       <div style={neonTheme.center}>
-        <style>{`
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        `}</style>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         <div style={neonTheme.loaderGlow}></div>
-        <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>
-          CARGANDO Click Network...
-        </p>
+        <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>CARGANDO Click Network...</p>
       </div>
     );
   }
 
-  // PANTALLA DE ERROR
   if (status === 'error') {
     return (
       <div style={neonTheme.center}>
         <div style={neonTheme.errorCard}>
           <div style={{ fontSize: '42px', marginBottom: '8px' }}>⚠️</div>
-          <h2 style={{ color: '#ffe600', margin: '0 0 10px 0', fontSize: '20px', fontWeight: '900' }}>
-            Acceso Interrumpido
-          </h2>
-          <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>
-            {errorMessage}
-          </p>
-          <button style={neonTheme.btnRetry} onClick={() => window.location.reload()}>
-            🔄 REINTENTAR
-          </button>
+          <h2 style={{ color: '#ffe600', margin: '0 0 10px 0', fontSize: '20px', fontWeight: '900' }}>Acceso Interrumpido</h2>
+          <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{errorMessage}</p>
+          <button style={neonTheme.btnRetry} onClick={() => window.location.reload()}>🔄 REINTENTAR</button>
         </div>
       </div>
     );
   }
 
-  if (mustJoin) return <ChannelJoin channelStatus={channelStatus} setChannelStatus={setChannelStatus} userData={userData} setMustJoin={setMustJoin} />;
   if (!isHuman && status === 'member') return <CaptchaVerification userData={userData} setIsHuman={setIsHuman} />;
 
   return (
     <div style={neonTheme.container}>
-      {/* Notificaciones Toaster con estilo Neón */}
-      <Toaster 
-        position="top-center" 
-        reverseOrder={false}
-        toastOptions={{
-          style: {
-            background: '#1d0833',
-            color: '#fff',
-            border: '2px solid #00f0ff',
-            boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)',
-            fontWeight: '800',
-            fontSize: '13px'
-          }
-        }} 
-      />
-
+      <Toaster position="top-center" toastOptions={{ style: { background: '#1d0833', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)', fontWeight: '800', fontSize: '13px' } }} />
       <div style={neonTheme.main}>
-        {activeTab === 'home' && (
-  <div className="fade-in">
-    <ProfileHeader userData={userData} />
-    <HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} />
-  </div>
-)}
-
-
-        {/* 2. TAREAS / MERCADO DE TRÁFICO */}
-        {activeTab === 'tasks' && (
-          <div className="fade-in">
-            <AdsTab userData={userData} setUserData={setUserData} />
-          </div>
-        )}
-
-        {/* 3. PUBLICAR */}
-        {activeTab === 'publish' && (
-          <div className="fade-in">
-            <PublishTab userData={userData} setUserData={setUserData} />
-          </div>
-        )}
-
-        {/* 4. AFILIADOS (Referidos) */}
-        {activeTab === 'referrals' && (
-          <div className="fade-in">
-            <ShareTab 
-              stats={stats} 
-              handleShare={handleShare} 
-              userId={userData?.id} 
-              totalReferralEarnings={userData?.referral_earnings} 
-            />
-          </div>
-        )}
+        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} /></div>}
+        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} /></div>}
+        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} /></div>}
+        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} /></div>}
       </div>
-
-      {/* BARRA DE NAVEGACIÓN INFERIOR DE 4 BOTONES */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
