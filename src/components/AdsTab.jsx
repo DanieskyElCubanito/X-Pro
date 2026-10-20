@@ -15,6 +15,7 @@ const neon = {
   taskCard: { background: 'linear-gradient(145deg, #10061e, #1a0b33)', border: '1.5px solid rgba(138, 43, 226, 0.5)', borderRadius: '20px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.4), inset 0 2px 10px rgba(138, 43, 226, 0.1)' },
   taskIconBox: { width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(138, 43, 226, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 240, 255, 0.3)', flexShrink: 0 },
   taskButton: { background: 'linear-gradient(180deg, #ffe600, #ffaa00)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #cc8800, 0 6px 15px rgba(255, 230, 0, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
+  taskButtonRejoin: { background: 'transparent', color: '#ffe600', border: '2px solid #ffe600', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' },
   taskButtonDisabled: { background: '#2b0b47', color: '#00f0ff', border: '1px solid #8a2be2', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', whiteSpace: 'nowrap', cursor: 'not-allowed' },
   taskButtonCheck: { background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', border: 'none', borderRadius: '14px', padding: '10px 14px', fontWeight: '900', fontSize: '13px', boxShadow: '0 4px 0 #007744, 0 6px 15px rgba(0, 255, 170, 0.3)', cursor: 'pointer', whiteSpace: 'nowrap' },
   calcContainer: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))', border: '2px solid #8a2be2', borderRadius: '24px', padding: '20px', color: '#ffffff', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.15)' },
@@ -155,7 +156,6 @@ export default function AdsTab({ userData, setUserData, t }) {
           toast.success("¡Bot es admin!", { id: tid }); 
           nextStep(); 
         } else { 
-          // 🔥 MUESTRA EL ERROR EXACTO DE TELEGRAM SI FALLA
           toast.error(data.error || "El bot no es admin.", { id: tid }); 
         }
       } catch (e) { toast.error("Error al verificar.", { id: tid }); } finally { setIsVerifying(false); }
@@ -273,9 +273,14 @@ export default function AdsTab({ userData, setUserData, t }) {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`+${data.reward} CLICK`, { id: tid });
-        if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
+        if (data.is_rejoin) {
+          toast.success("¡Unión restaurada!", { id: tid });
+        } else {
+          toast.success(`+${data.reward} CLICK`, { id: tid });
+          if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
+        }
         setTaskStatus(prev => ({ ...prev, [task.id]: 'completed' }));
+        fetchTasks();
       } else {
         toast.error(data.error || "Error", { id: tid });
         setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' }));
@@ -352,6 +357,7 @@ export default function AdsTab({ userData, setUserData, t }) {
   };
 
   const getTaskLabel = (type) => {
+    if (type === 'publish_group') return '🌐 Red Comunitaria';
     if (type.startsWith('daily_')) return t('ads_type_daily');
     switch (type) {
       case 'group':
@@ -363,6 +369,7 @@ export default function AdsTab({ userData, setUserData, t }) {
   };
 
   const getTaskIconType = (type) => {
+    if (type === 'publish_group') return 'channel';
     if (type.startsWith('daily_')) return type.replace('daily_', '');
     return type;
   };
@@ -375,6 +382,11 @@ export default function AdsTab({ userData, setUserData, t }) {
     const status = taskStatus[task.id];
     const isDaily = task.type.startsWith('daily_');
     
+    // Si ya cobró pero se salió de un grupo comunitario
+    if (task.needs_rejoin) {
+       return <button onClick={() => handleStartTask(task)} style={neon.taskButtonRejoin}>VOLVER A ENTRAR</button>;
+    }
+
     if (task.is_completed || status === 'completed') {
        return <button disabled style={neon.taskButtonDisabled}>{isDaily ? t('ads_btn_wait_tomorrow') : t('ads_completed')}</button>;
     }
@@ -438,7 +450,9 @@ export default function AdsTab({ userData, setUserData, t }) {
                       <div style={neon.taskIconBox}>{TaskIcons[iconType] ? TaskIcons[iconType]('#00f0ff') : TaskIcons.promo('#00f0ff')}</div>
                       <div>
                         <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>{task.title}</div>
-                        <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{getTaskLabel(task.type)} • {task.completions_done} / {task.completions_total}</div>
+                        <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>
+                          {getTaskLabel(task.type)} {task.type !== 'publish_group' && `• ${task.completions_done} / ${task.completions_total}`}
+                        </div>
                       </div>
                     </div>
                     {renderTaskButton(task)}
@@ -554,7 +568,6 @@ export default function AdsTab({ userData, setUserData, t }) {
             <div className="fade-in">
               <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#ffe600', marginBottom: '16px', textTransform: 'uppercase' }}>Pega tu Enlace</h3>
               <div style={neon.card}>
-                {/* 🔥 AQUÍ ESTÁ EL TEXTO DINÁMICO */}
                 <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4', fontWeight: 'bold' }}>
                   {taskType === 'bot' && t('ads_url_desc_bot')}
                   {taskType === 'channel' && t('ads_url_desc_channel')}
