@@ -29,16 +29,28 @@ const TabIcons = {
       <circle cx="17" cy="8" r="2.5" />
       <path d="M16 14.5a5.5 5.5 0 0 1 6 4.5v1h-3" />
     </svg>
+  ),
+  admin: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(255,230,0,0.5))' }}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
   )
 };
 
-export default function BottomNav({ activeTab, setActiveTab }) {
+export default function BottomNav({ activeTab, setActiveTab, userData }) {
+  const ADMIN_IDS = ['8968109534', '8892196101'];
+  const isAdmin = userData && ADMIN_IDS.includes(String(userData.id));
+
   const tabs = [
     { id: 'home', label: 'Inicio', icon: TabIcons.home, color: '#ff41b4' },
     { id: 'tasks', label: 'Tareas', icon: TabIcons.tasks, color: '#00f0ff' },
     { id: 'publish', label: 'Publicar', icon: TabIcons.publish, color: '#00ffaa' },
     { id: 'referrals', label: 'Afiliados', icon: TabIcons.referrals, color: '#8a2be2' }
   ];
+
+  if (isAdmin) {
+    tabs.push({ id: 'admin', label: 'Admin', icon: TabIcons.admin, color: '#ffe600' });
+  }
 
   return (
     <div style={{
