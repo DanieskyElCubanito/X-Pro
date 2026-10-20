@@ -118,7 +118,6 @@ export default function AdsTab({ userData, setUserData }) {
     }
   }, [taskStatus]);
 
-  // Vemos en vivo si el usuario sigue metido o no
   const verifyActualMembership = async () => {
     try {
       const res = await fetch('/api', {
@@ -301,6 +300,8 @@ export default function AdsTab({ userData, setUserData }) {
       } else {
         toast.error(data.error || "Aún no has completado la tarea.", { id: tid });
         setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' }));
+        // Si el servidor detectó que el bot no es admin y pausó la tarea, recargamos la lista
+        if (data.error && data.error.includes('pausada')) fetchTasks();
       }
     } catch (e) { toast.error("Error de conexión al verificar.", { id: tid }); setTaskStatus(prev => ({ ...prev, [task.id]: 'ready' })); } 
   };
@@ -372,6 +373,23 @@ export default function AdsTab({ userData, setUserData }) {
     } catch (err) { toast.error(err.message || "Error al eliminar.", { id: tid }); }
   };
 
+  // 🔥 NUEVO: Función para Pausar/Reanudar
+  const handleToggleStatus = async (task) => {
+    const isPausing = task.status === 'active';
+    const tid = toast.loading(isPausing ? "Pausando campaña..." : "Reanudando campaña...");
+    try {
+      const res = await fetch('/api', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle-task-status', taskId: task.id, requestingUserId: userData.id })
+      });
+      const data = await res.json();
+      if (data.success) { 
+        toast.success(isPausing ? "Campaña en pausa." : "Campaña activa de nuevo.", { id: tid }); 
+        fetchTasks(); 
+      } else { throw new Error(data.error); }
+    } catch (err) { toast.error(err.message || "Error al cambiar estado.", { id: tid }); }
+  };
+
   const handleOpenEdit = (task) => { setEditingTask({ id: task.id, title: task.title, url: task.url }); setShowEditModal(true); };
 
   const handleSaveEdit = async () => {
@@ -398,7 +416,10 @@ export default function AdsTab({ userData, setUserData }) {
   };
 
   const myTasks = tasks.filter(t => t.creator_id === String(userData?.id));
-  const communityTasks = tasks.filter(t => t.creator_id !== String(userData?.id)).sort((a, b) => { if (a.is_completed === b.is_completed) return 0; return a.is_completed ? 1 : -1; });
+  
+  // 🔥 El mercado público SOLO MUESTRA tareas ACTIVAS (Si las pausas, desaparecen de aquí)
+  const communityTasks = tasks.filter(t => t.creator_id !== String(userData?.id) && t.status === 'active')
+    .sort((a, b) => { if (a.is_completed === b.is_completed) return 0; return a.is_completed ? 1 : -1; });
 
   const renderTaskButton = (task) => {
     const status = taskStatus[task.id];
@@ -409,46 +430,19 @@ export default function AdsTab({ userData, setUserData }) {
     return <button onClick={() => handleStartTask(task)} style={neon.taskButton}>{`+${Number(task.reward).toFixed(2)} CLICK`}</button>;
   };
 
-  // Lógica inteligente para botones fijos
   const renderFixedButton = (taskId, link) => {
     const isCheckedInBackend = fixedCompleted.includes(taskId);
-    
     if (taskId === 'daily') {
       return (
-        <button 
-          onClick={() => claimFixedTask(taskId, link)} 
-          disabled={fixedTasksLoading || isCheckedInBackend} 
-          style={(fixedTasksLoading || isCheckedInBackend) ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'}}
-        >
+        <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading || isCheckedInBackend} style={(fixedTasksLoading || isCheckedInBackend) ? neon.taskButtonDisabled : {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'}}>
           {isCheckedInBackend ? '⏳ VUELVE MAÑANA' : '+1.00 CLICK'}
         </button>
       );
     }
-
     const isMemberCurrently = actualMembership[taskId];
-
-    // Si ya le pagamos pero AHORA no está en el grupo
-    if (isCheckedInBackend && !isMemberCurrently) {
-      return (
-        <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading} style={neon.taskButtonRejoin}>
-          VOLVER A ENTRAR
-        </button>
-      );
-    }
-
-    // Si ya le pagamos y AHORA sí está en el grupo
-    if (isCheckedInBackend && isMemberCurrently) {
-      return (
-        <button disabled style={neon.taskButtonDisabled}>✅ COMPLETADA</button>
-      );
-    }
-
-    // Si nunca le hemos pagado
-    return (
-      <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading} style={neon.taskButton}>
-        +1.00 CLICK
-      </button>
-    );
+    if (isCheckedInBackend && !isMemberCurrently) return <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading} style={neon.taskButtonRejoin}>VOLVER A ENTRAR</button>;
+    if (isCheckedInBackend && isMemberCurrently) return <button disabled style={neon.taskButtonDisabled}>✅ COMPLETADA</button>;
+    return <button onClick={() => claimFixedTask(taskId, link)} disabled={fixedTasksLoading} style={neon.taskButton}>+1.00 CLICK</button>;
   };
 
   return (
@@ -525,7 +519,7 @@ export default function AdsTab({ userData, setUserData }) {
             <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '14px', fontWeight: 'bold' }}>Sincronizando mercado...</div>
           ) : communityTasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-              <p style={{ color: '#ff99dd', fontSize: '13px', fontWeight: 'bold', margin: 0, lineHeight: '1.5' }}>No hay campañas disponibles.</p>
+              <p style={{ color: '#ff99dd', fontSize: '13px', fontWeight: 'bold', margin: 0, lineHeight: '1.5' }}>No hay campañas activas.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -576,28 +570,36 @@ export default function AdsTab({ userData, setUserData }) {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {myTasks.map((task) => {
                 const percent = Math.floor((task.completions_done / task.completions_total) * 100);
+                const isPaused = task.status === 'paused';
+                
                 return (
-                  <div key={task.id} style={{...neon.taskCard, borderColor: '#ff41b4'}}>
+                  <div key={task.id} style={{...neon.taskCard, borderColor: isPaused ? '#ffaa00' : '#ff41b4', opacity: isPaused ? 0.7 : 1}}>
                     <div style={{ width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-                        <div style={{...neon.taskIconBox, borderColor: '#ff1493', background: 'rgba(255, 20, 147, 0.1)'}}>
-                          {TaskIcons[task.type] ? TaskIcons[task.type]('#ff1493') : TaskIcons.promo('#ff1493')}
+                        <div style={{...neon.taskIconBox, borderColor: isPaused ? '#ffaa00' : '#ff1493', background: isPaused ? 'rgba(255, 170, 0, 0.1)' : 'rgba(255, 20, 147, 0.1)'}}>
+                          {TaskIcons[task.type] ? TaskIcons[task.type](isPaused ? '#ffaa00' : '#ff1493') : TaskIcons.promo(isPaused ? '#ffaa00' : '#ff1493')}
                         </div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{task.title}</div>
-                          <div style={{ color: '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold', fontFamily: 'monospace' }}>{task.url.substring(0, 25)}...</div>
+                          <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>
+                            {task.title} {isPaused && <span style={{ color: '#ffaa00', fontSize: '10px', verticalAlign: 'top' }}>(PAUSADA)</span>}
+                          </div>
+                          <div style={{ color: isPaused ? '#ffaa00' : '#ff99dd', fontSize: '11px', marginTop: '4px', fontWeight: 'bold', fontFamily: 'monospace' }}>{task.url.substring(0, 25)}...</div>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '6px' }}>
-                        <span style={{ color: '#ff41b4' }}>Progreso</span>
+                        <span style={{ color: isPaused ? '#ffaa00' : '#ff41b4' }}>Progreso</span>
                         <span style={{ color: '#fff' }}>{task.completions_done} / {task.completions_total} referidos</span>
                       </div>
                       <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
-                        <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, #ff1493, #ff66cc)', boxShadow: '0 0 10px #ff1493', transition: 'width 0.3s ease' }}></div>
+                        <div style={{ width: `${percent}%`, height: '100%', background: isPaused ? 'linear-gradient(90deg, #ffaa00, #ffe600)' : 'linear-gradient(90deg, #ff1493, #ff66cc)', boxShadow: isPaused ? '0 0 10px #ffaa00' : '0 0 10px #ff1493', transition: 'width 0.3s ease' }}></div>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        {/* 🔥 BOTÓN PAUSAR / REANUDAR */}
+                        <button onClick={() => handleToggleStatus(task)} style={{ background: isPaused ? '#00ffaa' : '#ffaa00', color: '#050214', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+                          {isPaused ? '▶️ Reanudar' : '⏸ Pausar'}
+                        </button>
                         <button onClick={() => handleOpenEdit(task)} style={{ background: '#00f0ff', color: '#050214', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>✏️ Editar</button>
                         <button onClick={() => handleDeleteTask(task.id)} style={{ background: '#ff1493', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>🗑️ Eliminar</button>
                       </div>
@@ -613,7 +615,6 @@ export default function AdsTab({ userData, setUserData }) {
 
       {view === 'wizard' && (
         <div className="fade-in">
-          {/* El código de Wizard (Paso 1 al 4) se mantiene intacto */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             {currentStepIndex > 0 && !checkoutView ? (
               <button onClick={prevStep} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>◀</button>
