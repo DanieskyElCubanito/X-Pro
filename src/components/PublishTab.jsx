@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import WebApp from '@twa-dev/sdk'; // 🔥 Importación del SDK añadida
+import WebApp from '@twa-dev/sdk';
 
 const neonStyles = {
   container: { color: '#ffffff', paddingBottom: '20px' },
@@ -78,6 +78,12 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const [showButtonModal, setShowButtonModal] = useState(false);
+  
+  // 🔥 MODAL GRUPO COMUNITARIO
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+  const [newGroupUrl, setNewGroupUrl] = useState('');
+  const [isVerifyingGroup, setIsVerifyingGroup] = useState(false);
+
   const [isPublishing, setIsPublishing] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -88,75 +94,69 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
   const [availableGroups, setAvailableGroups] = useState(INITIAL_GROUPS);
   const [unlockedTasks, setUnlockedTasks] = useState([]);
 
-  // 🔥 CABECERAS DE SEGURIDAD FASE 1
   const apiHeaders = { 
     'Content-Type': 'application/json', 
     'X-Telegram-Init-Data': WebApp.initData || '' 
   };
 
-  useEffect(() => {
-    const fetchStatsAndLocks = async () => {
-      if (!userData?.id) return;
+  const fetchStatsAndLocks = async () => {
+    if (!userData?.id) return;
 
-      try {
-        // 1. Cargar Estadísticas de Grupos
-        const resStats = await fetch('/api', {
-          method: 'POST',
-          headers: apiHeaders, // 🔥 Actualizado
-          body: JSON.stringify({
-            action: 'get-group-stats',
-            groupIds: INITIAL_GROUPS.map(g => g.id)
-          })
-        });
-        const dataStats = await resStats.json();
-
-        if (dataStats.success && dataStats.stats) {
-          setAvailableGroups(INITIAL_GROUPS.map(grp => {
-            const count = dataStats.stats[grp.id];
-            if (count) {
-              const formatted = count >= 1000 ? (count / 1000).toFixed(1).replace('.0', '') + 'K' : count;
-              return { ...grp, members: `${formatted} miembros` };
-            }
-            return { ...grp, members: "No disponible" };
-          }));
-        }
-
-        // 2. Cargar Tareas Fijas Completadas para Desbloquear
-        const resLocks = await fetch('/api', {
-          method: 'POST',
-          headers: apiHeaders, // 🔥 Actualizado
-          body: JSON.stringify({ action: 'get-tasks', userId: userData.id })
-        });
-        const dataLocks = await resLocks.json();
-
-        // Vamos a solicitar el historial y ver si "channel1" o "channel2" están allí.
-        const resHistory = await fetch('/api', {
-           method: 'POST',
-           headers: apiHeaders, // 🔥 Actualizado
-           body: JSON.stringify({ action: 'get-history', userId: userData.id })
-        });
-        const dataHistory = await resHistory.json();
-
-        if (dataHistory.success && dataHistory.history) {
-            // Buscamos en el historial las descripciones de las tareas fijas
-            const completed = [];
-            dataHistory.history.forEach(log => {
-                if (log.description && log.description.includes('@AirdropsCriptoES')) completed.push('channel1');
-                if (log.description && log.description.includes('@TONAirdropsES')) completed.push('channel2');
-            });
-            setUnlockedTasks(completed);
-        }
-
-      } catch (e) {
-        console.error("Error cargando datos:", e);
+    try {
+      // 1. Obtener grupos comunitarios de la base de datos
+      const resComm = await fetch('/api', {
+        method: 'POST', headers: apiHeaders,
+        body: JSON.stringify({ action: 'get-publish-groups' })
+      });
+      const dataComm = await resComm.json();
+      
+      let allGroups = [...INITIAL_GROUPS];
+      if (dataComm.success && dataComm.communityGroups) {
+         dataComm.communityGroups.forEach(g => {
+           allGroups.push({ id: g.url, name: g.title, members: "Calculando...", unlockTaskId: null, isCommunity: true });
+         });
       }
-    };
 
-    fetchStatsAndLocks();
-  }, [userData?.id]);
+      // 2. Obtener miembros reales de TODOS los grupos (oficiales + comunitarios)
+      const resStats = await fetch('/api', {
+        method: 'POST', headers: apiHeaders,
+        body: JSON.stringify({ action: 'get-group-stats', groupIds: allGroups.map(g => g.id) })
+      });
+      const dataStats = await resStats.json();
+
+      if (dataStats.success && dataStats.stats) {
+        setAvailableGroups(allGroups.map(grp => {
+          const count = dataStats.stats[grp.id];
+          if (count) {
+            const formatted = count >= 1000 ? (count / 1000).toFixed(1).replace('.0', '') + 'K' : count;
+            return { ...grp, members: `${formatted} miembros` };
+          }
+          return { ...grp, members: "No disponible" };
+        }));
+      }
+
+      // 3. Ver qué ha desbloqueado el usuario (Para los oficiales)
+      const resHistory = await fetch('/api', {
+         method: 'POST', headers: apiHeaders,
+         body: JSON.stringify({ action: 'get-history', userId: userData.id })
+      });
+      const dataHistory = await resHistory.json();
+
+      if (dataHistory.success && dataHistory.history) {
+          const completed = [];
+          dataHistory.history.forEach(log => {
+              if (log.description && log.description.includes('@AirdropsCriptoES')) completed.push('channel1');
+              if (log.description && log.description.includes('@TONAirdropsES')) completed.push('channel2');
+          });
+          setUnlockedTasks(completed);
+      }
+    } catch (e) { console.error("Error cargando datos:", e); }
+  };
+
+  useEffect(() => { fetchStatsAndLocks(); }, [userData?.id]);
 
   const handleToggleGroup = (groupId, isUnlocked) => {
-    if (!isUnlocked) return; // Bloquea si no está desbloqueado
+    if (!isUnlocked) return; 
     setSelectedGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
   };
 
@@ -198,40 +198,44 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
   const handlePublish = async () => {
     setIsPublishing(true);
     const tid = toast.loading("Transmitiendo señal...");
-
-    const finalButtonConfig = buttonConfig.url ? {
-      text: buttonConfig.text || "Abrir Enlace",
-      url: buttonConfig.url
-    } : null;
+    const finalButtonConfig = buttonConfig.url ? { text: buttonConfig.text || "Abrir Enlace", url: buttonConfig.url } : null;
 
     try {
       for (const chatId of selectedGroups) {
         const response = await fetch('/api', {
-          method: 'POST',
-          headers: apiHeaders, // 🔥 Actualizado
-          body: JSON.stringify({
-            action: 'publish-post',
-            userId: userData?.id,
-            chatId: chatId,
-            text: postText,
-            photoData: imageUrl || null,
-            buttonConfig: finalButtonConfig,
-            link: buttonConfig.url || null
-          })
+          method: 'POST', headers: apiHeaders,
+          body: JSON.stringify({ action: 'publish-post', userId: userData?.id, chatId: chatId, text: postText, photoData: imageUrl || null, buttonConfig: finalButtonConfig, link: buttonConfig.url || null })
         });
-
         const data = await response.json();
         if (!data.success) throw new Error(data.error || "Error al publicar.");
         if (data.balance !== undefined) setUserData((prev) => ({ ...prev, balance: data.balance }));
       }
-
       toast.success("¡Campaña Transmitida con Éxito!", { id: tid });
       setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default' }); setSelectedGroups([]); setStep(1);
-    } catch (err) {
-      toast.error(err.message || "Error de red", { id: tid });
-    } finally {
-      setIsPublishing(false);
-    }
+    } catch (err) { toast.error(err.message || "Error de red", { id: tid }); } 
+    finally { setIsPublishing(false); }
+  };
+
+  const handleAddCommunityGroup = async () => {
+    if (!newGroupUrl.trim()) return toast.error("Ingresa el enlace o @usuario.");
+    setIsVerifyingGroup(true);
+    const tid = toast.loading("Verificando administrador y miembros...");
+    try {
+      const res = await fetch('/api', {
+        method: 'POST', headers: apiHeaders,
+        body: JSON.stringify({ action: 'add-publish-group', userId: userData.id, url: newGroupUrl })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("¡Grupo integrado a la red exitosamente!", { id: tid });
+        setNewGroupUrl('');
+        setShowAddGroupModal(false);
+        fetchStatsAndLocks(); // Recarga la lista de grupos
+      } else {
+        toast.error(data.error || "Error al añadir el grupo.", { id: tid });
+      }
+    } catch (err) { toast.error("Error de conexión.", { id: tid }); } 
+    finally { setIsVerifyingGroup(false); }
   };
 
   return (
@@ -327,10 +331,11 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
                 <button onClick={() => setStep(2)} style={{ ...neonStyles.btnLight, padding: '6px 12px' }}>◀</button>
                 <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>¿Dónde lo publicamos?</h3>
               </div>
-              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Desbloquea los canales uniéndote a ellos en la sección de Mercado.</p>
+              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Desbloquea los canales oficiales uniéndote a ellos en el Mercado.</p>
 
               {availableGroups.map((grp) => {
-                const isUnlocked = unlockedTasks.includes(grp.unlockTaskId);
+                // Si es comunitario, está desbloqueado por defecto para todos. Si es oficial, revisa el candado.
+                const isUnlocked = grp.isCommunity ? true : unlockedTasks.includes(grp.unlockTaskId);
                 const isSelected = selectedGroups.includes(grp.id) && isUnlocked;
                 
                 return (
@@ -344,7 +349,7 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
                   >
                     <div>
                       <div style={{ fontWeight: '900', fontSize: '15px', color: isUnlocked ? '#ffffff' : '#aaaaaa' }}>
-                        {grp.name} {isUnlocked ? '' : '🔒'}
+                        {grp.name} {isUnlocked ? '' : '🔒'} {grp.isCommunity && <span style={{fontSize: '10px', background: '#8a2be2', padding: '2px 6px', borderRadius: '8px', marginLeft: '4px'}}>Comunidad</span>}
                       </div>
                       <div style={{ fontSize: '12px', color: isUnlocked ? '#ff99dd' : '#777777' }}>
                         {isUnlocked ? grp.members : 'Requiere unión previa'}
@@ -362,6 +367,10 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
                   </div>
                 );
               })}
+
+              <button onClick={() => setShowAddGroupModal(true)} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#00f0ff', border: '2px dashed #00f0ff', borderRadius: '16px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', marginBottom: '14px' }}>
+                ➕ AGREGAR GRUPO A LA RED
+              </button>
 
               <div style={{ background: 'linear-gradient(90deg, #ff1493, #8a2be2)', borderRadius: '18px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '14px', marginBottom: '14px', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.3)', marginTop: '16px' }}>
                 <span>🎯 {selectedGroups.length} seleccionados</span>
@@ -421,7 +430,7 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
         </div>
       )}
 
-      {/* MODAL BOTÓN */}
+      {/* MODAL CONFIGURAR BOTÓN */}
       {showButtonModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
           <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff' }}>
@@ -440,30 +449,13 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
               <input style={neonStyles.input} value={buttonConfig.url} onChange={(e) => setButtonConfig({ ...buttonConfig, url: e.target.value })} placeholder="https://t.me/..." />
             </div>
 
-            {/* SECCIÓN DE BOTONES DE COLORES CON TEXTO */}
             <div style={{ marginBottom: '20px' }}>
               <label style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900', display: 'block', marginBottom: '8px' }}>COLOR DEL BOTÓN</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'default' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'default' || !buttonConfig.style ? '2px solid #fff' : 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>
-                  GRIS
-                </button>
-                <button 
-                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'primary' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'primary' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00f0ff, #0088ff)', color: '#fff', fontSize: '11px', fontWeight: '900', textShadow: '0 1px 2px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
-                  AZUL
-                </button>
-                <button 
-                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'success' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'success' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00ffaa, #00bb77)', color: '#fff', fontSize: '11px', fontWeight: '900', textShadow: '0 1px 2px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
-                  VERDE
-                </button>
-                <button 
-                  onClick={() => setButtonConfig({ ...buttonConfig, style: 'danger' })} 
-                  style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'danger' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #ff1493, #d80073)', color: '#fff', fontSize: '11px', fontWeight: '900', textShadow: '0 1px 2px rgba(0,0,0,0.5)', cursor: 'pointer' }}>
-                  ROSA
-                </button>
+                <button onClick={() => setButtonConfig({ ...buttonConfig, style: 'default' })} style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'default' || !buttonConfig.style ? '2px solid #fff' : 'none', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>GRIS</button>
+                <button onClick={() => setButtonConfig({ ...buttonConfig, style: 'primary' })} style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'primary' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00f0ff, #0088ff)', color: '#fff', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>AZUL</button>
+                <button onClick={() => setButtonConfig({ ...buttonConfig, style: 'success' })} style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'success' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #00ffaa, #00bb77)', color: '#fff', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>VERDE</button>
+                <button onClick={() => setButtonConfig({ ...buttonConfig, style: 'danger' })} style={{ flex: 1, height: '36px', borderRadius: '10px', border: buttonConfig.style === 'danger' ? '2px solid #fff' : 'none', background: 'linear-gradient(90deg, #ff1493, #d80073)', color: '#fff', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}>ROSA</button>
               </div>
             </div>
 
@@ -471,6 +463,36 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
               <button onClick={handleClearButton} style={{ ...neonStyles.btnLight, flex: 1, borderColor: '#ff1493', color: '#ff1493' }}>BORRAR</button>
               <button onClick={handleSaveButton} style={{ ...neonStyles.btnPrimary, flex: 2 }}>GUARDAR</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 MODAL AGREGAR GRUPO COMUNITARIO */}
+      {showAddGroupModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
+          <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00ffaa' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontWeight: '900', color: '#00ffaa', fontSize: '17px' }}>Vincular Grupo/Canal</h3>
+              <button onClick={() => setShowAddGroupModal(false)} style={{ ...neonStyles.btnLight, padding: '4px 10px', color: '#fff', borderColor: '#ff1493' }}>✕</button>
+            </div>
+            
+            <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px', lineHeight: '1.4' }}>
+              Los usuarios podrán pagar para enviar mensajes a tu grupo. 
+              <br/><br/>
+              <b>Requisitos:</b><br/>
+              1. Debe ser público (ej. @MiGrupo).<br/>
+              2. Mínimo 500 miembros reales.<br/>
+              3. Tienes que añadir a nuestro bot oficial como Administrador para que pueda publicar.
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '11px', color: '#00ffaa', fontWeight: '900' }}>ENLACE O @USUARIO</label>
+              <input style={{...neonStyles.input, borderColor: '#00ffaa'}} value={newGroupUrl} onChange={(e) => setNewGroupUrl(e.target.value)} placeholder="Ej. @ClickNetwork" />
+            </div>
+
+            <button onClick={handleAddCommunityGroup} disabled={isVerifyingGroup} style={{ ...neonStyles.btnPrimary, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', boxShadow: '0 6px 0 #007744' }}>
+              {isVerifyingGroup ? 'VERIFICANDO RED...' : 'VERIFICAR Y AÑADIR'}
+            </button>
           </div>
         </div>
       )}
