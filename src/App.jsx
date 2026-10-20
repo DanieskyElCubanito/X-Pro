@@ -3,7 +3,7 @@ import WebApp from '@twa-dev/sdk';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
 import { botApi } from './api/botApi';
-import { translations } from './translations'; // 🔥 Importamos diccionario
+import { translations } from './translations'; 
 
 import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';
@@ -31,8 +31,8 @@ function App() {
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 🔥 LÓGICA DE IDIOMA
-  const [lang, setLang] = useState('es');
+  // 🔥 LÓGICA DE IDIOMA MANUAL Y AUTOMÁTICA
+  const [lang, setLang] = useState(localStorage.getItem('click_lang') || 'es');
 
   const initialized = useRef(false);
 
@@ -78,9 +78,11 @@ function App() {
         const initData = WebApp.initData;
         const inviterId = WebApp.initDataUnsafe?.start_param;
 
-        // Detectar idioma
-        if (user?.language_code) {
-          setLang(user.language_code.startsWith('es') ? 'es' : 'en');
+        // 🔥 Detectar idioma solo si el usuario no ha elegido uno manualmente
+        if (!localStorage.getItem('click_lang') && user?.language_code) {
+          const detectedLang = user.language_code.startsWith('es') ? 'es' : 'en';
+          setLang(detectedLang);
+          localStorage.setItem('click_lang', detectedLang);
         }
 
         if (!user || !initData) { 
@@ -130,12 +132,12 @@ function App() {
     <div style={neonTheme.container}>
       <Toaster position="top-center" toastOptions={{ style: { background: '#1d0833', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)', fontWeight: '800', fontSize: '13px' } }} />
       <div style={neonTheme.main}>
-        {/* 🔥 SE CORRIGIÓ: t={t} ahora pasa correctamente al HomeTab y demás pestañas */}
-        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} t={t} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} t={t} /></div>}
-        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} t={t} /></div>}
-        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} t={t} /></div>}
-        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} t={t} /></div>}
-        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} t={t} /></div>}
+        {/* 🔥 PASAMOS LANG Y SETLANG AL PROFILE HEADER */}
+        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} t={t} lang={lang} setLang={setLang} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} t={t} /></div>}
+        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} /></div>}
+        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} /></div>}
+        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} /></div>}
+        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} /></div>}
       </div>
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} t={t} />
     </div>
