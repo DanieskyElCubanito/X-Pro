@@ -1,9 +1,20 @@
 import axios from 'axios';
+import WebApp from '@twa-dev/sdk'; // Necesitamos WebApp para obtener initData
 
 const api = axios.create({
   baseURL: '/api', 
   timeout: 25000, 
   headers: { 'Content-Type': 'application/json' }
+});
+
+// Interceptor para inyectar initData de forma segura en CADA petición al backend
+api.interceptors.request.use((config) => {
+  const initData = WebApp.initData;
+  if (initData) {
+    // Lo enviamos en un header personalizado
+    config.headers['X-Telegram-Init-Data'] = initData;
+  }
+  return config;
 });
 
 const postAction = async (action, payload = {}) => {
@@ -32,11 +43,9 @@ export const botApi = {
   getTasks: (userId) => postAction('get-tasks', { userId }),
   completeTask: (userId, taskId) => postAction('complete-task', { userId, taskId }),
 
-  // --- RUTAS BILLETERAS ÚNICAS (GRAM) ---
   generatePaymentWallet: (payload) => postAction('generate-payment-wallet', payload),
   verifyCryptoPayment: (payload) => postAction('verify-crypto-payment', payload),
 
-  // --- NUEVAS RUTAS: TELEGRAM STARS (⭐) ---
   generateStarsInvoice: (payload) => postAction('generate-stars-invoice', payload),
   confirmStarsPayment: (payload) => postAction('confirm-stars-payment', payload)
 };
