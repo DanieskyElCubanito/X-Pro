@@ -71,8 +71,16 @@ function App() {
         WebApp.ready(); WebApp.expand();
         if (WebApp.disableVerticalSwipes) WebApp.disableVerticalSwipes();
         const user = WebApp.initDataUnsafe?.user;
+        const initData = WebApp.initData;
         const inviterId = WebApp.initDataUnsafe?.start_param;
-        if (!user) { setErrorMessage("Debes abrir la app desde Telegram."); setStatus('error'); return; }
+        
+        // Cierre estricto: Si no hay initData, significa que abrieron desde navegador web (fraudulento)
+        if (!user || !initData) { 
+            setErrorMessage("Acceso denegado: Debes abrir la app desde Telegram oficial."); 
+            setStatus('error'); 
+            return; 
+        }
+        
         initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) { setErrorMessage("Error al iniciar el SDK."); setStatus('error'); }
