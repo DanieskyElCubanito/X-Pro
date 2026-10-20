@@ -20,12 +20,6 @@ const neonStyles = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
     boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)', transition: 'all 0.2s ease'
   },
-  cardLocked: {
-    background: 'linear-gradient(135deg, rgba(38, 14, 66, 0.5), rgba(18, 7, 36, 0.5))',
-    border: '2px dashed #8a2be2', borderRadius: '20px', padding: '14px 18px', marginBottom: '12px',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    opacity: 0.7, position: 'relative', overflow: 'hidden'
-  },
   btnPrimary: {
     width: '100%', padding: '15px', background: 'linear-gradient(180deg, #ff66cc 0%, #ff1493 50%, #d80073 100%)',
     color: '#ffffff', border: 'none', borderRadius: '18px', fontWeight: '900', fontSize: '16px',
@@ -39,11 +33,6 @@ const neonStyles = {
   btnLight: {
     padding: '12px 18px', background: 'rgba(255, 255, 255, 0.08)', color: '#ff99dd',
     border: '2px solid rgba(255, 65, 180, 0.3)', borderRadius: '16px', fontWeight: '800', fontSize: '13px', cursor: 'pointer'
-  },
-  btnUnlock: {
-    padding: '8px 12px', background: 'linear-gradient(90deg, #ffe600, #ffaa00)', color: '#050214',
-    border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '11px', cursor: 'pointer',
-    boxShadow: '0 4px 10px rgba(255, 230, 0, 0.3)', textTransform: 'uppercase'
   },
   input: {
     width: '100%', background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', borderRadius: '16px',
@@ -63,12 +52,7 @@ const TEMPLATES = [
   { title: 'Red de Tráfico', icon: '⚡', accent: '#ffe600', text: '⚡ Únete a nuestra red. Gana CLICK gratis todos los días completando tareas simples.' }
 ];
 
-const INITIAL_GROUPS = [
-  { id: "-1003685621367", name: "@AirdropsCriptoES", members: "Calculando...", unlockTaskId: 'channel1' },
-  { id: "-1004377164928", name: "@TONAirdropsES", members: "Calculando...", unlockTaskId: 'channel2' }
-];
-
-export default function PublishTab({ userData, setUserData, setActiveTabGlobal }) {
+export default function PublishTab({ userData, setUserData }) {
   const [activeTab, setActiveTab] = useState('create');
   const [step, setStep] = useState(1);
 
@@ -78,8 +62,6 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
   const [selectedGroups, setSelectedGroups] = useState([]);
 
   const [showButtonModal, setShowButtonModal] = useState(false);
-  
-  // 🔥 MODAL GRUPO COMUNITARIO
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
   const [newGroupUrl, setNewGroupUrl] = useState('');
   const [isVerifyingGroup, setIsVerifyingGroup] = useState(false);
@@ -88,36 +70,39 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
   const fileInputRef = useRef(null);
 
   const balance = Number(userData?.balance || 0);
-  const COST_PER_GROUP = 10;
-  const totalCost = selectedGroups.length * COST_PER_GROUP;
 
-  const [availableGroups, setAvailableGroups] = useState(INITIAL_GROUPS);
-  const [unlockedTasks, setUnlockedTasks] = useState([]);
+  const [availableGroups, setAvailableGroups] = useState([]);
 
-  const apiHeaders = { 
-    'Content-Type': 'application/json', 
-    'X-Telegram-Init-Data': WebApp.initData || '' 
-  };
+  // 🔥 COSTO DINÁMICO (Si es tu grupo, es gratis)
+  const totalCost = selectedGroups.reduce((acc, groupId) => {
+      const grp = availableGroups.find(g => g.id === groupId);
+      if (grp && String(grp.creator_id) === String(userData?.id)) return acc; 
+      return acc + 10;
+  }, 0);
 
-  const fetchStatsAndLocks = async () => {
+  const apiHeaders = { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': WebApp.initData || '' };
+
+  const fetchGroups = async () => {
     if (!userData?.id) return;
-
     try {
-      // 1. Obtener grupos comunitarios de la base de datos
       const resComm = await fetch('/api', {
         method: 'POST', headers: apiHeaders,
         body: JSON.stringify({ action: 'get-publish-groups' })
       });
       const dataComm = await resComm.json();
       
-      let allGroups = [...INITIAL_GROUPS];
+      let allGroups = [];
       if (dataComm.success && dataComm.communityGroups) {
          dataComm.communityGroups.forEach(g => {
-           allGroups.push({ id: g.url, name: g.title, members: "Calculando...", unlockTaskId: null, isCommunity: true });
+           allGroups.push({ id: g.url, name: g.title, members: "Calculando...", isCommunity: true, creator_id: String(g.creator_id) });
          });
       }
 
-      // 2. Obtener miembros reales de TODOS los grupos (oficiales + comunitarios)
+      if (allGroups.length === 0) {
+        setAvailableGroups([]);
+        return;
+      }
+
       const resStats = await fetch('/api', {
         method: 'POST', headers: apiHeaders,
         body: JSON.stringify({ action: 'get-group-stats', groupIds: allGroups.map(g => g.id) })
@@ -134,29 +119,12 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
           return { ...grp, members: "No disponible" };
         }));
       }
-
-      // 3. Ver qué ha desbloqueado el usuario (Para los oficiales)
-      const resHistory = await fetch('/api', {
-         method: 'POST', headers: apiHeaders,
-         body: JSON.stringify({ action: 'get-history', userId: userData.id })
-      });
-      const dataHistory = await resHistory.json();
-
-      if (dataHistory.success && dataHistory.history) {
-          const completed = [];
-          dataHistory.history.forEach(log => {
-              if (log.description && log.description.includes('@AirdropsCriptoES')) completed.push('channel1');
-              if (log.description && log.description.includes('@TONAirdropsES')) completed.push('channel2');
-          });
-          setUnlockedTasks(completed);
-      }
-    } catch (e) { console.error("Error cargando datos:", e); }
+    } catch (e) { console.error("Error cargando grupos:", e); }
   };
 
-  useEffect(() => { fetchStatsAndLocks(); }, [userData?.id]);
+  useEffect(() => { fetchGroups(); }, [userData?.id]);
 
-  const handleToggleGroup = (groupId, isUnlocked) => {
-    if (!isUnlocked) return; 
+  const handleToggleGroup = (groupId) => {
     setSelectedGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
   };
 
@@ -230,7 +198,7 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
         toast.success("¡Grupo integrado a la red exitosamente!", { id: tid });
         setNewGroupUrl('');
         setShowAddGroupModal(false);
-        fetchStatsAndLocks(); // Recarga la lista de grupos
+        fetchGroups(); 
       } else {
         toast.error(data.error || "Error al añadir el grupo.", { id: tid });
       }
@@ -331,39 +299,36 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
                 <button onClick={() => setStep(2)} style={{ ...neonStyles.btnLight, padding: '6px 12px' }}>◀</button>
                 <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: '#ffe600' }}>¿Dónde lo publicamos?</h3>
               </div>
-              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Desbloquea los canales oficiales uniéndote a ellos en el Mercado.</p>
+              <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px' }}>Selecciona los grupos de la red. Si el grupo es tuyo, publicar es gratis.</p>
+
+              {availableGroups.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '20px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', marginBottom: '14px' }}>
+                  <p style={{ fontSize: '13px', color: '#ccc', margin: 0 }}>No hay grupos disponibles en la red todavía.</p>
+                </div>
+              )}
 
               {availableGroups.map((grp) => {
-                // Si es comunitario, está desbloqueado por defecto para todos. Si es oficial, revisa el candado.
-                const isUnlocked = grp.isCommunity ? true : unlockedTasks.includes(grp.unlockTaskId);
-                const isSelected = selectedGroups.includes(grp.id) && isUnlocked;
-                
+                const isSelected = selectedGroups.includes(grp.id);
+                const isMyGroup = String(grp.creator_id) === String(userData?.id);
+
                 return (
                   <div 
                     key={grp.id} 
-                    onClick={() => handleToggleGroup(grp.id, isUnlocked)} 
-                    style={isUnlocked 
-                      ? { ...neonStyles.cardInteractive, borderColor: isSelected ? '#00f0ff' : '#8a2be2', background: isSelected ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(46, 16, 77, 0.9))' : neonStyles.cardInteractive.background }
-                      : neonStyles.cardLocked
-                    }
+                    onClick={() => handleToggleGroup(grp.id)} 
+                    style={{ ...neonStyles.cardInteractive, borderColor: isSelected ? '#00f0ff' : '#8a2be2', background: isSelected ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(46, 16, 77, 0.9))' : neonStyles.cardInteractive.background }}
                   >
                     <div>
-                      <div style={{ fontWeight: '900', fontSize: '15px', color: isUnlocked ? '#ffffff' : '#aaaaaa' }}>
-                        {grp.name} {isUnlocked ? '' : '🔒'} {grp.isCommunity && <span style={{fontSize: '10px', background: '#8a2be2', padding: '2px 6px', borderRadius: '8px', marginLeft: '4px'}}>Comunidad</span>}
+                      <div style={{ fontWeight: '900', fontSize: '15px', color: '#ffffff' }}>
+                        {grp.name} 
+                        {isMyGroup && <span style={{fontSize: '10px', background: '#00ffaa', color: '#000', padding: '2px 6px', borderRadius: '8px', marginLeft: '6px'}}>Mi Grupo</span>}
                       </div>
-                      <div style={{ fontSize: '12px', color: isUnlocked ? '#ff99dd' : '#777777' }}>
-                        {isUnlocked ? grp.members : 'Requiere unión previa'}
+                      <div style={{ fontSize: '12px', color: isMyGroup ? '#00ffaa' : '#ff99dd', fontWeight: isMyGroup ? 'bold' : 'normal' }}>
+                        {grp.members} {isMyGroup ? ' • PUBLICAR GRATIS' : ' • 10 CLICK'}
                       </div>
                     </div>
-                    {isUnlocked ? (
-                       <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isSelected ? '#00f0ff' : 'transparent', border: '2px solid #00f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#050214', fontWeight: '900', fontSize: '14px' }}>
-                         {isSelected ? '✓' : ''}
-                       </div>
-                    ) : (
-                       <button onClick={(e) => { e.stopPropagation(); setActiveTabGlobal && setActiveTabGlobal('tasks'); }} style={neonStyles.btnUnlock}>
-                         Desbloquear
-                       </button>
-                    )}
+                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isSelected ? '#00f0ff' : 'transparent', border: '2px solid #00f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#050214', fontWeight: '900', fontSize: '14px' }}>
+                      {isSelected ? '✓' : ''}
+                    </div>
                   </div>
                 );
               })}
@@ -423,10 +388,15 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
       )}
 
       {activeTab === 'history' && (
-        <div className="fade-in" style={neonStyles.card}>
-          <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '10px' }}>📜</div>
-          <h4 style={{ margin: '0 0 8px 0', color: '#ffe600', textAlign: 'center', fontSize: '18px' }}>Publicaciones a Grupos</h4>
-          <p style={{ fontSize: '13px', color: '#ff99dd', textAlign: 'center', lineHeight: '1.5' }}>Aquí se registran los envíos directos de campañas a los grupos aliados de Click Network.</p>
+        <div className="fade-in">
+          <div style={neonStyles.card}>
+            <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '10px' }}>📜</div>
+            <h4 style={{ margin: '0 0 8px 0', color: '#ffe600', textAlign: 'center', fontSize: '18px' }}>Tus Grupos e Historial</h4>
+            <p style={{ fontSize: '13px', color: '#ff99dd', textAlign: 'center', lineHeight: '1.5' }}>Gana 2 CLICKs cada vez que alguien publique en los grupos que has añadido a la red.</p>
+            <button onClick={() => setShowAddGroupModal(true)} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#00f0ff', border: '2px dashed #00f0ff', borderRadius: '16px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', marginTop: '14px' }}>
+              ➕ AGREGAR GRUPO A LA RED
+            </button>
+          </div>
         </div>
       )}
 
@@ -477,7 +447,7 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
             </div>
             
             <p style={{ fontSize: '12px', color: '#ff99dd', marginBottom: '14px', lineHeight: '1.4' }}>
-              Los usuarios podrán pagar para enviar mensajes a tu grupo. 
+              Los usuarios podrán pagar para enviar mensajes a tu grupo. ¡Tú ganas 2 CLICKs por cada publicación!
               <br/><br/>
               <b>Requisitos:</b><br/>
               1. Debe ser público (ej. @MiGrupo).<br/>
