@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import crypto from 'crypto'; 
 import { TonClient, WalletContractV4, internal } from '@ton/ton';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
-
+l
 const supabase = createClient(
   "https://shfogfihzkwmusarhlxv.supabase.co",
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
