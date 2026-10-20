@@ -164,7 +164,7 @@ export default async function handler(req, res) {
     // ==========================================
     // GRUPOS COMUNITARIOS (AÑADIR Y LEER)
     // ==========================================
-    if (action === 'add-publish-group') {
+        if (action === 'add-publish-group') {
       const { url } = req.body;
       const targetId = String(userId);
       const chatId = extractTelegramUsername(url);
@@ -176,10 +176,15 @@ export default async function handler(req, res) {
       const isAdmin = await checkAdminStatus(chatId);
       if (!isAdmin) return res.status(400).json({success: false, error: 'El bot no es administrador del grupo/canal.'});
 
-      const statsRes = await fetchWithTimeout(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`);
-      const statsData = await statsRes.json();
-      if (!statsData.ok || statsData.result < 500) {
-         return res.status(400).json({success: false, error: `El grupo tiene ${statsData.result || 0} miembros. Se requieren mínimo 500.`});
+      // 🔥 EXCEPCIÓN DE ADMIN: Si el usuario actual es Administrador de la app, omitimos la regla de los 500 miembros
+      const isUserAdmin = ADMIN_IDS.includes(targetId);
+
+      if (!isUserAdmin) {
+        const statsRes = await fetchWithTimeout(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`);
+        const statsData = await statsRes.json();
+        if (!statsData.ok || statsData.result < 500) {
+           return res.status(400).json({success: false, error: `El grupo tiene ${statsData.result || 0} miembros. Se requieren mínimo 500.`});
+        }
       }
 
       await supabase.from('tasks').insert([{
@@ -188,7 +193,7 @@ export default async function handler(req, res) {
       }]);
       return res.status(200).json({ success: true, message: 'Grupo añadido con éxito' });
     }
-
+     
     if (action === 'get-publish-groups') {
        const { data: dbGroups } = await supabase.from('tasks').select('*').eq('type', 'publish_group').eq('status', 'active');
        return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
