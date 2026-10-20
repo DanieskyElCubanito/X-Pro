@@ -73,7 +73,6 @@ async function checkAdminStatus(chatId) {
   } catch (error) { return false; }
 }
 
-// 🔥 NUEVA FUNCIÓN: Nos dirá exactamente por qué falla la verificación en Telegram
 async function checkAdminStatusDetailed(chatId) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${BOT_ID}`;
@@ -154,17 +153,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // 🔥 MODIFICADO: EL ADMIN VE TODAS LAS TAREAS INCLUYENDO GRUPOS COMUNITARIOS
     if (action === 'admin-get-tasks') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
-      const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').order('created_at', { ascending: false });
+      const { data: allTasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
       return res.status(200).json({ success: true, tasks: allTasks || [] });
     }
 
     // ==========================================
     // GRUPOS COMUNITARIOS (AÑADIR Y LEER)
     // ==========================================
-        if (action === 'add-publish-group') {
+    if (action === 'add-publish-group') {
       const { url } = req.body;
       const targetId = String(userId);
       const chatId = extractTelegramUsername(url);
@@ -176,7 +176,7 @@ export default async function handler(req, res) {
       const isAdmin = await checkAdminStatus(chatId);
       if (!isAdmin) return res.status(400).json({success: false, error: 'El bot no es administrador del grupo/canal.'});
 
-      // 🔥 EXCEPCIÓN DE ADMIN: Si el usuario actual es Administrador de la app, omitimos la regla de los 500 miembros
+      // 🔥 EXCEPCIÓN DE ADMIN: Si el usuario es admin, se salta los 500 miembros
       const isUserAdmin = ADMIN_IDS.includes(targetId);
 
       if (!isUserAdmin) {
@@ -193,7 +193,7 @@ export default async function handler(req, res) {
       }]);
       return res.status(200).json({ success: true, message: 'Grupo añadido con éxito' });
     }
-     
+
     if (action === 'get-publish-groups') {
        const { data: dbGroups } = await supabase.from('tasks').select('*').eq('type', 'publish_group').eq('status', 'active');
        return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
@@ -299,7 +299,7 @@ export default async function handler(req, res) {
       let refundClicks = 0;
       if (task.status === 'active' || task.status === 'paused') {
         const remaining = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
-        refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0) || task.type === 'daily') ? (remaining > 0 ? Number(task.total_cost || 10) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
+        refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0) || task.type === 'daily' || task.type === 'publish_group') ? (remaining > 0 ? Number(task.total_cost || 0) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
         if (refundClicks > 0) {
           const { data: cu } = await supabase.from('users').select('balance').eq('id', task.creator_id).single();
           if (cu) await supabase.from('users').update({ balance: Number((Number(cu.balance || 0) + refundClicks).toFixed(2)) }).eq('id', task.creator_id);
@@ -345,11 +345,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // 🔥 FIX: VERIFICAR ADMIN CON DETALLE DE ERROR
     if (action === 'verify-admin') {
       const chatId = extractTelegramUsername(req.body.url);
       if (!chatId) return res.status(400).json({ success: false, error: 'Enlace público inválido.' });
-      
+
       const check = await checkAdminStatusDetailed(chatId);
       if (!check.isAdmin) {
          return res.status(400).json({ success: false, error: check.error || 'El bot no es administrador.' });
