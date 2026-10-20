@@ -32,7 +32,17 @@ export const translations = {
     terms_1: "Anti-Fraude: Está prohibido el uso de bots o multicuentas. Las cuentas sospechosas serán suspendidas.",
     terms_2: "Economía: El saldo CLICK es un puntaje interno, no constituye dinero fiat ni criptomoneda fuera de la app.",
     terms_3: "Contenido: No somos responsables por el contenido promocionado. Las estafas serán eliminadas sin reembolso.",
-    terms_4: "Pagos Web3: Las transacciones en TON y Stars son definitivas. Verifica antes de proceder."
+    terms_4: "Pagos Web3: Las transacciones en TON y Stars son definitivas. Verifica antes de proceder.",
+
+    // HomeTab
+    home_balance: "Saldo Disponible",
+    home_history: "Ganancias Históricas",
+    home_quick: "Acciones Rápidas",
+    home_earn: "Ganar CLICK",
+    home_create: "Crear Campaña",
+    home_invite: "Invita y Gana",
+    home_invite_desc: "Recibe +1.00 CLICK fijo y el 20% de las ganancias de tus amigos.",
+    home_btn_affiliates: "IR A AFILIADOS ➔"
   },
   en: {
     // App & BottomNav
@@ -67,6 +77,16 @@ export const translations = {
     terms_1: "Anti-Fraud: The use of bots or multiple accounts is strictly prohibited. Suspicious accounts will be banned.",
     terms_2: "Economy: The CLICK balance is an internal score and does not constitute fiat money or cryptocurrency outside this app.",
     terms_3: "Content: We are not responsible for promoted content. Scams will be removed without refund.",
-    terms_4: "Web3 Payments: Transactions in TON and Stars are final. Verify before proceeding."
+    terms_4: "Web3 Payments: Transactions in TON and Stars are final. Verify before proceeding.",
+
+    // HomeTab
+    home_balance: "Available Balance",
+    home_history: "All-Time Earnings",
+    home_quick: "Quick Actions",
+    home_earn: "Earn CLICK",
+    home_create: "Create Campaign",
+    home_invite: "Invite & Earn",
+    home_invite_desc: "Get a fixed +1.00 CLICK and 20% of your friends' earnings.",
+    home_btn_affiliates: "GO TO AFFILIATES ➔"
   }
 };
