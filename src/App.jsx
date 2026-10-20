@@ -132,12 +132,12 @@ function App() {
     <div style={neonTheme.container}>
       <Toaster position="top-center" toastOptions={{ style: { background: '#1d0833', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)', fontWeight: '800', fontSize: '13px' } }} />
       <div style={neonTheme.main}>
-        {/* 🔥 PASAMOS LANG Y SETLANG AL PROFILE HEADER */}
+        {/* 🔥 SE CORRIGIÓ: t={t} AHORA SE PASA A TODAS LAS PESTAÑAS */}
         {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} t={t} lang={lang} setLang={setLang} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} t={t} /></div>}
-        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} /></div>}
-        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} /></div>}
-        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} /></div>}
-        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} /></div>}
+        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} t={t} /></div>}
+        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} t={t} /></div>}
+        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} t={t} /></div>}
+        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} t={t} /></div>}
       </div>
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} t={t} />
     </div>
