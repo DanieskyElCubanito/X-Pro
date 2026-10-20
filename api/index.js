@@ -13,7 +13,7 @@ const supabase = createClient(
 
 const BOT_TOKEN = "8954086426:AAGNgUtmREvFLI2SAapaOroLuiy6_05nRlM";
 const BOT_ID = BOT_TOKEN.split(':')[0];
-const ADMIN_IDS = ['8968109534', '8968109534'];
+const ADMIN_IDS = ['8968109534', '8892196101'];
 const MAIN_ADMIN_ID = '8968109534'; 
 const MY_MASTER_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I";
 
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
 
       const { data: usersData } = await supabase.from('users').select('id');
-      const { data: tasksData } = await supabase.from('tasks').select('id').neq('type', 'publish_group');
+      const { data: tasksData } = await supabase.from('tasks').select('id');
 
       return res.status(200).json({ 
         success: true, 
@@ -153,7 +153,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // 🔥 MODIFICADO: EL ADMIN VE TODAS LAS TAREAS INCLUYENDO GRUPOS COMUNITARIOS
     if (action === 'admin-get-tasks') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
@@ -176,9 +175,7 @@ export default async function handler(req, res) {
       const isAdmin = await checkAdminStatus(chatId);
       if (!isAdmin) return res.status(400).json({success: false, error: 'El bot no es administrador del grupo/canal.'});
 
-      // 🔥 EXCEPCIÓN DE ADMIN: Si el usuario es admin, se salta los 500 miembros
       const isUserAdmin = ADMIN_IDS.includes(targetId);
-
       if (!isUserAdmin) {
         const statsRes = await fetchWithTimeout(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`);
         const statsData = await statsRes.json();
@@ -189,7 +186,7 @@ export default async function handler(req, res) {
 
       await supabase.from('tasks').insert([{
          creator_id: targetId, type: 'publish_group', title: chatId, url: chatId,
-         completions_total: 999999, completions_done: 0, reward: 0, total_cost: 0, status: 'active'
+         completions_total: 999999, completions_done: 0, reward: 1, total_cost: 0, status: 'active'
       }]);
       return res.status(200).json({ success: true, message: 'Grupo añadido con éxito' });
     }
@@ -232,7 +229,7 @@ export default async function handler(req, res) {
       if (!isOwner) {
         const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
         await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
-        await supabase.from('history_logs').insert([{ user_id: targetId, title: '📢 Publicación de Campaña', description: `Pago por envío a ${chatId}.`, amount: -COST_PER_GROUP }]);
+        await supabase.from('history_logs').insert([{ user_id: targetId, title: '📢 Publicación de Campaña', description: `Envío al grupo ${chatId}.`, amount: -COST_PER_GROUP }]);
 
         if (groupInfo && groupInfo.creator_id) {
            const { data: owner } = await supabase.from('users').select('balance, total_earnings').eq('id', groupInfo.creator_id).single();
@@ -370,9 +367,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
+    // ==========================================
+    // OBTENER TAREAS (INCLUYENDO COMUNITARIAS Y RE-UNIÓN)
+    // ==========================================
     if (action === 'get-tasks') {
       const targetId = String(userId);
-      const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
+      const { data: allTasks } = await supabase.from('tasks').select('*').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
 
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
@@ -387,33 +387,60 @@ export default async function handler(req, res) {
          });
       }
 
+      // Verificamos si en las comunitarias el usuario aún es miembro o se salió
+      const communityTasks = (allTasks || []).filter(t => t.type === 'publish_group');
+      const membershipMap = {};
+      for (const cTask of communityTasks) {
+        if (completedIds.has(String(cTask.id))) {
+          const chatId = extractTelegramUsername(cTask.url);
+          if (chatId) {
+             const isStillMember = await checkMembership(targetId, chatId);
+             membershipMap[String(cTask.id)] = isStillMember;
+          }
+        }
+      }
+
       const mappedTasks = (allTasks || []).map(t => {
         const isDaily = t.type.startsWith('daily_') || t.type === 'daily';
-        return { ...t, is_completed: isDaily ? completedDailyIds.has(String(t.id)) : completedIds.has(String(t.id)) };
+        const isCompleted = isDaily ? completedDailyIds.has(String(t.id)) : completedIds.has(String(t.id));
+        const isStillMember = membershipMap[String(t.id)];
+
+        return { 
+          ...t, 
+          reward: t.type === 'publish_group' ? 1 : (t.reward || 1),
+          is_completed: isCompleted,
+          needs_rejoin: t.type === 'publish_group' && isCompleted && isStillMember === false
+        };
       });
 
       return res.status(200).json({ success: true, tasks: mappedTasks });
     }
 
+    // ==========================================
+    // COMPLETAR TAREA (SOPORTE COMUNITARIAS Y RE-UNIÓN)
+    // ==========================================
     if (action === 'complete-task') {
       const { taskId } = req.body; const targetId = String(userId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
       if (!task || task.status !== 'active') return res.status(400).json({ success: false, error: 'Tarea no disponible o pausada.' });
 
       const isDaily = task.type.startsWith('daily_') || task.type === 'daily';
+      const isCommunity = task.type === 'publish_group';
       const baseType = isDaily ? task.type.replace('daily_', '') : task.type;
+
+      const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
 
       if (isDaily) {
          const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
          const { data: recentLog } = await supabase.from('history_logs')
            .select('id').eq('user_id', targetId).like('description', `%[Daily:${taskId}]%`).gte('created_at', yesterday).maybeSingle();
          if (recentLog) return res.status(400).json({ success: false, error: 'Ya reclamaste este Check-in hoy. Vuelve mañana.' });
-      } else {
-         const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
-         if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
+      } else if (alreadyDone && !isCommunity) {
+         return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
       }
 
-      if (baseType === 'group' || baseType === 'channel') {
+      // Verificación de membresía en Telegram
+      if (baseType === 'group' || baseType === 'channel' || isCommunity) {
         const chatId = extractTelegramUsername(task.url);
         if (chatId) {
           const isJoined = await checkMembership(targetId, chatId);
@@ -421,7 +448,7 @@ export default async function handler(req, res) {
             const isBotStillAdmin = await checkAdminStatus(chatId);
             if (!isBotStillAdmin) {
               await supabase.from('tasks').update({ status: 'paused' }).eq('id', taskId);
-              return res.status(400).json({ success: false, error: 'El bot ya no es administrador del grupo. La campaña se ha pausado automáticamente.' });
+              return res.status(400).json({ success: false, error: 'El bot ya no es administrador del grupo. Campaña pausada.' });
             }
             return res.status(400).json({ success: false, error: 'No te has unido al canal o grupo.' });
           }
@@ -430,11 +457,16 @@ export default async function handler(req, res) {
         try { await axios.post(`https://api.telegram.org/bot${task.bot_token}/sendChatAction`, { chat_id: targetId, action: 'typing' }); } catch (e) { return res.status(400).json({ success: false, error: 'Asegúrate de darle a INICIAR (/start) al bot.' }); }
       }
 
+      // Reconciliación de re-unión en grupos comunitarios sin pagar de más
+      if (isCommunity && alreadyDone) {
+        return res.status(200).json({ success: true, is_rejoin: true, message: '¡Unión verificada!' });
+      }
+
       if (!isDaily) {
          await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
       }
 
-      const rewardAmount = Number(task.reward || 1);
+      const rewardAmount = isCommunity ? 1 : Number(task.reward || 1);
       const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
       const newBalance = Number((Number(dbUser.balance || 0) + rewardAmount).toFixed(2));
       const newTotal = Number((Number(dbUser.total_earnings || 0) + rewardAmount).toFixed(2));
@@ -454,7 +486,7 @@ export default async function handler(req, res) {
       const newDoneCount = Number(task.completions_done || 0) + 1;
       await supabase.from('tasks').update({ 
         completions_done: newDoneCount, 
-        status: newDoneCount >= Number(task.completions_total) ? 'completed' : 'active' 
+        status: (!isCommunity && newDoneCount >= Number(task.completions_total)) ? 'completed' : 'active' 
       }).eq('id', taskId);
 
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
