@@ -15,11 +15,16 @@ export default function AdminDashboard({ userData }) {
   const [searchId, setSearchId] = useState('');
   const [foundUser, setFoundUser] = useState(null);
   const [newBalance, setNewBalance] = useState('');
+  
+  // 🔥 NUEVO: Estado para las campañas
+  const [allTasks, setAllTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
 
   const apiHeaders = { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': WebApp.initData || '' };
 
   useEffect(() => {
     loadStats();
+    loadAllTasks(); // Carga las campañas al abrir el panel
   }, []);
 
   const loadStats = async () => {
@@ -31,6 +36,42 @@ export default function AdminDashboard({ userData }) {
       const data = await res.json();
       if (data.success) setStats(data.stats);
     } catch (e) { console.error(e); }
+  };
+
+  // 🔥 NUEVO: Función para cargar todas las tareas
+  const loadAllTasks = async () => {
+    setLoadingTasks(true);
+    try {
+      const res = await fetch('/api', {
+        method: 'POST', headers: apiHeaders,
+        body: JSON.stringify({ action: 'admin-get-tasks', adminId: userData.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAllTasks(data.tasks || []);
+      }
+    } catch (e) { console.error("Error cargando campañas", e); }
+    finally { setLoadingTasks(false); }
+  };
+
+  // 🔥 NUEVO: Función para eliminar campañas desde el panel
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("¿Seguro que quieres eliminar esta campaña por violar las normas? Se reembolsará el saldo al creador.")) return;
+    const tid = toast.loading("Eliminando campaña...");
+    try {
+      const res = await fetch('/api', {
+        method: 'POST', headers: apiHeaders,
+        body: JSON.stringify({ action: 'delete-task', taskId: taskId, requestingUserId: userData.id, isAdminAction: true })
+      });
+      const data = await res.json();
+      if (data.success) { 
+        toast.success("Campaña eliminada", { id: tid }); 
+        loadAllTasks(); // Recarga la lista
+        loadStats(); // Actualiza el contador de arriba
+      } else { 
+        throw new Error(data.error); 
+      }
+    } catch (err) { toast.error(err.message || "Error al eliminar.", { id: tid }); }
   };
 
   const handleSearchUser = async () => {
@@ -144,6 +185,45 @@ export default function AdminDashboard({ userData }) {
             <button onClick={handleToggleBan} style={foundUser.is_banned ? { ...neon.btnDanger, borderColor: '#00ffaa', color: '#00ffaa' } : neon.btnDanger}>
               {foundUser.is_banned ? '♻️ DESBANEAR USUARIO' : '🚫 BANEAR USUARIO'}
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* 🔥 NUEVA SECCIÓN: AUDITORÍA DE CAMPAÑAS */}
+      <div style={neon.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', color: '#00ffaa' }}>Auditoría de Campañas</h3>
+          <button onClick={loadAllTasks} style={{ background: 'transparent', border: 'none', color: '#00ffaa', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄</button>
+        </div>
+
+        {loadingTasks ? (
+          <div style={{ textAlign: 'center', fontSize: '12px', color: '#ff99dd' }}>Cargando datos...</div>
+        ) : allTasks.length === 0 ? (
+          <div style={{ textAlign: 'center', fontSize: '12px', color: '#ff99dd' }}>No hay campañas activas en la plataforma.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
+            {allTasks.map(task => (
+              <div key={task.id} style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '12px', border: '1px solid #00f0ff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <strong style={{ fontSize: '13px', color: '#fff' }}>{task.title}</strong>
+                  <span style={{ fontSize: '10px', color: task.status === 'paused' ? '#ffaa00' : '#00ffaa', fontWeight: 'bold' }}>
+                    {task.status.toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: '#ff99dd', marginBottom: '8px', wordBreak: 'break-all' }}>
+                  {task.url}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px' }}>
+                  <span style={{ color: '#aaa' }}>Creador: {task.creator_id}</span>
+                  <span style={{ color: '#ffe600', fontWeight: 'bold' }}>{task.completions_done}/{task.completions_total}</span>
+                </div>
+                <div style={{ marginTop: '10px', textAlign: 'right' }}>
+                  <button onClick={() => handleDeleteTask(task.id)} style={{ background: '#ff1493', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    🗑️ Eliminar Forzadamente
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
