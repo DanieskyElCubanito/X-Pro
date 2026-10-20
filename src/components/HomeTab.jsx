@@ -1,158 +1,56 @@
-import { useState } from 'react';
-import toast from 'react-hot-toast';
-import { botApi } from '../api/botApi';
+import React from 'react';
 
 const neon = {
-  container: { display: 'flex', flexDirection: 'column', width: '100%' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
-  iconBtn: { width: '46px', height: '46px', background: 'rgba(15, 5, 28, 0.8)', border: '2px solid #8a2be2', borderRadius: '14px', boxShadow: '0 0 10px rgba(138, 43, 226, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', color: '#ffffff' },
-  title: { fontSize: '28px', fontWeight: '900', letterSpacing: '-0.5px', textTransform: 'uppercase', color: '#00f0ff', margin: 0, textShadow: '0 0 15px rgba(0, 240, 255, 0.4)' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' },
-  statCard: (borderColor, bgColor, glowColor) => ({ background: bgColor, border: `2px solid ${borderColor}`, borderRadius: '20px', boxShadow: `0 4px 15px ${glowColor}`, padding: '16px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', justifyContent: 'center' }),
-  statInnerIcon: { width: '36px', height: '36px', background: 'rgba(0,0,0,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', marginBottom: '10px' },
-  statNumber: { fontSize: '22px', fontWeight: '900', lineHeight: '1.1', marginBottom: '6px', color: '#ffffff' },
-  statDesc: { fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: '1.2', color: '#ff99dd' },
-  infoCard: { background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.6), rgba(20, 8, 38, 0.8))', border: '2px solid #8a2be2', borderRadius: '26px', boxShadow: '0 8px 24px rgba(138, 43, 226, 0.2)', padding: '20px 18px', marginBottom: '20px' },
-  howTitle: { fontSize: '14px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase', color: '#ffe600', marginBottom: '16px' },
-  howStep: { display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 0' },
-  howStepIcon: (bgColor, textColor, glowColor) => ({ width: '44px', height: '44px', background: bgColor, color: textColor, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '900', flexShrink: 0, boxShadow: `0 0 15px ${glowColor}` }),
-  howStepText: { fontSize: '14px', fontWeight: '800', lineHeight: '1.3', color: '#ffffff' },
-  dashedDivider: { border: 'none', borderTop: '2px dashed rgba(255, 65, 180, 0.4)', margin: '6px 0' },
-
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100000 },
-  modalContent: { width: '100%', height: '70vh', background: 'linear-gradient(180deg, rgba(46, 16, 77, 0.95), rgba(20, 8, 38, 1))', borderTop: '2px solid #00f0ff', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '24px 20px', display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 30px rgba(0, 240, 255, 0.2)' },
-  historyItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: 'rgba(15, 5, 28, 0.8)', borderRadius: '12px', border: '1px solid rgba(138, 43, 226, 0.5)', marginBottom: '8px' }
+  card: { background: 'linear-gradient(145deg, #18052a, #0d0217)', border: '2px solid #8a2be2', borderRadius: '20px', padding: '20px', marginBottom: '16px', boxShadow: '0 4px 20px rgba(138, 43, 226, 0.15)' },
+  btnPrimary: { width: '100%', padding: '14px', background: 'linear-gradient(180deg, #00f0ff 0%, #0099ff 100%)', color: '#050214', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', boxShadow: '0 6px 0 #0066aa, 0 10px 20px rgba(0, 240, 255, 0.4)', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  btnSecondary: { width: '100%', padding: '14px', background: 'transparent', color: '#ff99dd', border: '2px dashed #ff41b4', borderRadius: '16px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 65, 180, 0.2)', textTransform: 'uppercase' },
 };
 
 export default function HomeTab({ userData, setActiveTab }) {
-  const [showHistory, setShowHistory] = useState(false);
-  // CORRECCIÓN 1: 'history' todo en minúscula
-  const [history, setHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  const clickBalance = Number(userData?.balance || 0).toFixed(2);
-  const globalClicks = userData?.global_clicks || '0';
-  const clicksReceived = userData?.clicks_received || '0';
-
-  const openHistory = async () => {
-    setShowHistory(true);
-    setLoadingHistory(true);
-    try {
-      const res = await botApi.getHistory(userData.id);
-      if (res.success) setHistory(res.history || []);
-    } catch (e) {
-      toast.error("Error al cargar historial");
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const formatDate = (isoString) => {
-    if (!isoString) return '';
-    const d = new Date(isoString);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-  };
+  const balance = Number(userData?.balance || 0).toFixed(2);
+  const totalEarned = Number(userData?.total_earnings || 0).toFixed(2);
 
   return (
-    <div className="fade-in" style={neon.container}>
-
-      <div style={neon.header}>
-        <div onClick={openHistory} style={neon.iconBtn}>🕒</div>
-        <h1 style={neon.title}>INICIO</h1>
-        <div style={{ width: '46px' }}></div> 
+    <div className="fade-in" style={{ color: '#fff', paddingBottom: '20px' }}>
+      
+      {/* TARJETA DE BALANCE PRINCIPAL */}
+      <div style={{ ...neon.card, borderColor: '#00f0ff', textAlign: 'center', background: 'linear-gradient(145deg, rgba(0,240,255,0.1), rgba(13,2,23,0.95))' }}>
+        <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#00f0ff', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' }}>Saldo Disponible</h3>
+        <div style={{ fontSize: '48px', fontWeight: '900', color: '#ffffff', textShadow: '0 0 20px rgba(0, 240, 255, 0.5)', lineHeight: '1' }}>
+          {balance} <span style={{ fontSize: '16px', color: '#00f0ff' }}>CLICK</span>
+        </div>
+        <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#ff99dd', fontWeight: 'bold' }}>
+          Ganancias Históricas: {totalEarned} CLICK
+        </p>
       </div>
 
-      <div style={neon.statsGrid}>
-        <div style={neon.statCard('#8a2be2', 'rgba(138, 43, 226, 0.2)', 'rgba(138, 43, 226, 0.3)')}>
-          <div style={neon.statInnerIcon}>🌐</div>
-          <div style={neon.statNumber}>{globalClicks}</div>
-          <div style={{...neon.statDesc, color: '#ff99dd'}}>Clicks Globales</div>
-        </div>
-        <div style={neon.statCard('#00f0ff', 'rgba(0, 240, 255, 0.1)', 'rgba(0, 240, 255, 0.3)')}>
-          <div style={neon.statInnerIcon}>⚡</div>
-          <div style={{...neon.statNumber, color: '#00f0ff'}}>{clickBalance}</div>
-          <div style={{...neon.statDesc, color: '#ffffff'}}>Saldo</div>
-        </div>
-        <div style={neon.statCard('#ff1493', 'rgba(255, 20, 147, 0.2)', 'rgba(255, 20, 147, 0.3)')}>
-          <div style={neon.statInnerIcon}>📥</div>
-          <div style={neon.statNumber}>{clicksReceived}</div>
-          <div style={{...neon.statDesc, color: '#ff99dd'}}>Recibidos</div>
-        </div>
+      {/* ACCIONES RÁPIDAS */}
+      <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#ffe600', fontWeight: '900', textTransform: 'uppercase' }}>Acciones Rápidas</h4>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+        <button onClick={() => setActiveTab('tasks')} style={{ background: 'linear-gradient(135deg, rgba(38,14,66,0.9), rgba(18,7,36,0.9))', border: '2px solid #00ffaa', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0, 255, 170, 0.2)' }}>
+          <div style={{ fontSize: '28px' }}>💰</div>
+          <div style={{ color: '#fff', fontSize: '13px', fontWeight: '900' }}>Ganar CLICK</div>
+        </button>
+        <button onClick={() => setActiveTab('publish')} style={{ background: 'linear-gradient(135deg, rgba(38,14,66,0.9), rgba(18,7,36,0.9))', border: '2px solid #ff41b4', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(255, 65, 180, 0.2)' }}>
+          <div style={{ fontSize: '28px' }}>🚀</div>
+          <div style={{ color: '#fff', fontSize: '13px', fontWeight: '900' }}>Crear Campaña</div>
+        </button>
       </div>
 
-      <div style={neon.infoCard}>
-        <div style={neon.howTitle}>MERCADO DE TRÁFICO</div>
-        <div style={neon.howStep}>
-          <div style={neon.howStepIcon('#00f0ff', '#050214', 'rgba(0, 240, 255, 0.4)')}>+</div>
-          <div style={neon.howStepText}>Crea una campaña y atrae usuarios a tu Bot o Grupo.</div>
-        </div>
-        <hr style={neon.dashedDivider} />
-        <div style={neon.howStep}>
-          <div style={neon.howStepIcon('#ffe600', '#050214', 'rgba(255, 230, 0, 0.4)')}>⚡</div>
-          <div style={neon.howStepText}>Completa tareas de otros para ganar saldo CLICK gratis.</div>
-        </div>
-        <hr style={neon.dashedDivider} />
-        <div style={neon.howStep}>
-          <div style={neon.howStepIcon('#ff1493', '#ffffff', 'rgba(255, 20, 147, 0.4)')}>💎</div>
-          <div style={neon.howStepText}>Usa el menú inferior para ir al mercado de tráfico.</div>
-        </div>
-      </div>
-
-      {/* MODAL DE HISTORIAL */}
-      {showHistory && (
-        <div className="fade-in" style={neon.modalOverlay} onClick={() => setShowHistory(false)}>
-          <div style={neon.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, color: '#00f0ff', fontSize: '20px', fontWeight: '900', textTransform: 'uppercase' }}>
-                🕒 Mi Historial
-              </h3>
-              <button onClick={() => setShowHistory(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>✕</button>
-            </div>
-
-            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
-              {loadingHistory ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: '#00f0ff', fontWeight: 'bold' }}>Cargando transacciones...</div>
-              ) : (!history || history.length === 0) ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: '#ff99dd', fontWeight: 'bold' }}>Aún no hay movimientos recientes.</div>
-              ) : (
-                history.map((item, index) => (
-                  <div key={item.id || index} style={{ ...neon.historyItem, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '14px', gap: '8px' }}>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1, paddingRight: '12px' }}>
-                        <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', marginBottom: '4px' }}>
-                          {item.title || "Transacción"}
-                        </div>
-
-                        {item.description && (
-                          <div style={{ color: '#ff99dd', fontSize: '11px', lineHeight: '1.4' }}>
-                            {item.description}
-                          </div>
-                        )}
-
-                        <div style={{ color: '#8a2be2', fontSize: '10px', marginTop: '6px', fontWeight: 'bold' }}>
-                          {item.created_at ? new Date(item.created_at).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-                        </div>
-                      </div>
-
-                      <div style={{ 
-                        color: Number(item.amount || 0) > 0 ? '#00ffaa' : Number(item.amount || 0) < 0 ? '#ff1493' : '#00f0ff', 
-                        fontSize: '16px', 
-                        fontWeight: '900', 
-                        textShadow: Number(item.amount || 0) > 0 ? '0 0 5px rgba(0,255,170,0.5)' : 'none',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {Number(item.amount || 0) > 0 ? '+' : ''}{Number(item.amount || 0) === 0 ? '-' : Number(item.amount || 0).toFixed(2)} CLICK
-                      </div>
-                    </div>
-
-                  </div>
-                ))
-              )}
-            </div>
+      {/* TARJETA DE REFERIDOS RESUMEN */}
+      <div style={neon.card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(138, 43, 226, 0.2)', border: '1px solid #8a2be2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+            👥
+          </div>
+          <div>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#fff', fontWeight: '900' }}>Invita y Gana</h3>
+            <p style={{ margin: 0, fontSize: '11px', color: '#ff99dd', lineHeight: '1.4' }}>Recibe +1.00 CLICK fijo y el 20% de las ganancias de tus amigos.</p>
           </div>
         </div>
-      )}
+        <button onClick={() => setActiveTab('referrals')} style={neon.btnSecondary}>IR A AFILIADOS ➔</button>
+      </div>
+
     </div>
   );
 }
