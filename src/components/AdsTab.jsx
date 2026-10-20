@@ -151,8 +151,13 @@ export default function AdsTab({ userData, setUserData, t }) {
           body: JSON.stringify({ action: 'verify-admin', url: val })
         });
         const data = await res.json();
-        if (data.success) { toast.success("¡Bot es admin!", { id: tid }); nextStep(); } 
-        else { toast.error("El bot no es admin.", { id: tid }); }
+        if (data.success) { 
+          toast.success("¡Bot es admin!", { id: tid }); 
+          nextStep(); 
+        } else { 
+          // 🔥 MUESTRA EL ERROR EXACTO DE TELEGRAM SI FALLA
+          toast.error(data.error || "El bot no es admin.", { id: tid }); 
+        }
       } catch (e) { toast.error("Error al verificar.", { id: tid }); } finally { setIsVerifying(false); }
     } else {
       if (!val.startsWith('http') && !val.startsWith('@')) val = 'https://' + val;
@@ -162,7 +167,7 @@ export default function AdsTab({ userData, setUserData, t }) {
 
   const handleCheckout = () => {
     if (paymentMethod === 'balance') {
-      if (balance < totalClicksCost) return toast.error(`Saldo insuficiente.`);
+      if (balance < totalClicksCost) return toast.error(`Saldo insuficiente. Necesitas ${totalClicksCost} CLICK.`);
       handleCreateTaskPaid();
     } else if (paymentMethod === 'gram') generateGramWallet();
     else if (paymentMethod === 'stars') handleStarsPayment();
@@ -549,7 +554,12 @@ export default function AdsTab({ userData, setUserData, t }) {
             <div className="fade-in">
               <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#ffe600', marginBottom: '16px', textTransform: 'uppercase' }}>Pega tu Enlace</h3>
               <div style={neon.card}>
-                <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4', fontWeight: 'bold' }}>Ingresa la URL pública de tu proyecto o tu enlace de afiliado.</p>
+                {/* 🔥 AQUÍ ESTÁ EL TEXTO DINÁMICO */}
+                <p style={{ color: '#ff99dd', fontSize: '13px', marginBottom: '16px', lineHeight: '1.4', fontWeight: 'bold' }}>
+                  {taskType === 'bot' && t('ads_url_desc_bot')}
+                  {taskType === 'channel' && t('ads_url_desc_channel')}
+                  {(taskType === 'promo' || taskType === 'daily') && t('ads_url_desc_promo')}
+                </p>
                 <input style={neon.input} placeholder="https://t.me/..." value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />
               </div>
               <button onClick={handleVerifyUrl} disabled={isVerifying} style={neon.btnPrimary}>{isVerifying ? 'VERIFICANDO RED...' : 'VALIDAR ENLACE ➔'}</button>
