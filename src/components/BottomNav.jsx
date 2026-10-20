@@ -37,19 +37,20 @@ const TabIcons = {
   )
 };
 
-export default function BottomNav({ activeTab, setActiveTab, userData }) {
+export default function BottomNav({ activeTab, setActiveTab, userData, t }) {
   const ADMIN_IDS = ['8968109534', '8892196101'];
   const isAdmin = userData && ADMIN_IDS.includes(String(userData.id));
 
+  // 🔥 Se usan las traducciones
   const tabs = [
-    { id: 'home', label: 'Inicio', icon: TabIcons.home, color: '#ff41b4' },
-    { id: 'tasks', label: 'Tareas', icon: TabIcons.tasks, color: '#00f0ff' },
-    { id: 'publish', label: 'Publicar', icon: TabIcons.publish, color: '#00ffaa' },
-    { id: 'referrals', label: 'Afiliados', icon: TabIcons.referrals, color: '#8a2be2' }
+    { id: 'home', label: t('nav_home'), icon: TabIcons.home, color: '#ff41b4' },
+    { id: 'tasks', label: t('nav_tasks'), icon: TabIcons.tasks, color: '#00f0ff' },
+    { id: 'publish', label: t('nav_publish'), icon: TabIcons.publish, color: '#00ffaa' },
+    { id: 'referrals', label: t('nav_referrals'), icon: TabIcons.referrals, color: '#8a2be2' }
   ];
 
   if (isAdmin) {
-    tabs.push({ id: 'admin', label: 'Admin', icon: TabIcons.admin, color: '#ffe600' });
+    tabs.push({ id: 'admin', label: t('nav_admin'), icon: TabIcons.admin, color: '#ffe600' });
   }
 
   return (
