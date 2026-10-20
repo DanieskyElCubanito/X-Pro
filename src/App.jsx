@@ -30,13 +30,13 @@ function App() {
   const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   // 🔥 LÓGICA DE IDIOMA
   const [lang, setLang] = useState('es');
-  
+
   const initialized = useRef(false);
 
-  // Función traductora
+  // Función traductora global
   const t = (key) => translations[lang][key] || key;
 
   const verifyUser = async (teleUser, startParam) => {
@@ -130,11 +130,12 @@ function App() {
     <div style={neonTheme.container}>
       <Toaster position="top-center" toastOptions={{ style: { background: '#1d0833', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)', fontWeight: '800', fontSize: '13px' } }} />
       <div style={neonTheme.main}>
-        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} t={t} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} /></div>}
-        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} /></div>}
-        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} /></div>}
-        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} /></div>}
-        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} /></div>}
+        {/* 🔥 SE CORRIGIÓ: t={t} ahora pasa correctamente al HomeTab y demás pestañas */}
+        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} t={t} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} t={t} /></div>}
+        {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} t={t} /></div>}
+        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} t={t} /></div>}
+        {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} t={t} /></div>}
+        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} t={t} /></div>}
       </div>
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} t={t} />
     </div>
