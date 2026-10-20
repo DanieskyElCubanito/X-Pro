@@ -24,7 +24,7 @@ function verifyTelegramWebAppData(telegramInitData) {
   const urlParams = new URLSearchParams(telegramInitData);
   const hash = urlParams.get('hash');
   urlParams.delete('hash');
-  
+
   urlParams.sort();
   let dataCheckString = '';
   for (const [key, value] of urlParams.entries()) { dataCheckString += `${key}=${value}\n`; }
@@ -87,7 +87,7 @@ async function tryGrantReferralReward(targetUserObj) {
       const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
       const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
       const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
-      
+
       await supabase.from('users').update({ balance: refBalance, referral_earnings: refEarnings, total_earnings: refTotal }).eq('id', referrer.id);
       await supabase.from('users').update({ referral_reward_granted: true }).eq('id', targetId);
       return true;
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Telegram-Init-Data');
-  
+
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
@@ -116,6 +116,44 @@ export default async function handler(req, res) {
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
     // ==========================================
+    // MODO DIOS: PANEL DE ADMINISTRACIÓN
+    // ==========================================
+    if (action === 'admin-stats') {
+      const { adminId } = req.body;
+      if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
+      
+      // Conteo a prueba de fallos: traemos los IDs y contamos la longitud exacta.
+      const { data: usersData } = await supabase.from('users').select('id');
+      const { data: tasksData } = await supabase.from('tasks').select('id').neq('type', 'publish_group'); // Ignoramos los grupos de la comunidad
+      
+      return res.status(200).json({ 
+        success: true, 
+        stats: { 
+          users: usersData ? usersData.length : 0, 
+          tasks: tasksData ? tasksData.length : 0 
+        } 
+      });
+    }
+
+    if (action === 'admin-search-user') {
+      const { adminId, targetId } = req.body;
+      if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
+
+      const { data: foundUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
+      if (!foundUser) return res.status(400).json({ success: false });
+
+      return res.status(200).json({ success: true, user: foundUser });
+    }
+
+    if (action === 'admin-update-user') {
+      const { adminId, targetId, update } = req.body;
+      if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
+
+      await supabase.from('users').update(update).eq('id', String(targetId));
+      return res.status(200).json({ success: true });
+    }
+
+    // ==========================================
     // GRUPOS COMUNITARIOS (AÑADIR Y LEER)
     // ==========================================
     if (action === 'add-publish-group') {
@@ -123,13 +161,13 @@ export default async function handler(req, res) {
       const targetId = String(userId);
       const chatId = extractTelegramUsername(url);
       if (!chatId) return res.status(400).json({success: false, error: 'Enlace inválido. Debe ser un @usuario o enlace t.me'});
-      
+
       const { data: existing } = await supabase.from('tasks').select('id').eq('type', 'publish_group').eq('url', chatId).maybeSingle();
       if (existing) return res.status(400).json({success: false, error: 'Este grupo ya está registrado en la red.'});
 
       const isAdmin = await checkAdminStatus(chatId);
       if (!isAdmin) return res.status(400).json({success: false, error: 'El bot no es administrador del grupo/canal.'});
-      
+
       const statsRes = await fetchWithTimeout(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`);
       const statsData = await statsRes.json();
       if (!statsData.ok || statsData.result < 500) {
@@ -356,13 +394,13 @@ export default async function handler(req, res) {
           await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
         }
       }
-      
+
       const newDoneCount = Number(task.completions_done || 0) + 1;
       await supabase.from('tasks').update({ 
         completions_done: newDoneCount, 
         status: newDoneCount >= Number(task.completions_total) ? 'completed' : 'active' 
       }).eq('id', taskId);
-      
+
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
