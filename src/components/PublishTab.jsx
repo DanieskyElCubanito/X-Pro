@@ -43,7 +43,11 @@ const neonStyles = {
     width: '45px', height: '8px',
     background: active ? 'linear-gradient(90deg, #ff1493, #00f0ff)' : 'rgba(255, 255, 255, 0.1)',
     borderRadius: '20px', boxShadow: active ? '0 0 10px #00f0ff' : 'none', transition: 'all 0.3s ease'
-  })
+  }),
+  historyItem: {
+    backgroundColor: '#120822', padding: '12px 14px', borderRadius: '14px',
+    border: '1px solid #3d1b63', marginBottom: '10px'
+  }
 };
 
 const TEMPLATES = [
@@ -67,10 +71,11 @@ export default function PublishTab({ userData, setUserData, t }) {
   const [isVerifyingGroup, setIsVerifyingGroup] = useState(false);
 
   const [isPublishing, setIsPublishing] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const fileInputRef = useRef(null);
-
   const balance = Number(userData?.balance || 0);
-
   const [availableGroups, setAvailableGroups] = useState([]);
 
   const totalCost = selectedGroups.reduce((acc, groupId) => {
@@ -120,10 +125,39 @@ export default function PublishTab({ userData, setUserData, t }) {
       } else {
         setAvailableGroups(allGroups);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {}
   };
 
-  useEffect(() => { fetchGroups(); }, [userData?.id]);
+  const fetchPublishHistory = async () => {
+    if (!userData?.id) return;
+    setLoadingHistory(true);
+    try {
+      const res = await fetch('/api', {
+        method: 'POST', headers: apiHeaders,
+        body: JSON.stringify({ action: 'get-history', userId: userData.id })
+      });
+      const data = await res.json();
+      if (data.success && data.history) {
+        // Filtramos solo los logs relacionados con publicaciones o ganancias de red
+        const pubLogs = data.history.filter(h => 
+          (h.title && (h.title.includes('Publicación') || h.title.includes('Ingreso por Red')))
+        );
+        setHistoryList(pubLogs);
+      }
+    } catch (e) {} finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => { 
+    fetchGroups(); 
+  }, [userData?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchPublishHistory();
+    }
+  }, [activeTab, userData?.id]);
 
   const handleToggleGroup = (groupId) => {
     setSelectedGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
@@ -179,6 +213,7 @@ export default function PublishTab({ userData, setUserData, t }) {
       }
       toast.success("OK!", { id: tid });
       setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default' }); setSelectedGroups([]); setStep(1);
+      fetchPublishHistory();
     } catch (err) { toast.error(err.message || "Error", { id: tid }); } 
     finally { setIsPublishing(false); }
   };
@@ -386,15 +421,40 @@ export default function PublishTab({ userData, setUserData, t }) {
         </>
       )}
 
+      {/* SUB-PESTAÑA DE HISTORIAL REAL */}
       {activeTab === 'history' && (
         <div className="fade-in">
           <div style={neonStyles.card}>
-            <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '10px' }}>📜</div>
-            <h4 style={{ margin: '0 0 8px 0', color: '#ffe600', textAlign: 'center', fontSize: '18px' }}>{t('pub_history_title')}</h4>
-            <p style={{ fontSize: '13px', color: '#ff99dd', textAlign: 'center', lineHeight: '1.5' }}>{t('pub_history_desc')}</p>
-            <button onClick={() => setShowAddGroupModal(true)} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#00f0ff', border: '2px dashed #00f0ff', borderRadius: '16px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', marginTop: '14px' }}>
-              {t('pub_btn_add_group')}
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h4 style={{ margin: 0, color: '#ffe600', fontSize: '16px', fontWeight: '900' }}>{t('pub_history_title')}</h4>
+              <button onClick={fetchPublishHistory} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄</button>
+            </div>
+
+            {loadingHistory ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px' }}>Cargando historial...</div>
+            ) : historyList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                <div style={{ fontSize: '36px', marginBottom: '8px' }}>📜</div>
+                <p style={{ fontSize: '12px', color: '#ff99dd', margin: '0 0 16px 0', lineHeight: '1.5' }}>{t('pub_history_desc')}</p>
+                <button onClick={() => setShowAddGroupModal(true)} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#00f0ff', border: '2px dashed #00f0ff', borderRadius: '16px', fontWeight: '900', fontSize: '13px', cursor: 'pointer' }}>
+                  {t('pub_btn_add_group')}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }}>
+                {historyList.map(item => (
+                  <div key={item.id} style={neonStyles.historyItem}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ fontSize: '13px', color: '#fff' }}>{item.title}</strong>
+                      <span style={{ fontSize: '12px', fontWeight: '900', color: item.amount >= 0 ? '#00ffaa' : '#ff1493' }}>
+                        {item.amount >= 0 ? `+${item.amount}` : item.amount} CLICK
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#ff99dd' }}>{item.description}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
