@@ -79,7 +79,7 @@ export const translations = {
     ads_btn_waiting: "ESPERANDO",
     ads_btn_check: "✅ COMPROBAR",
     ads_btn_verifying: "VALIDANDO...",
-    
+
     // PublishTab (Crear Campaña)
     pub_title: "CREAR CAMPAÑA",
     pub_tab_new: "🚀 Nueva Campaña",
@@ -137,17 +137,22 @@ export const translations = {
     pub_modal_grp_verifying: "VERIFICANDO RED...",
 
     // ShareTab (Afiliados)
-    ref_title: "AFILIADOS",
-    ref_btn_invite: "👥 INVITAR AMIGOS",
-    ref_btn_copy: "📋 COPIAR ENLACE",
-    ref_rewards: "Tus Recompensas",
-    ref_balance: "Ganancias de Red",
-    ref_history: "Historial Fijo",
-    ref_network: "Tu Red",
-    ref_users: "Usuarios Activos",
+    ref_title: "PROGRAMA DE AFILIADOS",
+    ref_active_network: "RED ACTIVA",
+    ref_update: "ACTUALIZAR",
+    ref_btn_invite: "🚀 INVITAR",
+    ref_btn_copy: "📋 COPIAR",
+    ref_earnings_title: "GANANCIAS POR INVITADOS",
+    ref_network_title: "📊 Tu Red de Tráfico",
     ref_syncing: "Sincronizando red...",
-    ref_empty: "Aún no has invitado a nadie.",
-    ref_level: "Afiliado Nivel 1"
+    ref_empty_desc: "Aún no tienes afiliados registrados.\n¡Invita amigos para ganar CLICK gratis!",
+    ref_status_active: "ACTIVO",
+    ref_status_pending: "PENDIENTE",
+    ref_footer_p1: "Recibes",
+    ref_footer_p2: "por cada afiliado verificado",
+    ref_footer_p3: "de cada tarea que ellos completen.",
+    ref_toast_copy_ok: "¡Enlace copiado al portapapeles!",
+    ref_toast_copy_fail: "Error al copiar el enlace"
   },
   en: {
     // App & BottomNav
@@ -287,16 +292,21 @@ export const translations = {
     pub_modal_grp_verifying: "VERIFYING NETWORK...",
 
     // ShareTab (Afiliados)
-    ref_title: "AFFILIATES",
-    ref_btn_invite: "👥 INVITE FRIENDS",
-    ref_btn_copy: "📋 COPY LINK",
-    ref_rewards: "Your Rewards",
-    ref_balance: "Network Earnings",
-    ref_history: "Fixed History",
-    ref_network: "Your Network",
-    ref_users: "Active Users",
+    ref_title: "AFFILIATE PROGRAM",
+    ref_active_network: "ACTIVE NETWORK",
+    ref_update: "UPDATE",
+    ref_btn_invite: "🚀 INVITE",
+    ref_btn_copy: "📋 COPY",
+    ref_earnings_title: "REFERRAL EARNINGS",
+    ref_network_title: "📊 Your Traffic Network",
     ref_syncing: "Syncing network...",
-    ref_empty: "You haven't invited anyone yet.",
-    ref_level: "Level 1 Affiliate"
+    ref_empty_desc: "You don't have registered affiliates yet.\nInvite friends to earn free CLICK!",
+    ref_status_active: "ACTIVE",
+    ref_status_pending: "PENDING",
+    ref_footer_p1: "You get",
+    ref_footer_p2: "for each verified affiliate",
+    ref_footer_p3: "of every task they complete.",
+    ref_toast_copy_ok: "Link copied to clipboard!",
+    ref_toast_copy_fail: "Error copying the link"
   }
 };
