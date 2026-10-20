@@ -24,12 +24,10 @@ function verifyTelegramWebAppData(telegramInitData) {
   const urlParams = new URLSearchParams(telegramInitData);
   const hash = urlParams.get('hash');
   urlParams.delete('hash');
-
+  
   urlParams.sort();
   let dataCheckString = '';
-  for (const [key, value] of urlParams.entries()) {
-    dataCheckString += `${key}=${value}\n`;
-  }
+  for (const [key, value] of urlParams.entries()) { dataCheckString += `${key}=${value}\n`; }
   dataCheckString = dataCheckString.slice(0, -1);
 
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
@@ -55,9 +53,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 5000) {
 }
 
 async function notifyAdmin(message) {
-  try {
-    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: MAIN_ADMIN_ID, text: message, parse_mode: 'HTML' });
-  } catch (e) { console.error(e.message); }
+  try { await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: MAIN_ADMIN_ID, text: message, parse_mode: 'HTML' }); } catch (e) {}
 }
 
 async function checkMembership(userId, chatId) {
@@ -84,7 +80,6 @@ async function tryGrantReferralReward(targetUserObj) {
   try {
     const targetId = String(targetUserObj.id);
     const { data: currentUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
-
     if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted || !currentUser.is_human) return false;
 
     const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).maybeSingle();
@@ -92,7 +87,7 @@ async function tryGrantReferralReward(targetUserObj) {
       const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
       const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
       const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
-
+      
       await supabase.from('users').update({ balance: refBalance, referral_earnings: refEarnings, total_earnings: refTotal }).eq('id', referrer.id);
       await supabase.from('users').update({ referral_reward_granted: true }).eq('id', targetId);
       return true;
@@ -105,12 +100,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Telegram-Init-Data');
-
+  
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
     const telegramInitData = req.headers['x-telegram-init-data'];
-
     if (!telegramInitData || !verifyTelegramWebAppData(telegramInitData)) {
        if (req.body.action !== 'generate-stars-invoice') {
          return res.status(403).json({ success: false, error: 'Firma de Telegram inválida o ausente. Solicitud rechazada por seguridad.' });
@@ -121,6 +115,42 @@ export default async function handler(req, res) {
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp = forwarded ? forwarded.split(',')[0].trim() : (req.socket?.remoteAddress || req.headers['x-real-ip'] || null);
 
+    // ==========================================
+    // GRUPOS COMUNITARIOS (AÑADIR Y LEER)
+    // ==========================================
+    if (action === 'add-publish-group') {
+      const { url } = req.body;
+      const targetId = String(userId);
+      const chatId = extractTelegramUsername(url);
+      if (!chatId) return res.status(400).json({success: false, error: 'Enlace inválido. Debe ser un @usuario o enlace t.me'});
+      
+      const { data: existing } = await supabase.from('tasks').select('id').eq('type', 'publish_group').eq('url', chatId).maybeSingle();
+      if (existing) return res.status(400).json({success: false, error: 'Este grupo ya está registrado en la red.'});
+
+      const isAdmin = await checkAdminStatus(chatId);
+      if (!isAdmin) return res.status(400).json({success: false, error: 'El bot no es administrador del grupo/canal.'});
+      
+      const statsRes = await fetchWithTimeout(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMemberCount?chat_id=${chatId}`);
+      const statsData = await statsRes.json();
+      if (!statsData.ok || statsData.result < 500) {
+         return res.status(400).json({success: false, error: `El grupo tiene ${statsData.result || 0} miembros. Se requieren mínimo 500.`});
+      }
+
+      await supabase.from('tasks').insert([{
+         creator_id: targetId, type: 'publish_group', title: chatId, url: chatId,
+         completions_total: 999999, completions_done: 0, reward: 0, total_cost: 0, status: 'active'
+      }]);
+      return res.status(200).json({ success: true, message: 'Grupo añadido con éxito' });
+    }
+
+    if (action === 'get-publish-groups') {
+       const { data: dbGroups } = await supabase.from('tasks').select('*').eq('type', 'publish_group').eq('status', 'active');
+       return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
+    }
+
+    // ==========================================
+    // PUBLICAR POST
+    // ==========================================
     if (action === 'publish-post') {
       const { userId: pubUserId, chatId, text, link, photoData, buttonConfig } = req.body;
       const targetId = String(pubUserId);
@@ -169,10 +199,8 @@ export default async function handler(req, res) {
       const { taskId, requestingUserId } = req.body;
       const targetId = String(requestingUserId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
-
       if (!task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
       if (String(task.creator_id) !== targetId && !ADMIN_IDS.includes(targetId)) return res.status(403).json({ success: false, error: 'Sin permisos.' });
-
       const newStatus = task.status === 'active' ? 'paused' : 'active';
       await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
       return res.status(200).json({ success: true, newStatus });
@@ -185,7 +213,6 @@ export default async function handler(req, res) {
       if (!task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
       const isOwner = String(task.creator_id) === targetId;
       if (!isOwner && (!isAdminAction || !ADMIN_IDS.includes(targetId))) return res.status(403).json({ success: false, error: 'Sin permisos.' });
-
       const updates = {}; if (newTitle !== undefined) updates.title = newTitle; if (newUrl !== undefined) updates.url = newUrl;
       await supabase.from('tasks').update(updates).eq('id', taskId);
       return res.status(200).json({ success: true });
@@ -208,7 +235,6 @@ export default async function handler(req, res) {
           if (cu) await supabase.from('users').update({ balance: Number((Number(cu.balance || 0) + refundClicks).toFixed(2)) }).eq('id', task.creator_id);
         }
       }
-
       await supabase.from('history_logs').insert([{ user_id: task.creator_id, title: '🗑️ Campaña cancelada', description: `Reembolso por campaña eliminada.`, amount: refundClicks }]);
       await supabase.from('tasks').delete().eq('id', taskId);
       return res.status(200).json({ success: true });
@@ -271,15 +297,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
-    // 🔥 FIX: Traer activas, pausadas Y todas las que pertenezcan al creador (incluyendo completadas)
     if (action === 'get-tasks') {
       const targetId = String(userId);
-      const { data: allTasks } = await supabase
-        .from('tasks')
-        .select('*')
-        .or(`status.in.(active,paused),creator_id.eq.${targetId}`)
-        .order('created_at', { ascending: false });
-
+      const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
       const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
@@ -318,7 +338,7 @@ export default async function handler(req, res) {
           }
         }
       } else if (task.type === 'bot' && task.bot_token) {
-        try { await axios.post(`https://api.telegram.org/bot${task.bot_token}/sendChatAction`, { chat_id: targetId, action: 'typing' }); } catch (e) { return res.status(400).json({ success: false, error: 'Inicia el bot.' }); }
+        try { await axios.post(`https://api.telegram.org/bot${task.bot_token}/sendChatAction`, { chat_id: targetId, action: 'typing' }); } catch (e) { return res.status(400).json({ success: false, error: 'Asegúrate de darle a INICIAR (/start) al bot.' }); }
       }
 
       await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
@@ -336,13 +356,13 @@ export default async function handler(req, res) {
           await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
         }
       }
-
+      
       const newDoneCount = Number(task.completions_done || 0) + 1;
       await supabase.from('tasks').update({ 
         completions_done: newDoneCount, 
         status: newDoneCount >= Number(task.completions_total) ? 'completed' : 'active' 
       }).eq('id', taskId);
-
+      
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
@@ -382,7 +402,6 @@ export default async function handler(req, res) {
           await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
         }
       }
-
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
@@ -406,11 +425,8 @@ export default async function handler(req, res) {
       if (dbUser.referred_by) {
         const commissionAmount = Number((reward * 0.20).toFixed(2));
         const { data: referrer } = await supabase.from('users').select('*').eq('id', dbUser.referred_by).maybeSingle();
-        if (referrer) {
-          await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
-        }
+        if (referrer) { await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id); }
       }
-
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
@@ -426,14 +442,11 @@ export default async function handler(req, res) {
 
       if (lv1 && lv1.length > 0) {
         for (const refUser of lv1) {
-          if (!refUser.referral_reward_granted) {
-            await tryGrantReferralReward({ id: refUser.id, is_premium: false }); 
-          }
+          if (!refUser.referral_reward_granted) { await tryGrantReferralReward({ id: refUser.id, is_premium: false }); }
         }
         const refreshed = await supabase.from('users').select('*').eq('referred_by', targetId);
         lv1 = refreshed.data || lv1;
       }
-
       const { data: dbUser } = await supabase.from('users').select('referral_earnings').eq('id', targetId).maybeSingle();
       return res.status(200).json({ success: true, referrals: lv1 || [], earnings: dbUser?.referral_earnings || 0 });
     }
@@ -461,19 +474,12 @@ export default async function handler(req, res) {
 
     await tryGrantReferralReward(targetUser);
     const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
-    const { data: totalTasks } = await supabase.from('tasks').select('completions_done');
+    const { data: totalTasks } = await supabase.from('tasks').select('completions_done').neq('type', 'publish_group');
     const globalclicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
     const formattedGlobal = globalclicks >= 1000 ? (globalclicks / 1000).toFixed(1) + 'K' : globalclicks;
 
     dbUser.global_clicks = formattedGlobal;
+    return res.status(200).json({ success: true, user: dbUser, stats: { n1: refCount || 0, c1: String(dbUser?.referral_earnings || 0) } });
 
-    return res.status(200).json({
-      success: true, 
-      user: dbUser,
-      stats: { n1: refCount || 0, c1: String(dbUser?.referral_earnings || 0) }
-    });
-
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
+  } catch (error) { return res.status(500).json({ success: false, error: error.message }); }
 }
