@@ -117,8 +117,10 @@ export default function PublishTab({ userData, setUserData, t }) {
           }
           return { ...grp, members: "N/A" };
         }));
+      } else {
+        setAvailableGroups(allGroups);
       }
-    } catch (e) {}
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => { fetchGroups(); }, [userData?.id]);
@@ -177,7 +179,7 @@ export default function PublishTab({ userData, setUserData, t }) {
       }
       toast.success("OK!", { id: tid });
       setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default' }); setSelectedGroups([]); setStep(1);
-    } catch (err) { toast.error("Error", { id: tid }); } 
+    } catch (err) { toast.error(err.message || "Error", { id: tid }); } 
     finally { setIsPublishing(false); }
   };
 
