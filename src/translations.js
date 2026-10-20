@@ -1,0 +1,72 @@
+export const translations = {
+  es: {
+    // App & BottomNav
+    loading: "CARGANDO Click Network...",
+    access_interrupted: "Acceso Interrumpido",
+    access_denied: "Acceso denegado: Debes abrir la app desde Telegram oficial.",
+    retry: "🔄 REINTENTAR",
+    nav_home: "Inicio",
+    nav_tasks: "Tareas",
+    nav_publish: "Publicar",
+    nav_referrals: "Afiliados",
+    nav_admin: "Admin",
+    share_text: "⚡ ¡Entra a la red, publica en grupos y gana Puntos (CLICK) gratis! 🚀",
+
+    // ProfileHeader
+    operator: "Operador Web3",
+    verified: "VERIFICADO",
+    support_tab: "SOPORTE",
+    about_tab: "ACERCA DE",
+    terms_tab: "TÉRMINOS",
+    support_title: "Asistencia y Contacto",
+    support_idea_title: "¿Tienes alguna sugerencia?",
+    support_idea_desc: "Nos encanta mejorar. Contáctanos y cuéntanos tus ideas en",
+    support_bug_title: "Recompensa por Bugs",
+    support_bug_desc: "Si encuentras un error o fallo en la app, dímelo y te llevas 25 CLICKs gratis a tu saldo:",
+    about_title: "Sobre Click Network",
+    about_p1: "Click Network es una plataforma publicitaria y red de intercambio de tráfico nativa de Telegram.",
+    about_p2: "Diseñada para impulsar el crecimiento orgánico de canales, grupos, bots y Mini Apps recompensando a los usuarios de la comunidad.",
+    about_p3: "Construida con tecnología blockchain para asegurar la transparencia de pagos usando Telegram Stars y la red TON.",
+    terms_title: "Términos y Condiciones",
+    terms_subtitle: "Al utilizar Click Network, aceptas los siguientes términos:",
+    terms_1: "Anti-Fraude: Está prohibido el uso de bots o multicuentas. Las cuentas sospechosas serán suspendidas.",
+    terms_2: "Economía: El saldo CLICK es un puntaje interno, no constituye dinero fiat ni criptomoneda fuera de la app.",
+    terms_3: "Contenido: No somos responsables por el contenido promocionado. Las estafas serán eliminadas sin reembolso.",
+    terms_4: "Pagos Web3: Las transacciones en TON y Stars son definitivas. Verifica antes de proceder."
+  },
+  en: {
+    // App & BottomNav
+    loading: "LOADING Click Network...",
+    access_interrupted: "Access Interrupted",
+    access_denied: "Access denied: You must open the app from the official Telegram app.",
+    retry: "🔄 RETRY",
+    nav_home: "Home",
+    nav_tasks: "Tasks",
+    nav_publish: "Publish",
+    nav_referrals: "Referrals",
+    nav_admin: "Admin",
+    share_text: "⚡ Join the network, publish in groups and earn free Points (CLICK)! 🚀",
+
+    // ProfileHeader
+    operator: "Web3 Operator",
+    verified: "VERIFIED",
+    support_tab: "SUPPORT",
+    about_tab: "ABOUT",
+    terms_tab: "TERMS",
+    support_title: "Help & Support",
+    support_idea_title: "Have a suggestion?",
+    support_idea_desc: "We love to improve. Contact us and share your ideas at",
+    support_bug_title: "Bug Bounty",
+    support_bug_desc: "Find a bug or error? Tell us and get 25 free CLICKs added to your balance:",
+    about_title: "About Click Network",
+    about_p1: "Click Network is a native advertising platform and traffic exchange network for Telegram.",
+    about_p2: "Designed to boost the organic growth of channels, groups, bots, and Mini Apps by rewarding community users.",
+    about_p3: "Built with blockchain technology to ensure transparent payments using Telegram Stars and The Open Network (TON).",
+    terms_title: "Terms and Conditions",
+    terms_subtitle: "By using Click Network, you agree to the following terms:",
+    terms_1: "Anti-Fraud: The use of bots or multiple accounts is strictly prohibited. Suspicious accounts will be banned.",
+    terms_2: "Economy: The CLICK balance is an internal score and does not constitute fiat money or cryptocurrency outside this app.",
+    terms_3: "Content: We are not responsible for promoted content. Scams will be removed without refund.",
+    terms_4: "Web3 Payments: Transactions in TON and Stars are final. Verify before proceeding."
+  }
+};
