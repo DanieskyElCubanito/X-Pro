@@ -3,6 +3,7 @@ import WebApp from '@twa-dev/sdk';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import toast, { Toaster } from 'react-hot-toast'; 
 import { botApi } from './api/botApi';
+import { translations } from './translations'; // 🔥 Importamos diccionario
 
 import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';
@@ -11,7 +12,7 @@ import AdsTab from './components/AdsTab';
 import ShareTab from './components/ShareTab';
 import BottomNav from './components/BottomNav';
 import CaptchaVerification from './components/CaptchaVerification';
-import AdminDashboard from './components/AdminDashboard'; // 🔥 NUEVO
+import AdminDashboard from './components/AdminDashboard';
 
 const neonTheme = {
   container: { backgroundColor: '#0a0314', backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)', minHeight: '100vh', height: 'var(--tg-viewport-height, 100vh)', color: '#ffffff', fontFamily: "'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif", display: 'flex', flexDirection: 'column', boxSizing: 'border-box' },
@@ -29,23 +30,25 @@ function App() {
   const [stats, setStats] = useState({ n1: 0, c1: "0.000" });
   const [isHuman, setIsHuman] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-
+  
+  // 🔥 LÓGICA DE IDIOMA
+  const [lang, setLang] = useState('es');
+  
   const initialized = useRef(false);
+
+  // Función traductora
+  const t = (key) => translations[lang][key] || key;
 
   const verifyUser = async (teleUser, startParam) => {
     try {
       const fp = await FingerprintJS.load();
       const result = await fp.get();
       const generatedDeviceId = result.visitorId;
-
       const storedFirstUser = localStorage.getItem('xpro_linked_user');
       let previousAccount = null;
 
-      if (!storedFirstUser) {
-        localStorage.setItem('xpro_linked_user', String(teleUser.id));
-      } else if (storedFirstUser !== String(teleUser.id)) {
-        previousAccount = storedFirstUser;
-      }
+      if (!storedFirstUser) { localStorage.setItem('xpro_linked_user', String(teleUser.id)); } 
+      else if (storedFirstUser !== String(teleUser.id)) { previousAccount = storedFirstUser; }
 
       const userPayload = { ...teleUser, deviceId: generatedDeviceId, previousAccountDetected: previousAccount };
       const data = await botApi.verifyUser(userPayload, startParam);
@@ -56,11 +59,11 @@ function App() {
         setStatus('member');
         if (data.user?.is_human) setIsHuman(true);
       } else {
-        setErrorMessage(data?.message || data?.error || "Error al verificar la cuenta.");
+        setErrorMessage(data?.message || data?.error || "Error");
         setStatus('error');
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.error || err.response?.data?.message || err.message || "Error de conexión.");
+      setErrorMessage(err.response?.data?.error || err.message || "Error");
       setStatus('error');
     }
   };
@@ -75,23 +78,27 @@ function App() {
         const initData = WebApp.initData;
         const inviterId = WebApp.initDataUnsafe?.start_param;
 
+        // Detectar idioma
+        if (user?.language_code) {
+          setLang(user.language_code.startsWith('es') ? 'es' : 'en');
+        }
+
         if (!user || !initData) { 
-            setErrorMessage("Acceso denegado: Debes abrir la app desde Telegram oficial."); 
+            setErrorMessage(t('access_denied')); 
             setStatus('error'); 
             return; 
         }
 
         initialized.current = true;
         verifyUser(user, inviterId);
-      } catch (e) { setErrorMessage("Error al iniciar el SDK."); setStatus('error'); }
+      } catch (e) { setErrorMessage("Error SDK"); setStatus('error'); }
     }, 150);
     return () => clearTimeout(initTimer);
   }, []);
 
   const handleShare = () => {
     const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userData?.id}`;
-    const text = "⚡ ¡Entra a la red, publica en grupos y gana Puntos (CLICK) gratis! 🚀";
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
+    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(t('share_text'))}`);
   };
 
   if (status === 'loading') {
@@ -99,7 +106,7 @@ function App() {
       <div style={neonTheme.center}>
         <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         <div style={neonTheme.loaderGlow}></div>
-        <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>CARGANDO Click Network...</p>
+        <p style={{ marginTop: '22px', fontSize: '15px', fontWeight: '900', color: '#ff66cc', letterSpacing: '1px' }}>{t('loading')}</p>
       </div>
     );
   }
@@ -109,9 +116,9 @@ function App() {
       <div style={neonTheme.center}>
         <div style={neonTheme.errorCard}>
           <div style={{ fontSize: '42px', marginBottom: '8px' }}>⚠️</div>
-          <h2 style={{ color: '#ffe600', margin: '0 0 10px 0', fontSize: '20px', fontWeight: '900' }}>Acceso Interrumpido</h2>
+          <h2 style={{ color: '#ffe600', margin: '0 0 10px 0', fontSize: '20px', fontWeight: '900' }}>{t('access_interrupted')}</h2>
           <p style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{errorMessage}</p>
-          <button style={neonTheme.btnRetry} onClick={() => window.location.reload()}>🔄 REINTENTAR</button>
+          <button style={neonTheme.btnRetry} onClick={() => window.location.reload()}>🔄 {t('retry')}</button>
         </div>
       </div>
     );
@@ -123,13 +130,13 @@ function App() {
     <div style={neonTheme.container}>
       <Toaster position="top-center" toastOptions={{ style: { background: '#1d0833', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 15px rgba(0, 240, 255, 0.4)', fontWeight: '800', fontSize: '13px' } }} />
       <div style={neonTheme.main}>
-        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} /></div>}
+        {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} t={t} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} /></div>}
         {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} /></div>}
         {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} /></div>}
         {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} /></div>}
         {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} /></div>}
       </div>
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} t={t} />
     </div>
   );
 }
