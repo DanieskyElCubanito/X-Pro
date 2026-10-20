@@ -79,6 +79,10 @@ export const translations = {
     ads_btn_waiting: "ESPERANDO",
     ads_btn_check: "✅ COMPROBAR",
     ads_btn_verifying: "VALIDANDO...",
+    // 🔥 TEXTOS DINÁMICOS PARA URL
+    ads_url_desc_bot: "Ingresa el enlace de tu Bot o Mini App (ej. t.me/MiBot?start=...)",
+    ads_url_desc_channel: "Ingresa el enlace público de tu Canal o Grupo (ej. @MiCanal o t.me/MiCanal)",
+    ads_url_desc_promo: "Ingresa la URL de tu sitio web, red social o enlace de afiliado.",
 
     // PublishTab (Crear Campaña)
     pub_title: "CREAR CAMPAÑA",
@@ -234,6 +238,10 @@ export const translations = {
     ads_btn_waiting: "WAITING",
     ads_btn_check: "✅ CHECK",
     ads_btn_verifying: "VERIFYING...",
+    // 🔥 TEXTOS DINÁMICOS PARA URL
+    ads_url_desc_bot: "Enter your Bot or Mini App link (e.g. t.me/MyBot?start=...)",
+    ads_url_desc_channel: "Enter the public link of your Channel/Group (e.g. @MyChannel)",
+    ads_url_desc_promo: "Enter the URL of your website, social network, or affiliate link.",
 
     // PublishTab (Crear Campaña)
     pub_title: "CREATE CAMPAIGN",
