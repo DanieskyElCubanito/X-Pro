@@ -24,7 +24,7 @@ function verifyTelegramWebAppData(telegramInitData) {
   const urlParams = new URLSearchParams(telegramInitData);
   const hash = urlParams.get('hash');
   urlParams.delete('hash');
-  
+
   urlParams.sort();
   let dataCheckString = '';
   for (const [key, value] of urlParams.entries()) {
@@ -84,7 +84,7 @@ async function tryGrantReferralReward(targetUserObj) {
   try {
     const targetId = String(targetUserObj.id);
     const { data: currentUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
-    
+
     if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted || !currentUser.is_human) return false;
 
     const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).maybeSingle();
@@ -92,7 +92,7 @@ async function tryGrantReferralReward(targetUserObj) {
       const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
       const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
       const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
-      
+
       await supabase.from('users').update({ balance: refBalance, referral_earnings: refEarnings, total_earnings: refTotal }).eq('id', referrer.id);
       await supabase.from('users').update({ referral_reward_granted: true }).eq('id', targetId);
       return true;
@@ -105,12 +105,12 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Telegram-Init-Data');
-  
+
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
     const telegramInitData = req.headers['x-telegram-init-data'];
-    
+
     if (!telegramInitData || !verifyTelegramWebAppData(telegramInitData)) {
        if (req.body.action !== 'generate-stars-invoice') {
          return res.status(403).json({ success: false, error: 'Firma de Telegram inválida o ausente. Solicitud rechazada por seguridad.' });
@@ -165,14 +165,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, stats });
     }
 
-    // ==========================================
-    // PAUSAR / REANUDAR TAREAS (Fase 2)
-    // ==========================================
     if (action === 'toggle-task-status') {
       const { taskId, requestingUserId } = req.body;
       const targetId = String(requestingUserId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
-      
+
       if (!task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
       if (String(task.creator_id) !== targetId && !ADMIN_IDS.includes(targetId)) return res.status(403).json({ success: false, error: 'Sin permisos.' });
 
@@ -188,7 +185,7 @@ export default async function handler(req, res) {
       if (!task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
       const isOwner = String(task.creator_id) === targetId;
       if (!isOwner && (!isAdminAction || !ADMIN_IDS.includes(targetId))) return res.status(403).json({ success: false, error: 'Sin permisos.' });
-      
+
       const updates = {}; if (newTitle !== undefined) updates.title = newTitle; if (newUrl !== undefined) updates.url = newUrl;
       await supabase.from('tasks').update(updates).eq('id', taskId);
       return res.status(200).json({ success: true });
@@ -274,10 +271,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
+    // 🔥 FIX: Traer activas, pausadas Y todas las que pertenezcan al creador (incluyendo completadas)
     if (action === 'get-tasks') {
       const targetId = String(userId);
-      // 🔥 Ahora traemos las activas Y las pausadas para que el creador pueda verlas y reanudarlas
-      const { data: allTasks } = await supabase.from('tasks').select('*').in('status', ['active', 'paused']).order('created_at', { ascending: false });
+      const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .or(`status.in.(active,paused),creator_id.eq.${targetId}`)
+        .order('created_at', { ascending: false });
+
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
       const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
@@ -302,13 +304,11 @@ export default async function handler(req, res) {
       const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
       if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
 
-      // 🔥 AUTO-PAUSA DE SEGURIDAD (Fase 2)
       if (task.type === 'group' || task.type === 'channel') {
         const chatId = extractTelegramUsername(task.url);
         if (chatId) {
           const isJoined = await checkMembership(targetId, chatId);
           if (!isJoined) {
-            // Verificamos si falló porque el creador eliminó a nuestro bot de administrador
             const isBotStillAdmin = await checkAdminStatus(chatId);
             if (!isBotStillAdmin) {
               await supabase.from('tasks').update({ status: 'paused' }).eq('id', taskId);
@@ -336,13 +336,13 @@ export default async function handler(req, res) {
           await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
         }
       }
-      
+
       const newDoneCount = Number(task.completions_done || 0) + 1;
       await supabase.from('tasks').update({ 
         completions_done: newDoneCount, 
         status: newDoneCount >= Number(task.completions_total) ? 'completed' : 'active' 
       }).eq('id', taskId);
-      
+
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
