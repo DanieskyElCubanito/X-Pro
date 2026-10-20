@@ -11,6 +11,7 @@ import AdsTab from './components/AdsTab';
 import ShareTab from './components/ShareTab';
 import BottomNav from './components/BottomNav';
 import CaptchaVerification from './components/CaptchaVerification';
+import AdminDashboard from './components/AdminDashboard'; // 🔥 NUEVO
 
 const neonTheme = {
   container: { backgroundColor: '#0a0314', backgroundImage: 'radial-gradient(circle at 50% 10%, #2b0b47 0%, #0a0314 80%)', minHeight: '100vh', height: 'var(--tg-viewport-height, 100vh)', color: '#ffffff', fontFamily: "'Fredoka', 'Quicksand', system-ui, -apple-system, sans-serif", display: 'flex', flexDirection: 'column', boxSizing: 'border-box' },
@@ -73,14 +74,13 @@ function App() {
         const user = WebApp.initDataUnsafe?.user;
         const initData = WebApp.initData;
         const inviterId = WebApp.initDataUnsafe?.start_param;
-        
-        // Cierre estricto: Si no hay initData, significa que abrieron desde navegador web (fraudulento)
+
         if (!user || !initData) { 
             setErrorMessage("Acceso denegado: Debes abrir la app desde Telegram oficial."); 
             setStatus('error'); 
             return; 
         }
-        
+
         initialized.current = true;
         verifyUser(user, inviterId);
       } catch (e) { setErrorMessage("Error al iniciar el SDK."); setStatus('error'); }
@@ -125,10 +125,11 @@ function App() {
       <div style={neonTheme.main}>
         {activeTab === 'home' && <div className="fade-in"><ProfileHeader userData={userData} /><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} /></div>}
         {activeTab === 'tasks' && <div className="fade-in"><AdsTab userData={userData} setUserData={setUserData} /></div>}
-        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} /></div>}
+        {activeTab === 'publish' && <div className="fade-in"><PublishTab userData={userData} setUserData={setUserData} setActiveTabGlobal={setActiveTab} /></div>}
         {activeTab === 'referrals' && <div className="fade-in"><ShareTab stats={stats} handleShare={handleShare} userId={userData?.id} totalReferralEarnings={userData?.referral_earnings} /></div>}
+        {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} /></div>}
       </div>
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} />
     </div>
   );
 }
