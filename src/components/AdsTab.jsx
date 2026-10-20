@@ -30,15 +30,13 @@ const TaskIcons = {
   group: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
   channel: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
   bot: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="16" y1="16" x2="16.01" y2="16" /></svg>,
-  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>,
-  daily: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+  promo: (color) => <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>
 };
 
 const TASK_TYPES = [
   { id: 'bot', icon: TaskIcons.bot('#ffe600'), title: 'Bots & Mini Apps', desc: 'Usuarios inician tu bot o app', color: '#ffe600', autoName: 'Iniciar Bot/App' },
   { id: 'channel', icon: TaskIcons.channel('#00ffaa'), title: 'Canales & Grupos', desc: 'Suma miembros a tu comunidad', color: '#00ffaa', autoName: 'Unirse al Chat' },
-  { id: 'promo', icon: TaskIcons.promo('#ff1493'), title: 'Vistas & Promos', desc: 'Consigue referidos o tráfico', color: '#ff1493', autoName: 'Visitar Promo' },
-  { id: 'daily', icon: TaskIcons.daily('#00f0ff'), title: 'Check-in Diario', desc: 'Tráfico recurrente cada 24h', color: '#00f0ff', autoName: 'Check-in Diario' }
+  { id: 'promo', icon: TaskIcons.promo('#ff1493'), title: 'Vistas & Promos', desc: 'Consigue referidos o tráfico', color: '#ff1493', autoName: 'Visitar Promo' }
 ];
 
 export default function AdsTab({ userData, setUserData }) {
@@ -54,6 +52,9 @@ export default function AdsTab({ userData, setUserData }) {
   const [targetUrl, setTargetUrl] = useState('');
   const [botToken, setBotToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  
+  // 🔥 NUEVO: Toggle para tarea diaria
+  const [isDailyTask, setIsDailyTask] = useState(false);
 
   const [completions, setCompletions] = useState(100);
   const [rewardPerClick, setRewardPerClick] = useState(1);
@@ -71,10 +72,7 @@ export default function AdsTab({ userData, setUserData }) {
 
   const balance = Number(userData?.balance || 0);
 
-  const apiHeaders = { 
-    'Content-Type': 'application/json', 
-    'X-Telegram-Init-Data': WebApp.initData || '' 
-  };
+  const apiHeaders = { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': WebApp.initData || '' };
 
   useEffect(() => {
     const fetchLivePrice = async () => {
@@ -95,9 +93,7 @@ export default function AdsTab({ userData, setUserData }) {
   const starsPrice = Math.ceil(usdPrice / 0.013);
 
   useEffect(() => {
-    if (userData?.id && (view === 'list' || view === 'activity')) {
-      fetchTasks();
-    }
+    if (userData?.id && (view === 'list' || view === 'activity')) fetchTasks();
   }, [userData?.id, view]);
 
   useEffect(() => {
@@ -126,7 +122,7 @@ export default function AdsTab({ userData, setUserData }) {
       });
       const data = await res.json();
       if (data && data.success) setTasks(data.tasks || []);
-    } catch (e) { console.error(e); } finally { setLoadingTasks(false); }
+    } catch (e) {} finally { setLoadingTasks(false); }
   };
 
   const stepsFlow = taskType === 'bot' ? ['type', 'url', 'token', 'budget'] : ['type', 'url', 'budget'];
@@ -177,17 +173,20 @@ export default function AdsTab({ userData, setUserData }) {
     setIsGenerating(true);
     const tid = toast.loading("Publicando campaña...");
     const fixedTitle = TASK_TYPES.find(t => t.id === taskType)?.autoName || 'Nueva Tarea';
+    
+    // 🔥 Determinamos si es tarea normal o Daily
+    const finalTaskType = isDailyTask ? `daily_${taskType}` : taskType;
 
     try {
       const res = await fetch('/api', {
         method: 'POST', headers: apiHeaders,
-        body: JSON.stringify({ creator_id: userData?.id, action: 'create-task', type: taskType, title: fixedTitle, url: targetUrl, bot_token: botToken || null, completions_total: completions, reward: rewardPerClick })
+        body: JSON.stringify({ creator_id: userData?.id, action: 'create-task', type: finalTaskType, title: fixedTitle, url: targetUrl, bot_token: botToken || null, completions_total: completions, reward: rewardPerClick })
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       if (data.balance !== undefined) setUserData(prev => ({ ...prev, balance: data.balance }));
       toast.success("¡Campaña activada con éxito!", { id: tid });
-      setTaskType(null); setTargetUrl(''); setBotToken(''); setCompletions(100); setCurrentStepIndex(0); setCheckoutView(false); setView('activity');
+      setTaskType(null); setTargetUrl(''); setBotToken(''); setIsDailyTask(false); setCompletions(100); setCurrentStepIndex(0); setCheckoutView(false); setView('activity');
     } catch (err) { toast.error(err.message || "Error al procesar.", { id: tid }); } finally { setIsGenerating(false); }
   };
 
@@ -353,14 +352,19 @@ export default function AdsTab({ userData, setUserData }) {
   };
 
   const getTaskLabel = (type) => {
+    if (type.startsWith('daily_')) return '🎁 Check-in Diario';
     switch (type) {
       case 'group':
       case 'channel': return '📢 Canales & Grupos';
       case 'bot': return '🤖 Bots & Mini Apps';
       case 'promo': return '⚡ Vistas & Promos';
-      case 'daily': return '🎁 Check-in Diario';
       default: return '⚡ Tarea';
     }
+  };
+
+  const getTaskIconType = (type) => {
+    if (type.startsWith('daily_')) return type.replace('daily_', '');
+    return type;
   };
 
   const myTasks = tasks.filter(t => t.creator_id === String(userData?.id));
@@ -370,17 +374,17 @@ export default function AdsTab({ userData, setUserData }) {
 
   const renderTaskButton = (task) => {
     const status = taskStatus[task.id];
+    const isDaily = task.type.startsWith('daily_');
     
-    // 🔥 FIX: Lógica para Daily Check-in vs Tareas Normales
     if (task.is_completed || status === 'completed') {
-       return <button disabled style={neon.taskButtonDisabled}>{task.type === 'daily' ? '⏳ VUELVE MAÑANA' : '✅ COMPLETADA'}</button>;
+       return <button disabled style={neon.taskButtonDisabled}>{isDaily ? '⏳ VUELVE MAÑANA' : '✅ COMPLETADA'}</button>;
     }
     
     if (status === 'waiting') return <button disabled style={neon.taskButtonDisabled}>ESPERANDO ({countdown[task.id] || 0}s)</button>;
     if (status === 'ready') return <button onClick={() => handleCheckTask(task)} style={neon.taskButtonCheck}>✅ COMPROBAR</button>;
     if (status === 'verifying') return <button disabled style={neon.taskButtonDisabled}>VALIDANDO...</button>;
     
-    return <button onClick={() => handleStartTask(task)} style={neon.taskButton}>{`+${Number(task.reward).toFixed(2)} CLICK`}</button>;
+    return <button onClick={() => handleStartTask(task)} style={isDaily ? {...neon.taskButton, background: 'linear-gradient(180deg, #00ffaa, #00bb77)', color: '#050214', boxShadow: '0 4px 0 #007744'} : neon.taskButton}>{`+${Number(task.reward).toFixed(2)} CLICK`}</button>;
   };
 
   return (
@@ -426,11 +430,13 @@ export default function AdsTab({ userData, setUserData }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {communityTasks.map((task) => (
+              {communityTasks.map((task) => {
+                const iconType = getTaskIconType(task.type);
+                return (
                 <div key={task.id} style={{ ...neon.taskCard, flexDirection: 'column', alignItems: 'stretch' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div style={neon.taskIconBox}>{TaskIcons[task.type] ? TaskIcons[task.type]('#00f0ff') : TaskIcons.promo('#00f0ff')}</div>
+                      <div style={neon.taskIconBox}>{TaskIcons[iconType] ? TaskIcons[iconType]('#00f0ff') : TaskIcons.promo('#00f0ff')}</div>
                       <div>
                         <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900', letterSpacing: '0.3px' }}>{task.title}</div>
                         <div style={{ color: '#00f0ff', fontSize: '11px', marginTop: '4px', fontWeight: 'bold' }}>{getTaskLabel(task.type)} • {task.completions_done} / {task.completions_total}</div>
@@ -439,7 +445,7 @@ export default function AdsTab({ userData, setUserData }) {
                     {renderTaskButton(task)}
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
 
@@ -470,13 +476,14 @@ export default function AdsTab({ userData, setUserData }) {
                 const percent = Math.floor((task.completions_done / task.completions_total) * 100);
                 const isPaused = task.status === 'paused';
                 const isCompleted = task.status === 'completed' || task.completions_done >= task.completions_total;
+                const iconType = getTaskIconType(task.type);
                 
                 return (
                   <div key={task.id} style={{...neon.taskCard, borderColor: isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff41b4', opacity: (isPaused || isCompleted) ? 0.7 : 1}}>
                     <div style={{ width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
                         <div style={{...neon.taskIconBox, borderColor: isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff1493', background: isCompleted ? 'rgba(0, 255, 170, 0.1)' : isPaused ? 'rgba(255, 170, 0, 0.1)' : 'rgba(255, 20, 147, 0.1)'}}>
-                          {TaskIcons[task.type] ? TaskIcons[task.type](isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff1493') : TaskIcons.promo(isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff1493')}
+                          {TaskIcons[iconType] ? TaskIcons[iconType](isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff1493') : TaskIcons.promo(isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff1493')}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>
@@ -489,7 +496,7 @@ export default function AdsTab({ userData, setUserData }) {
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '6px' }}>
-                        <span style={{ color: isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff41b4' }}>Progreso</span>
+                        <span style={{ color: isCompleted ? '#00ffaa' : isPaused ? '#ffaa00' : '#ff41b4' }}>Progreso {task.type.startsWith('daily_') && '(Check-in Diario)'}</span>
                         <span style={{ color: '#fff' }}>{task.completions_done} / {task.completions_total} referidos</span>
                       </div>
                       <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
@@ -522,7 +529,7 @@ export default function AdsTab({ userData, setUserData }) {
               <button onClick={prevStep} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>◀</button>
             ) : <div />}
             <div style={{ fontSize: '12px', fontWeight: '900', color: '#00f0ff', letterSpacing: '1px' }}>PASO {currentStepIndex + 1} DE {totalSteps}</div>
-            <button onClick={() => { setView('list'); setTaskType(null); setCurrentStepIndex(0); setCompletions(100); setCheckoutView(false); }} style={{ background: '#ff1493', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>✕</button>
+            <button onClick={() => { setView('list'); setTaskType(null); setCurrentStepIndex(0); setCompletions(100); setIsDailyTask(false); setCheckoutView(false); }} style={{ background: '#ff1493', border: 'none', borderRadius: '10px', padding: '6px 12px', color: '#fff', fontWeight: '900', cursor: 'pointer' }}>✕</button>
           </div>
           <div style={neon.progressBox}>{stepsFlow.map((step, idx) => <div key={idx} style={neon.progressStep(idx <= currentStepIndex)} />)}</div>
 
@@ -594,7 +601,14 @@ export default function AdsTab({ userData, setUserData }) {
                 </div>
               ) : (
                 <div className="fade-in">
-                  <h2 style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.5px', color: '#ffffff' }}>¿Cuánto tráfico?</h2>
+                  <h2 style={{ margin: '0 0 10px 0', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.5px', color: '#ffffff' }}>¿Cuánto tráfico?</h2>
+                  
+                  {/* 🔥 TOGGLE CHECK-IN DIARIO */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0, 240, 255, 0.1)', padding: '12px', borderRadius: '12px', border: '1px dashed #00f0ff', marginBottom: '20px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={isDailyTask} onChange={(e) => setIsDailyTask(e.target.checked)} style={{ width: '18px', height: '18px' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#00f0ff' }}>Hacer Tarea Diaria (Los usuarios pueden repetirla cada 24h)</span>
+                  </label>
+
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                     <button onClick={() => setCompletions(100)} style={neon.pillButton(completions === 100)}>100</button>
                     <button onClick={() => setCompletions(500)} style={neon.pillButton(completions === 500)}>500</button>
