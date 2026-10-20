@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import crypto from 'crypto'; 
 import { TonClient, WalletContractV4, internal } from '@ton/ton';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
-l
+
 const supabase = createClient(
   "https://shfogfihzkwmusarhlxv.supabase.co",
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
@@ -122,48 +122,34 @@ export default async function handler(req, res) {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
 
-      // Conteo a prueba de fallos: traemos los IDs y contamos la longitud exacta.
       const { data: usersData } = await supabase.from('users').select('id');
-      const { data: tasksData } = await supabase.from('tasks').select('id').neq('type', 'publish_group'); // Ignoramos los grupos de la comunidad
+      const { data: tasksData } = await supabase.from('tasks').select('id').neq('type', 'publish_group');
 
       return res.status(200).json({ 
         success: true, 
-        stats: { 
-          users: usersData ? usersData.length : 0, 
-          tasks: tasksData ? tasksData.length : 0 
-        } 
+        stats: { users: usersData ? usersData.length : 0, tasks: tasksData ? tasksData.length : 0 } 
       });
     }
 
     if (action === 'admin-search-user') {
       const { adminId, targetId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
-
       const { data: foundUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
       if (!foundUser) return res.status(400).json({ success: false });
-
       return res.status(200).json({ success: true, user: foundUser });
     }
 
     if (action === 'admin-update-user') {
       const { adminId, targetId, update } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
-
       await supabase.from('users').update(update).eq('id', String(targetId));
       return res.status(200).json({ success: true });
     }
 
-    // 🔥 NUEVO: Endpoint para que el Admin lea todas las campañas
     if (action === 'admin-get-tasks') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
-
-      const { data: allTasks } = await supabase
-        .from('tasks')
-        .select('*')
-        .neq('type', 'publish_group')
-        .order('created_at', { ascending: false });
-
+      const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').order('created_at', { ascending: false });
       return res.status(200).json({ success: true, tasks: allTasks || [] });
     }
 
@@ -281,7 +267,7 @@ export default async function handler(req, res) {
       let refundClicks = 0;
       if (task.status === 'active' || task.status === 'paused') {
         const remaining = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
-        refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0)) ? (remaining > 0 ? Number(task.total_cost || 10) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
+        refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0) || task.type === 'daily') ? (remaining > 0 ? Number(task.total_cost || 10) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
         if (refundClicks > 0) {
           const { data: cu } = await supabase.from('users').select('balance').eq('id', task.creator_id).single();
           if (cu) await supabase.from('users').update({ balance: Number((Number(cu.balance || 0) + refundClicks).toFixed(2)) }).eq('id', task.creator_id);
@@ -349,32 +335,48 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
+    // 🔥 FIX: Tareas Dinámicas (Daily Check-in)
     if (action === 'get-tasks') {
       const targetId = String(userId);
       const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
+      
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
-      const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
 
+      // Verificamos cuáles tareas tipo 'daily' se han hecho en las últimas 24h
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: historyLogs } = await supabase.from('history_logs').select('title, description, created_at').eq('user_id', targetId);
-      const fixed_completed = [];
+      const { data: historyLogs } = await supabase.from('history_logs').select('description').eq('user_id', targetId).gte('created_at', yesterday);
+      const completedDailyIds = new Set();
       if (historyLogs) {
-        historyLogs.forEach(log => {
-          if (log.description && log.description.includes('@AirdropsCriptoES')) fixed_completed.push('channel1');
-          if (log.description && log.description.includes('@TONAirdropsES')) fixed_completed.push('channel2');
-          if (log.title === '🎁 Check-in Diario' && log.created_at >= yesterday) fixed_completed.push('daily');
-        });
+         historyLogs.forEach(log => {
+           const match = log.description?.match(/\[Daily:(.+?)\]/);
+           if (match) completedDailyIds.add(match[1]);
+         });
       }
-      return res.status(200).json({ success: true, tasks: mappedTasks, fixed_completed });
+
+      const mappedTasks = (allTasks || []).map(t => ({ 
+        ...t, 
+        is_completed: t.type === 'daily' ? completedDailyIds.has(String(t.id)) : completedIds.has(String(t.id)) 
+      }));
+
+      return res.status(200).json({ success: true, tasks: mappedTasks });
     }
 
     if (action === 'complete-task') {
       const { taskId } = req.body; const targetId = String(userId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
       if (!task || task.status !== 'active') return res.status(400).json({ success: false, error: 'Tarea no disponible o pausada.' });
-      const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
-      if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
+      
+      // 🔥 Validar según el tipo de tarea
+      if (task.type === 'daily') {
+         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+         const { data: recentLog } = await supabase.from('history_logs')
+           .select('id').eq('user_id', targetId).like('description', `%[Daily:${taskId}]%`).gte('created_at', yesterday).maybeSingle();
+         if (recentLog) return res.status(400).json({ success: false, error: 'Ya reclamaste este Check-in hoy. Vuelve mañana.' });
+      } else {
+         const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
+         if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
+      }
 
       if (task.type === 'group' || task.type === 'channel') {
         const chatId = extractTelegramUsername(task.url);
@@ -393,13 +395,19 @@ export default async function handler(req, res) {
         try { await axios.post(`https://api.telegram.org/bot${task.bot_token}/sendChatAction`, { chat_id: targetId, action: 'typing' }); } catch (e) { return res.status(400).json({ success: false, error: 'Asegúrate de darle a INICIAR (/start) al bot.' }); }
       }
 
-      await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
+      // Si no es daily, lo marcamos permanente
+      if (task.type !== 'daily') {
+         await supabase.from('user_completed_tasks').insert([{ task_id: taskId, user_id: targetId }]);
+      }
+
       const rewardAmount = Number(task.reward || 1);
       const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
       const newBalance = Number((Number(dbUser.balance || 0) + rewardAmount).toFixed(2));
       const newTotal = Number((Number(dbUser.total_earnings || 0) + rewardAmount).toFixed(2));
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
-      await supabase.from('history_logs').insert([{ user_id: targetId, title: `✅ Tarea Completada`, description: `Recompensa por "${task.title}".`, amount: rewardAmount }]);
+      
+      const logDesc = task.type === 'daily' ? `Check-in: "${task.title}" [Daily:${taskId}]` : `Recompensa por "${task.title}".`;
+      await supabase.from('history_logs').insert([{ user_id: targetId, title: `✅ Tarea Completada`, description: logDesc, amount: rewardAmount }]);
 
       if (dbUser.referred_by) {
         const commissionAmount = Number((rewardAmount * 0.20).toFixed(2));
@@ -416,52 +424,6 @@ export default async function handler(req, res) {
       }).eq('id', taskId);
 
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
-    }
-
-    if (action === 'claim-fixed-task') {
-      const { taskId } = req.body;
-      const targetId = String(userId);
-      let chatId = ''; let title = ''; let reward = 1; let isDaily = false;
-
-      if (taskId === 'channel1') { chatId = '-1003685621367'; title = '@AirdropsCriptoES'; }
-      else if (taskId === 'channel2') { chatId = '-1004377164928'; title = '@TONAirdropsES'; }
-      else if (taskId === 'daily') { chatId = '-1004362492963'; title = 'Crypto Web3'; isDaily = true; }
-      else return res.status(400).json({success: false, error: 'Tarea inválida'});
-
-      const isJoined = await checkMembership(targetId, chatId);
-      if (!isJoined) return res.status(400).json({success: false, error: 'Aún no te has unido al canal.'});
-
-      if (isDaily) {
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data: recentLog } = await supabase.from('history_logs').select('id').eq('user_id', targetId).eq('title', '🎁 Check-in Diario').gte('created_at', yesterday).maybeSingle();
-        if (recentLog) return res.status(400).json({success: false, error: 'Ya reclamaste tu Check-in hoy.'});
-      } else {
-        const { data: alreadyDone } = await supabase.from('history_logs').select('id').eq('user_id', targetId).eq('description', `Recompensa por unirte a ${title}.`).maybeSingle();
-        if (alreadyDone) return res.status(200).json({ success: true, message: 'Unión restaurada', is_rejoin: true });
-      }
-
-      const { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).single();
-      const newBalance = Number((Number(dbUser.balance || 0) + reward).toFixed(2));
-      const newTotal = Number((Number(dbUser.total_earnings || 0) + reward).toFixed(2));
-
-      await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
-      await supabase.from('history_logs').insert([{ user_id: targetId, title: isDaily ? '🎁 Check-in Diario' : `✅ Tarea Fija`, description: isDaily ? 'Recompensa por check-in diario.' : `Recompensa por unirte a ${title}.`, amount: reward }]);
-
-      if (dbUser.referred_by) {
-        const commissionAmount = Number((reward * 0.20).toFixed(2));
-        const { data: referrer } = await supabase.from('users').select('*').eq('id', dbUser.referred_by).maybeSingle();
-        if (referrer) {
-          await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
-        }
-      }
-      return res.status(200).json({ success: true, balance: newBalance });
-    }
-
-    if (action === 'check-channels') {
-      const targetId = String(userId);
-      const isMember1 = await checkMembership(targetId, "-1003685621367"); 
-      const isMember2 = await checkMembership(targetId, "-1004377164928"); 
-      return res.status(200).json({ success: true, channel1: isMember1, channel2: isMember2 });
     }
 
     if (action === 'claim-bonus') {
