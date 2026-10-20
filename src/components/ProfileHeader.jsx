@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 
-export default function ProfileHeader({ userData, t }) {
+export default function ProfileHeader({ userData, t, lang, setLang }) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoTab, setInfoTab] = useState('support'); 
 
@@ -9,6 +9,11 @@ export default function ProfileHeader({ userData, t }) {
 
   const photoUrl = WebApp.initDataUnsafe?.user?.photo_url;
   const avatarLetter = userData?.username ? userData.username.charAt(0).toUpperCase() : 'U';
+
+  const handleLanguageChange = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem('click_lang', newLang);
+  };
 
   const modalStyles = {
     overlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' },
@@ -19,7 +24,8 @@ export default function ProfileHeader({ userData, t }) {
     tabContainer: { display: 'flex', gap: '8px', marginBottom: '16px', background: 'rgba(0,0,0,0.3)', padding: '6px', borderRadius: '14px' },
     tab: (active) => ({ flex: 1, padding: '8px 0', fontSize: '11px', fontWeight: '900', textAlign: 'center', cursor: 'pointer', borderRadius: '10px', background: active ? 'linear-gradient(90deg, #ff1493, #8a2be2)' : 'transparent', color: active ? '#fff' : '#aaa', border: 'none', transition: '0.2s' }),
     contentArea: { overflowY: 'auto', paddingRight: '4px', fontSize: '13px', lineHeight: '1.6', color: '#ddd' },
-    linkBox: { background: 'rgba(0, 240, 255, 0.1)', border: '1px solid #00f0ff', padding: '12px', borderRadius: '12px', marginBottom: '12px', display: 'block', textDecoration: 'none', color: '#fff' }
+    linkBox: { background: 'rgba(0, 240, 255, 0.1)', border: '1px solid #00f0ff', padding: '12px', borderRadius: '12px', marginBottom: '12px', display: 'block', textDecoration: 'none', color: '#fff' },
+    langBtn: (active, color) => ({ padding: '8px 16px', borderRadius: '10px', background: active ? color : 'transparent', border: `1px solid ${color}`, color: active ? (color === '#00f0ff' ? '#000' : '#fff') : color, fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', flex: 1 })
   };
 
   return (
@@ -58,6 +64,12 @@ export default function ProfileHeader({ userData, t }) {
             <div style={modalStyles.header}>
               <h3 style={modalStyles.title}>Click Network</h3>
               <button onClick={() => setShowInfoModal(false)} style={modalStyles.closeBtn}>✕</button>
+            </div>
+
+            {/* 🔥 SELECTOR DE IDIOMAS */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <button onClick={() => handleLanguageChange('es')} style={modalStyles.langBtn(lang === 'es', '#ff1493')}>🇪🇸 Español</button>
+              <button onClick={() => handleLanguageChange('en')} style={modalStyles.langBtn(lang === 'en', '#00f0ff')}>🇬🇧 English</button>
             </div>
 
             <div style={modalStyles.tabContainer}>
