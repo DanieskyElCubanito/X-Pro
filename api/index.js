@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 import WebSocket from 'ws';
-import crypto from 'crypto'; // <-- MÓDULO NATIVO DE NODEJS PARA CIFRADO
+import crypto from 'crypto'; 
 import { TonClient, WalletContractV4, internal } from '@ton/ton';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 
@@ -19,17 +19,12 @@ const MY_MASTER_WALLET = "UQDgJUo4Ycvd9Q_ICUI6I-trCRcZgzBXHmhe0z_8lRHWfU3I";
 
 const tonClient = new TonClient({ endpoint: 'https://toncenter.com/api/v2/jsonRPC' });
 
-// ==========================================
-// MOTOR CRIPTOGRÁFICO: VALIDACIÓN DE TELEGRAM
-// ==========================================
 function verifyTelegramWebAppData(telegramInitData) {
   if (!telegramInitData) return false;
-
   const urlParams = new URLSearchParams(telegramInitData);
   const hash = urlParams.get('hash');
   urlParams.delete('hash');
   
-  // Telegram requiere que ordenemos alfabéticamente
   urlParams.sort();
   let dataCheckString = '';
   for (const [key, value] of urlParams.entries()) {
@@ -37,11 +32,9 @@ function verifyTelegramWebAppData(telegramInitData) {
   }
   dataCheckString = dataCheckString.slice(0, -1);
 
-  // HMAC-SHA256 con el Bot Token
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
   const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-  // Si los hashes coinciden, los datos provienen de un cliente oficial de Telegram sin manipular
   return calculatedHash === hash;
 }
 
@@ -87,9 +80,11 @@ async function checkAdminStatus(chatId) {
   } catch (error) { return false; }
 }
 
-async function tryGrantReferralReward(targetId) {
+async function tryGrantReferralReward(targetUserObj) {
   try {
-    const { data: currentUser } = await supabase.from('users').select('*').eq('id', String(targetId)).maybeSingle();
+    const targetId = String(targetUserObj.id);
+    const { data: currentUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
+    
     if (!currentUser || !currentUser.referred_by || currentUser.referral_reward_granted || !currentUser.is_human) return false;
 
     const { data: referrer } = await supabase.from('users').select('*').eq('id', currentUser.referred_by).maybeSingle();
@@ -97,8 +92,9 @@ async function tryGrantReferralReward(targetId) {
       const refBalance = Number((Number(referrer.balance || 0) + 1).toFixed(2));
       const refEarnings = Number((Number(referrer.referral_earnings || 0) + 1).toFixed(2));
       const refTotal = Number((Number(referrer.total_earnings || 0) + 1).toFixed(2));
+      
       await supabase.from('users').update({ balance: refBalance, referral_earnings: refEarnings, total_earnings: refTotal }).eq('id', referrer.id);
-      await supabase.from('users').update({ referral_reward_granted: true }).eq('id', String(targetId));
+      await supabase.from('users').update({ referral_reward_granted: true }).eq('id', targetId);
       return true;
     }
   } catch (err) {}
@@ -115,10 +111,7 @@ export default async function handler(req, res) {
   try {
     const telegramInitData = req.headers['x-telegram-init-data'];
     
-    // 🔥 BLOQUEO DE SEGURIDAD FASE 1: Verificación estricta de firma HMAC-SHA256
-    // Permite pasar solicitudes específicas sin firma (como callbacks públicos), pero bloquea la manipulación de saldos.
     if (!telegramInitData || !verifyTelegramWebAppData(telegramInitData)) {
-       // Excepciones (Por ejemplo, generar la factura no manipula base de datos directamente)
        if (req.body.action !== 'generate-stars-invoice') {
          return res.status(403).json({ success: false, error: 'Firma de Telegram inválida o ausente. Solicitud rechazada por seguridad.' });
        }
@@ -172,6 +165,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, stats });
     }
 
+    // ==========================================
+    // PAUSAR / REANUDAR TAREAS (Fase 2)
+    // ==========================================
+    if (action === 'toggle-task-status') {
+      const { taskId, requestingUserId } = req.body;
+      const targetId = String(requestingUserId);
+      const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
+      
+      if (!task) return res.status(400).json({ success: false, error: 'Campaña no encontrada.' });
+      if (String(task.creator_id) !== targetId && !ADMIN_IDS.includes(targetId)) return res.status(403).json({ success: false, error: 'Sin permisos.' });
+
+      const newStatus = task.status === 'active' ? 'paused' : 'active';
+      await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
+      return res.status(200).json({ success: true, newStatus });
+    }
+
     if (action === 'edit-task') {
       const { taskId, requestingUserId, newTitle, newUrl, isAdminAction } = req.body;
       const targetId = String(requestingUserId);
@@ -194,7 +203,7 @@ export default async function handler(req, res) {
       if (!isOwner && (!isAdminAction || !ADMIN_IDS.includes(targetId))) return res.status(403).json({ success: false, error: 'Sin permisos.' });
 
       let refundClicks = 0;
-      if (task.status === 'active') {
+      if (task.status === 'active' || task.status === 'paused') {
         const remaining = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
         refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0)) ? (remaining > 0 ? Number(task.total_cost || 10) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
         if (refundClicks > 0) {
@@ -267,7 +276,8 @@ export default async function handler(req, res) {
 
     if (action === 'get-tasks') {
       const targetId = String(userId);
-      const { data: allTasks } = await supabase.from('tasks').select('*').eq('status', 'active').order('created_at', { ascending: false });
+      // 🔥 Ahora traemos las activas Y las pausadas para que el creador pueda verlas y reanudarlas
+      const { data: allTasks } = await supabase.from('tasks').select('*').in('status', ['active', 'paused']).order('created_at', { ascending: false });
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
       const mappedTasks = (allTasks || []).map(t => ({ ...t, is_completed: completedIds.has(String(t.id)) }));
@@ -288,15 +298,24 @@ export default async function handler(req, res) {
     if (action === 'complete-task') {
       const { taskId } = req.body; const targetId = String(userId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
-      if (!task || task.status !== 'active') return res.status(400).json({ success: false, error: 'Tarea no disponible.' });
+      if (!task || task.status !== 'active') return res.status(400).json({ success: false, error: 'Tarea no disponible o pausada.' });
       const { data: alreadyDone } = await supabase.from('user_completed_tasks').select('id').eq('task_id', taskId).eq('user_id', targetId).maybeSingle();
       if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
 
+      // 🔥 AUTO-PAUSA DE SEGURIDAD (Fase 2)
       if (task.type === 'group' || task.type === 'channel') {
         const chatId = extractTelegramUsername(task.url);
         if (chatId) {
           const isJoined = await checkMembership(targetId, chatId);
-          if (!isJoined) return res.status(400).json({ success: false, error: 'No te has unido al canal.' });
+          if (!isJoined) {
+            // Verificamos si falló porque el creador eliminó a nuestro bot de administrador
+            const isBotStillAdmin = await checkAdminStatus(chatId);
+            if (!isBotStillAdmin) {
+              await supabase.from('tasks').update({ status: 'paused' }).eq('id', taskId);
+              return res.status(400).json({ success: false, error: 'El bot ya no es administrador del grupo. La campaña se ha pausado automáticamente.' });
+            }
+            return res.status(400).json({ success: false, error: 'No te has unido al canal o grupo.' });
+          }
         }
       } else if (task.type === 'bot' && task.bot_token) {
         try { await axios.post(`https://api.telegram.org/bot${task.bot_token}/sendChatAction`, { chat_id: targetId, action: 'typing' }); } catch (e) { return res.status(400).json({ success: false, error: 'Inicia el bot.' }); }
@@ -317,7 +336,13 @@ export default async function handler(req, res) {
           await supabase.from('users').update({ balance: Number((Number(referrer.balance || 0) + commissionAmount).toFixed(2)), referral_earnings: Number((Number(referrer.referral_earnings || 0) + commissionAmount).toFixed(2)), total_earnings: Number((Number(referrer.total_earnings || 0) + commissionAmount).toFixed(2)) }).eq('id', referrer.id);
         }
       }
-      await supabase.from('tasks').update({ completions_done: Number(task.completions_done || 0) + 1, status: (Number(task.completions_done || 0) + 1) >= Number(task.completions_total) ? 'completed' : 'active' }).eq('id', taskId);
+      
+      const newDoneCount = Number(task.completions_done || 0) + 1;
+      await supabase.from('tasks').update({ 
+        completions_done: newDoneCount, 
+        status: newDoneCount >= Number(task.completions_total) ? 'completed' : 'active' 
+      }).eq('id', taskId);
+      
       return res.status(200).json({ success: true, reward: rewardAmount, balance: newBalance });
     }
 
@@ -401,7 +426,9 @@ export default async function handler(req, res) {
 
       if (lv1 && lv1.length > 0) {
         for (const refUser of lv1) {
-          if (!refUser.referral_reward_granted) await tryGrantReferralReward(refUser.id);
+          if (!refUser.referral_reward_granted) {
+            await tryGrantReferralReward({ id: refUser.id, is_premium: false }); 
+          }
         }
         const refreshed = await supabase.from('users').select('*').eq('referred_by', targetId);
         lv1 = refreshed.data || lv1;
@@ -414,57 +441,25 @@ export default async function handler(req, res) {
     if (action === 'verify-human') {
       const targetId = String(userId || user?.id);
       await supabase.from('users').update({ is_human: true }).eq('id', targetId);
-      await tryGrantReferralReward(targetId);
+      await tryGrantReferralReward(user || { id: targetId, is_premium: false });
       return res.status(200).json({ success: true, is_human: true });
     }
 
-    // ==========================================
-    // LÓGICA GENERAL AL ENTRAR + MULTICUENTAS (Fase 1)
-    // ==========================================
-    const targetUser = user || { id: userId };
+    const targetUser = user || { id: userId, is_premium: false };
     const targetId = String(targetUser?.id);
     if (!targetId || targetId === 'undefined') return res.status(400).json({ success: false, error: 'No user id' });
 
     let { data: dbUser } = await supabase.from('users').select('*').eq('id', targetId).maybeSingle();
-    
-    // Si la cuenta está suspendida por el admin
     if (dbUser && dbUser.is_banned) return res.status(403).json({ success: false, error: 'Cuenta suspendida.' });
 
-    // Revisamos señales de riesgo (Pero ya no bloqueamos ciegamente, las guardamos para auditoría)
-    const updates = {};
-    if (dbUser && currentDeviceId && !dbUser.device_id) updates.device_id = currentDeviceId;
-    if (dbUser && clientIp && dbUser.ip_address !== clientIp) updates.ip_address = clientIp;
-    
-    // Solo vinculamos afiliado si no es cuenta fraudulenta obvia 
-    // (Ej. Mismo dispositivo tratando de auto-referirse)
-    if (dbUser && !dbUser.referred_by && start_param && String(start_param) !== targetId) {
-      const { data: checkReferrer } = await supabase.from('users').select('device_id').eq('id', start_param).single();
-      if (!checkReferrer || (checkReferrer.device_id !== currentDeviceId)) {
-        updates.referred_by = String(start_param);
-      }
-    }
-
-    if (Object.keys(updates).length > 0) {
-      await supabase.from('users').update(updates).eq('id', targetId);
-      dbUser = { ...dbUser, ...updates };
-    }
-
-    // Si es nuevo usuario
     if (!dbUser) {
-      const newUserObj = { id: targetId, username: targetUser.username || 'Usuario', balance: 0, total_earnings: 0, referral_earnings: 0, is_human: false, referral_reward_granted: false, device_id: currentDeviceId || null, ip_address: clientIp || null };
-      
-      if (start_param && String(start_param) !== targetId) {
-         // Auto-referido protección básica: Si el creador del enlace tiene el mismo DeviceID, anula el referido
-         const { data: refCheck } = await supabase.from('users').select('device_id').eq('id', start_param).single();
-         if (!refCheck || (refCheck.device_id !== currentDeviceId)) {
-           newUserObj.referred_by = String(start_param);
-         }
-      }
+      const newUserObj = { id: targetId, username: targetUser.username || 'Usuario', balance: 0, total_earnings: 0, referral_earnings: 0, is_human: false, referral_reward_granted: false };
+      if (start_param && String(start_param) !== targetId) newUserObj.referred_by = String(start_param);
       const { data: newUser } = await supabase.from('users').insert([newUserObj]).select().single();
       dbUser = newUser;
     }
 
-    await tryGrantReferralReward(targetId);
+    await tryGrantReferralReward(targetUser);
     const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
     const { data: totalTasks } = await supabase.from('tasks').select('completions_done');
     const globalclicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
