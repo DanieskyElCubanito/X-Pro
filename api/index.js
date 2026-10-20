@@ -73,6 +73,19 @@ async function checkAdminStatus(chatId) {
   } catch (error) { return false; }
 }
 
+// 🔥 NUEVA FUNCIÓN: Nos dirá exactamente por qué falla la verificación en Telegram
+async function checkAdminStatusDetailed(chatId) {
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/getChatMember?chat_id=${chatId}&user_id=${BOT_ID}`;
+    const response = await fetchWithTimeout(url);
+    const resData = await response.json();
+    if (!resData.ok) return { isAdmin: false, error: resData.description };
+    const status = resData.result.status;
+    if (['administrator', 'creator'].includes(status)) return { isAdmin: true };
+    return { isAdmin: false, error: `El bot es ${status}, no es administrador.` };
+  } catch (error) { return { isAdmin: false, error: error.message }; }
+}
+
 async function tryGrantReferralReward(targetUserObj) {
   try {
     const targetId = String(targetUserObj.id);
@@ -110,12 +123,20 @@ export default async function handler(req, res) {
 
     const { user, action, userId, start_param } = req.body; 
 
+    // ==========================================
+    // MODO DIOS: PANEL DE ADMINISTRACIÓN
+    // ==========================================
     if (action === 'admin-stats') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
+
       const { data: usersData } = await supabase.from('users').select('id');
-      const { data: tasksData } = await supabase.from('tasks').select('id');
-      return res.status(200).json({ success: true, stats: { users: usersData?.length || 0, tasks: tasksData?.length || 0 } });
+      const { data: tasksData } = await supabase.from('tasks').select('id').neq('type', 'publish_group');
+
+      return res.status(200).json({ 
+        success: true, 
+        stats: { users: usersData ? usersData.length : 0, tasks: tasksData ? tasksData.length : 0 } 
+      });
     }
 
     if (action === 'admin-search-user') {
@@ -133,14 +154,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // 🔥 AHORA EL ADMIN VE TODAS LAS TAREAS (INCLUYENDO GRUPOS COMUNITARIOS)
     if (action === 'admin-get-tasks') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
-      const { data: allTasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+      const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').order('created_at', { ascending: false });
       return res.status(200).json({ success: true, tasks: allTasks || [] });
     }
 
+    // ==========================================
+    // GRUPOS COMUNITARIOS (AÑADIR Y LEER)
+    // ==========================================
     if (action === 'add-publish-group') {
       const { url } = req.body;
       const targetId = String(userId);
@@ -171,11 +194,13 @@ export default async function handler(req, res) {
        return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
     }
 
-    // 🔥 ECONOMÍA JUSTA PARA GRUPOS COMUNITARIOS
+    // ==========================================
+    // PUBLICAR POST (ECONOMÍA JUSTA)
+    // ==========================================
     if (action === 'publish-post') {
       const { userId: pubUserId, chatId, text, link, photoData, buttonConfig } = req.body;
       const targetId = String(pubUserId);
-      
+
       const { data: groupInfo } = await supabase.from('tasks').select('creator_id').eq('type', 'publish_group').eq('url', chatId).maybeSingle();
       const isOwner = groupInfo && String(groupInfo.creator_id) === targetId;
       const COST_PER_GROUP = isOwner ? 0 : 10;
@@ -203,8 +228,7 @@ export default async function handler(req, res) {
         const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
         await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
         await supabase.from('history_logs').insert([{ user_id: targetId, title: '📢 Publicación de Campaña', description: `Pago por envío a ${chatId}.`, amount: -COST_PER_GROUP }]);
-        
-        // Pagar 2 CLICKs al dueño del grupo
+
         if (groupInfo && groupInfo.creator_id) {
            const { data: owner } = await supabase.from('users').select('balance, total_earnings').eq('id', groupInfo.creator_id).single();
            if (owner) {
@@ -217,7 +241,7 @@ export default async function handler(req, res) {
       } else {
         await supabase.from('history_logs').insert([{ user_id: targetId, title: '📢 Publicación Gratuita', description: `Publicaste en tu propio grupo ${chatId}.`, amount: 0 }]);
       }
-      
+
       await supabase.from('tasks').insert([{ creator_id: targetId, type: 'group', title: 'Campaña en Grupo', url: buttonConfig?.url || link || 'https://t.me/ClickNetworkbot', completions_total: 1, completions_done: 1, reward: 0, total_cost: COST_PER_GROUP, status: 'completed' }]);
       return res.status(200).json({ success: true, balance: isOwner ? dbUser.balance : Number((dbUser.balance - COST_PER_GROUP).toFixed(2)) });
     }
@@ -270,7 +294,7 @@ export default async function handler(req, res) {
       let refundClicks = 0;
       if (task.status === 'active' || task.status === 'paused') {
         const remaining = Math.max(0, Number(task.completions_total) - Number(task.completions_done));
-        refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0)) ? (remaining > 0 ? Number(task.total_cost || 10) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
+        refundClicks = (task.type === 'promo' || (task.type === 'group' && task.reward === 0) || task.type === 'daily') ? (remaining > 0 ? Number(task.total_cost || 10) : 0) : Number((remaining * Number(task.reward || 1)).toFixed(2));
         if (refundClicks > 0) {
           const { data: cu } = await supabase.from('users').select('balance').eq('id', task.creator_id).single();
           if (cu) await supabase.from('users').update({ balance: Number((Number(cu.balance || 0) + refundClicks).toFixed(2)) }).eq('id', task.creator_id);
@@ -316,11 +340,36 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, balance: newBalance });
     }
 
-    // 🔥 FIX: AHORA LEE CORRECTAMENTE CUALQUIER TAREA CON PREFIJO daily_
+    // 🔥 FIX: VERIFICAR ADMIN CON DETALLE DE ERROR
+    if (action === 'verify-admin') {
+      const chatId = extractTelegramUsername(req.body.url);
+      if (!chatId) return res.status(400).json({ success: false, error: 'Enlace público inválido.' });
+      
+      const check = await checkAdminStatusDetailed(chatId);
+      if (!check.isAdmin) {
+         return res.status(400).json({ success: false, error: check.error || 'El bot no es administrador.' });
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'create-task') {
+      const { creator_id, type, title, url, bot_token, completions_total, reward } = req.body;
+      const targetId = String(creator_id || userId);
+      const count = Number(completions_total || 100); const rew = Number(reward || 1); const totalCost = Number((count * rew).toFixed(2));
+      const { data: dbUser } = await supabase.from('users').select('balance').eq('id', targetId).single();
+      if (!dbUser || Number(dbUser.balance || 0) < totalCost) return res.status(400).json({ success: false, error: 'Saldo insuficiente.' });
+
+      const newBalance = Number((dbUser.balance - totalCost).toFixed(2));
+      await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
+      const { data: newTask } = await supabase.from('tasks').insert([{ creator_id: targetId, type, title, url, bot_token: bot_token || null, completions_total: count, completions_done: 0, reward: rew, total_cost: totalCost, status: 'active' }]).select().single();
+      await supabase.from('history_logs').insert([{ user_id: targetId, title: '🚀 Nueva Campaña Creada', description: `Campaña para ${count} referidos.`, amount: -totalCost }]);
+      return res.status(200).json({ success: true, task: newTask, balance: newBalance });
+    }
+
     if (action === 'get-tasks') {
       const targetId = String(userId);
       const { data: allTasks } = await supabase.from('tasks').select('*').neq('type', 'publish_group').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
-      
+
       const { data: completedRows } = await supabase.from('user_completed_tasks').select('task_id').eq('user_id', targetId);
       const completedIds = new Set((completedRows || []).map(r => String(r.task_id)));
 
@@ -342,12 +391,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, tasks: mappedTasks });
     }
 
-    // 🔥 FIX: VALIDACIÓN ESTRICTA PARA TAREAS DIARIAS
     if (action === 'complete-task') {
       const { taskId } = req.body; const targetId = String(userId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
       if (!task || task.status !== 'active') return res.status(400).json({ success: false, error: 'Tarea no disponible o pausada.' });
-      
+
       const isDaily = task.type.startsWith('daily_') || task.type === 'daily';
       const baseType = isDaily ? task.type.replace('daily_', '') : task.type;
 
@@ -361,7 +409,6 @@ export default async function handler(req, res) {
          if (alreadyDone) return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
       }
 
-      // Verificación de existencia real según el tipo
       if (baseType === 'group' || baseType === 'channel') {
         const chatId = extractTelegramUsername(task.url);
         if (chatId) {
@@ -388,7 +435,7 @@ export default async function handler(req, res) {
       const newBalance = Number((Number(dbUser.balance || 0) + rewardAmount).toFixed(2));
       const newTotal = Number((Number(dbUser.total_earnings || 0) + rewardAmount).toFixed(2));
       await supabase.from('users').update({ balance: newBalance, total_earnings: newTotal }).eq('id', targetId);
-      
+
       const logDesc = isDaily ? `Check-in: "${task.title}" [Daily:${taskId}]` : `Recompensa por "${task.title}".`;
       await supabase.from('history_logs').insert([{ user_id: targetId, title: `✅ Tarea Completada`, description: logDesc, amount: rewardAmount }]);
 
