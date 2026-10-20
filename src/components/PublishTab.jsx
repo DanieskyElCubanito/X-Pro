@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import WebApp from '@twa-dev/sdk'; // 🔥 Importación del SDK añadida
 
 const neonStyles = {
   container: { color: '#ffffff', paddingBottom: '20px' },
@@ -87,6 +88,12 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
   const [availableGroups, setAvailableGroups] = useState(INITIAL_GROUPS);
   const [unlockedTasks, setUnlockedTasks] = useState([]);
 
+  // 🔥 CABECERAS DE SEGURIDAD FASE 1
+  const apiHeaders = { 
+    'Content-Type': 'application/json', 
+    'X-Telegram-Init-Data': WebApp.initData || '' 
+  };
+
   useEffect(() => {
     const fetchStatsAndLocks = async () => {
       if (!userData?.id) return;
@@ -95,7 +102,7 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
         // 1. Cargar Estadísticas de Grupos
         const resStats = await fetch('/api', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders, // 🔥 Actualizado
           body: JSON.stringify({
             action: 'get-group-stats',
             groupIds: INITIAL_GROUPS.map(g => g.id)
@@ -117,28 +124,19 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
         // 2. Cargar Tareas Fijas Completadas para Desbloquear
         const resLocks = await fetch('/api', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders, // 🔥 Actualizado
           body: JSON.stringify({ action: 'get-tasks', userId: userData.id })
         });
         const dataLocks = await resLocks.json();
 
-        // Esta llamada extrae las tareas que el usuario ya hizo
-        // get-tasks también nos sirve para ver si ya hizo 'channel1' y 'channel2'
-        // Como las tareas fijas usan ID de texto, verificamos en user_completed_tasks
-        
-        // Haremos un endpoint ligero en /api para verificar esto si es necesario, 
-        // pero por ahora, si el backend está enviando las tareas completadas...
-        // Nota: Para optimizar, se puede añadir una bandera en userData o 
-        // consultar la tabla `user_completed_tasks`.
-
         // Vamos a solicitar el historial y ver si "channel1" o "channel2" están allí.
         const resHistory = await fetch('/api', {
            method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
+           headers: apiHeaders, // 🔥 Actualizado
            body: JSON.stringify({ action: 'get-history', userId: userData.id })
         });
         const dataHistory = await resHistory.json();
-        
+
         if (dataHistory.success && dataHistory.history) {
             // Buscamos en el historial las descripciones de las tareas fijas
             const completed = [];
@@ -210,7 +208,7 @@ export default function PublishTab({ userData, setUserData, setActiveTabGlobal }
       for (const chatId of selectedGroups) {
         const response = await fetch('/api', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders, // 🔥 Actualizado
           body: JSON.stringify({
             action: 'publish-post',
             userId: userData?.id,
