@@ -181,10 +181,8 @@ export default function AdsTab({ userData, setUserData }) {
         else { toast.error("El bot no es admin. Añádelo y reintenta.", { id: tid }); }
       } catch (e) { toast.error("Error al verificar.", { id: tid }); } finally { setIsVerifying(false); }
     } else if (taskType === 'bot') {
-      // 🔥 VALIDACIÓN ESTRICTA DE BOTS
-      if (!val.toLowerCase().includes('bot')) return toast.error("El enlace debe pertenecer a un Bot.");
-      if (!val.includes('start=') && !val.includes('startapp=')) return toast.error("Los enlaces de bots deben incluir ?start= (o ?startapp= para Mini Apps)");
-      toast.success("¡Bot detectado!"); nextStep();
+      // 🔥 Validación estricta eliminada para permitir formatos diversos de Web Apps y bots
+      toast.success("¡Enlace de Bot / App detectado!"); nextStep();
     } else {
       if (!val.startsWith('http') && !val.startsWith('@')) val = 'https://' + val;
       setTargetUrl(val); nextStep();
