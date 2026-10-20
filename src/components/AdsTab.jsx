@@ -181,7 +181,6 @@ export default function AdsTab({ userData, setUserData }) {
         else { toast.error("El bot no es admin. Añádelo y reintenta.", { id: tid }); }
       } catch (e) { toast.error("Error al verificar.", { id: tid }); } finally { setIsVerifying(false); }
     } else if (taskType === 'bot') {
-      // 🔥 Validación estricta eliminada para permitir formatos diversos de Web Apps y bots
       toast.success("¡Enlace de Bot / App detectado!"); nextStep();
     } else {
       if (!val.startsWith('http') && !val.startsWith('@')) val = 'https://' + val;
@@ -536,11 +535,6 @@ export default function AdsTab({ userData, setUserData }) {
                     </div>
                     {renderTaskButton(task)}
                   </div>
-                  {isAdmin && (
-                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'right' }}>
-                      <button onClick={() => handleDeleteTask(task.id)} style={{ background: '#ff1493', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>🗑️ Eliminar (Admin)</button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
