@@ -121,11 +121,11 @@ export default async function handler(req, res) {
     if (action === 'admin-stats') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
-      
+
       // Conteo a prueba de fallos: traemos los IDs y contamos la longitud exacta.
       const { data: usersData } = await supabase.from('users').select('id');
       const { data: tasksData } = await supabase.from('tasks').select('id').neq('type', 'publish_group'); // Ignoramos los grupos de la comunidad
-      
+
       return res.status(200).json({ 
         success: true, 
         stats: { 
@@ -151,6 +151,20 @@ export default async function handler(req, res) {
 
       await supabase.from('users').update(update).eq('id', String(targetId));
       return res.status(200).json({ success: true });
+    }
+
+    // 🔥 NUEVO: Endpoint para que el Admin lea todas las campañas
+    if (action === 'admin-get-tasks') {
+      const { adminId } = req.body;
+      if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
+
+      const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .neq('type', 'publish_group')
+        .order('created_at', { ascending: false });
+
+      return res.status(200).json({ success: true, tasks: allTasks || [] });
     }
 
     // ==========================================
