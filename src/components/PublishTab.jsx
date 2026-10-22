@@ -138,11 +138,8 @@ export default function PublishTab({ userData, setUserData, t }) {
       });
       const data = await res.json();
       if (data.success && data.history) {
-        // Filtramos solo los logs relacionados con publicaciones o ganancias de red
-        const pubLogs = data.history.filter(h => 
-          (h.title && (h.title.includes('Publicación') || h.title.includes('Ingreso por Red')))
-        );
-        setHistoryList(pubLogs);
+        // 🔥 FIX: AHORA MUESTRA TODO EL HISTORIAL DE PUBLICACIONES
+        setHistoryList(data.history);
       }
     } catch (e) {} finally {
       setLoadingHistory(false);
@@ -155,6 +152,7 @@ export default function PublishTab({ userData, setUserData, t }) {
 
   useEffect(() => {
     if (activeTab === 'history') {
+      fetchGroups();
       fetchPublishHistory();
     }
   }, [activeTab, userData?.id]);
@@ -199,7 +197,7 @@ export default function PublishTab({ userData, setUserData, t }) {
   const handlePublish = async () => {
     setIsPublishing(true);
     const tid = toast.loading(t('pub_btn_launching'));
-    const finalButtonConfig = buttonConfig.url ? { text: buttonConfig.text || t('pub_open_link'), url: buttonConfig.url } : null;
+    const finalButtonConfig = buttonConfig.url ? { text: buttonConfig.text || t('pub_open_link'), url: buttonConfig.url, style: buttonConfig.style } : null;
 
     try {
       for (const chatId of selectedGroups) {
@@ -213,7 +211,6 @@ export default function PublishTab({ userData, setUserData, t }) {
       }
       toast.success("OK!", { id: tid });
       setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default' }); setSelectedGroups([]); setStep(1);
-      fetchPublishHistory();
     } catch (err) { toast.error(err.message || "Error", { id: tid }); } 
     finally { setIsPublishing(false); }
   };
@@ -239,6 +236,8 @@ export default function PublishTab({ userData, setUserData, t }) {
     } catch (err) { toast.error("Error", { id: tid }); } 
     finally { setIsVerifyingGroup(false); }
   };
+
+  const myCommunityGroups = availableGroups.filter(g => String(g.creator_id) === String(userData?.id));
 
   return (
     <div style={neonStyles.container}>
@@ -421,7 +420,7 @@ export default function PublishTab({ userData, setUserData, t }) {
         </>
       )}
 
-      {/* SUB-PESTAÑA DE HISTORIAL REAL */}
+      {/* 🔥 FIX: SUB-PESTAÑA DE HISTORIAL REAL (MUY CLARA) */}
       {activeTab === 'history' && (
         <div className="fade-in">
           <div style={neonStyles.card}>
@@ -430,8 +429,26 @@ export default function PublishTab({ userData, setUserData, t }) {
               <button onClick={fetchPublishHistory} style={{ background: 'transparent', border: 'none', color: '#ff99dd', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>🔄</button>
             </div>
 
+            {/* SECCIÓN 1: MIS GRUPOS REGISTRADOS */}
+            {myCommunityGroups.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '11px', color: '#00ffaa', fontWeight: '900', marginBottom: '8px', textTransform: 'uppercase' }}>Tus Grupos Recaudadores</div>
+                {myCommunityGroups.map(grp => (
+                  <div key={grp.id} style={{ ...neonStyles.cardInteractive, borderColor: '#00ffaa', background: 'rgba(0, 255, 170, 0.05)', marginBottom: '8px', padding: '10px 14px' }}>
+                    <div>
+                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{grp.name}</div>
+                      <div style={{ color: '#ff99dd', fontSize: '11px' }}>{grp.members}</div>
+                    </div>
+                    <div style={{ color: '#00ffaa', fontSize: '20px' }}>🌐</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* SECCIÓN 2: HISTORIAL DE LOGS */}
+            <div style={{ fontSize: '11px', color: '#ff41b4', fontWeight: '900', marginBottom: '8px', textTransform: 'uppercase' }}>Historial Completo</div>
             {loadingHistory ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px' }}>Cargando historial...</div>
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px' }}>Cargando...</div>
             ) : historyList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px 10px' }}>
                 <div style={{ fontSize: '36px', marginBottom: '8px' }}>📜</div>
@@ -441,13 +458,13 @@ export default function PublishTab({ userData, setUserData, t }) {
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
                 {historyList.map(item => (
                   <div key={item.id} style={neonStyles.historyItem}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <strong style={{ fontSize: '13px', color: '#fff' }}>{item.title}</strong>
                       <span style={{ fontSize: '12px', fontWeight: '900', color: item.amount >= 0 ? '#00ffaa' : '#ff1493' }}>
-                        {item.amount >= 0 ? `+${item.amount}` : item.amount} CLICK
+                        {item.amount > 0 ? `+${item.amount}` : item.amount} CLICK
                       </span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#ff99dd' }}>{item.description}</div>
@@ -459,6 +476,7 @@ export default function PublishTab({ userData, setUserData, t }) {
         </div>
       )}
 
+      {/* MODALES INFERIORES */}
       {showButtonModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(5, 2, 20, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100000, backdropFilter: 'blur(5px)' }}>
           <div style={{ ...neonStyles.card, width: '100%', maxWidth: '340px', marginBottom: 0, borderColor: '#00f0ff' }}>
