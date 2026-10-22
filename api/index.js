@@ -190,7 +190,6 @@ export default async function handler(req, res) {
        return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
     }
 
-    // 🔥 FIX: ENLACES SIN VISTA PREVIA Y BOTONES CON ESTILOS
     if (action === 'publish-post') {
       const { userId: pubUserId, chatId, text, link, photoData, buttonConfig } = req.body;
       const targetId = String(pubUserId);
@@ -217,8 +216,8 @@ export default async function handler(req, res) {
       let payload = { 
         chat_id: chatId, 
         parse_mode: "HTML",
-        link_preview_options: { is_disabled: true }, // Bloquea la vista previa de los enlaces (API Nueva)
-        disable_web_page_preview: true // Bloquea la vista previa (API Legacy)
+        link_preview_options: { is_disabled: true }, 
+        disable_web_page_preview: true 
       };
       if (inline_keyboard.length > 0) payload.reply_markup = { inline_keyboard };
 
@@ -376,7 +375,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
-    // 🔥 FIX: AHORA SIN FILTROS PARA QUE LAS TAREAS DE GRUPOS SALGAN EN EL MERCADO
     if (action === 'get-tasks') {
       const targetId = String(userId);
       const { data: allTasks } = await supabase.from('tasks').select('*').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
@@ -554,12 +552,31 @@ export default async function handler(req, res) {
     }
 
     await tryGrantReferralReward(targetUser);
-    const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
-    const { data: totalTasks } = await supabase.from('tasks').select('completions_done').neq('type', 'publish_group');
-    const globalclicks = totalTasks ? totalTasks.reduce((acc, t) => acc + (t.completions_done || 0), 0) : 0;
+    
+    // 🔥 CALCULAR CLICKS GLOBALES Y RECIBIDOS REALES
+    const { data: totalTasks } = await supabase.from('tasks').select('completions_done, creator_id').neq('type', 'publish_group');
+    
+    let globalclicks = 0;
+    let receivedclicks = 0;
+    
+    if (totalTasks) {
+      totalTasks.forEach(t => {
+        const done = t.completions_done || 0;
+        globalclicks += done;
+        if (String(t.creator_id) === targetId) {
+          receivedclicks += done;
+        }
+      });
+    }
+
     const formattedGlobal = globalclicks >= 1000 ? (globalclicks / 1000).toFixed(1) + 'K' : globalclicks;
+    const formattedReceived = receivedclicks >= 1000 ? (receivedclicks / 1000).toFixed(1) + 'K' : receivedclicks;
 
     dbUser.global_clicks = formattedGlobal;
+    dbUser.received_clicks = formattedReceived;
+
+    const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
+    
     return res.status(200).json({ success: true, user: dbUser, stats: { n1: refCount || 0, c1: String(dbUser?.referral_earnings || 0) } });
 
   } catch (error) { return res.status(500).json({ success: false, error: error.message }); }
