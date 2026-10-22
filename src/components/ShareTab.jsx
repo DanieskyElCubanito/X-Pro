@@ -222,5 +222,4 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
     </div>
   );
 }
-
 export default ShareTab;
