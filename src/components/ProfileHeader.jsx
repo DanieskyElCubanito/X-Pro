@@ -81,7 +81,6 @@ export default function ProfileHeader({ userData, t, lang, setLang }) {
           <p style={{ margin: '2px 0 0 0', color: '#00f0ff', fontSize: '11px', fontWeight: '900' }}>ID: {userData.id}</p>
         </div>
 
-        {/* 🔥 AQUÍ ESTÁ EL RELOJITO DEL HISTORIAL Y EL ENGRANAJE DE AJUSTES */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
           <button onClick={openHistory} style={{ background: 'rgba(0, 240, 255, 0.1)', border: '1px solid #00f0ff', borderRadius: '12px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', cursor: 'pointer', boxShadow: '0 0 10px rgba(0, 240, 255, 0.3)', color: '#fff' }}>
             🕒
@@ -92,7 +91,6 @@ export default function ProfileHeader({ userData, t, lang, setLang }) {
         </div>
       </div>
 
-      {/* MODAL DEL HISTORIAL GLOBAL */}
       {showHistoryModal && (
         <div style={modalStyles.overlay}>
           <div className="fade-in" style={{...modalStyles.card, borderColor: '#ffe600'}}>
@@ -129,7 +127,6 @@ export default function ProfileHeader({ userData, t, lang, setLang }) {
         </div>
       )}
 
-      {/* MODAL DE AJUSTES E INFO */}
       {showInfoModal && (
         <div style={modalStyles.overlay}>
           <div className="fade-in" style={modalStyles.card}>
@@ -159,4 +156,37 @@ export default function ProfileHeader({ userData, t, lang, setLang }) {
                     <div style={{ fontSize: '11px', color: '#ccc', marginTop: '4px' }}>{t('support_idea_desc')} <b>@TheDannyWeb3</b>.</div>
                   </a>
                   <a href="https://t.me/TheDannyWeb3" target="_blank" rel="noopener noreferrer" style={{ ...modalStyles.linkBox, borderColor: '#ff1493', background: 'rgba(255, 20, 147, 0.1)' }}>
-                    <div style
+                    <div style={{ fontSize: '20px', marginBottom: '4px' }}>🐛</div>
+                    <div style={{ fontWeight: '900', color: '#ff41b4', fontSize: '14px' }}>{t('support_bug_title')}</div>
+                    <div style={{ fontSize: '11px', color: '#ccc', marginTop: '4px' }}>{t('support_bug_desc')} <b>@TheDannyWeb3</b>.</div>
+                  </a>
+                </div>
+              )}
+              {infoTab === 'about' && (
+                <div>
+                  <h4 style={{ color: '#ffe600', marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: '900' }}>{t('about_title')}</h4>
+                  <p style={{ marginBottom: '10px' }}>{t('about_p1')}</p>
+                  <p style={{ marginBottom: '10px' }}>{t('about_p2')}</p>
+                  <p>{t('about_p3')}</p>
+                  <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '11px', color: '#888' }}>Versión 1.0.0 (Build 2026)</div>
+                </div>
+              )}
+              {infoTab === 'terms' && (
+                <div>
+                  <h4 style={{ color: '#00ffaa', marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: '900' }}>{t('terms_title')}</h4>
+                  <p style={{ fontSize: '11px', marginBottom: '10px' }}>{t('terms_subtitle')}</p>
+                  <ul style={{ paddingLeft: '16px', margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <li>{t('terms_1')}</li>
+                    <li>{t('terms_2')}</li>
+                    <li>{t('terms_3')}</li>
+                    <li>{t('terms_4')}</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
