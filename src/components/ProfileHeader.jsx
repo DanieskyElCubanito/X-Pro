@@ -80,13 +80,12 @@ export default function ProfileHeader({ userData, t, lang, setLang }) {
           </h3>
           <p style={{ margin: '2px 0 6px 0', color: '#00f0ff', fontSize: '11px', fontWeight: '900' }}>ID: {userData.id}</p>
           
-          {/* 🔥 AQUÍ RESTAURAMOS LOS CLICKS GLOBALES Y RECIBIDOS */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <div style={{ background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', borderRadius: '6px', padding: '2px 6px', fontSize: '9px', color: '#00f0ff', fontWeight: '900', textTransform: 'uppercase' }}>
               🌍 {t('profile_global') || 'Globales'}: {userData.global_clicks || 0}
             </div>
             <div style={{ background: 'rgba(255, 20, 147, 0.1)', border: '1px solid rgba(255, 20, 147, 0.3)', borderRadius: '6px', padding: '2px 6px', fontSize: '9px', color: '#ff99dd', fontWeight: '900', textTransform: 'uppercase' }}>
-              ⚡ {t('profile_earned') || 'Recibidos'}: {Number(userData.total_earnings || 0).toFixed(0)}
+              ⚡ {t('profile_earned') || 'Recibidos'}: {userData.received_clicks || 0}
             </div>
           </div>
         </div>
