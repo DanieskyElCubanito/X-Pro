@@ -13,6 +13,8 @@ export const translations = {
     share_text: "⚡ ¡Entra a la red, publica en grupos y gana Puntos (CLICK) gratis! 🚀",
 
     // ProfileHeader
+    profile_global: "Globales",
+    profile_earned: "Recibidos",
     operator: "Operador Web3",
     verified: "VERIFICADO",
     support_tab: "SOPORTE",
