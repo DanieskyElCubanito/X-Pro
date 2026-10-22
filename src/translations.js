@@ -174,6 +174,8 @@ export const translations = {
     share_text: "⚡ Join the network, publish in groups and earn free Points (CLICK)! 🚀",
 
     // ProfileHeader
+    profile_global: "Global",
+    profile_earned: "Earned",
     operator: "Web3 Operator",
     verified: "VERIFIED",
     support_tab: "SUPPORT",
