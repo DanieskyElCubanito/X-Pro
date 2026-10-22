@@ -138,8 +138,9 @@ export default function PublishTab({ userData, setUserData, t }) {
       });
       const data = await res.json();
       if (data.success && data.history) {
-        // 🔥 FIX: AHORA MUESTRA TODO EL HISTORIAL DE PUBLICACIONES
-        setHistoryList(data.history);
+        // 🔥 FIX: AHORA SOLO MUESTRA HISTORIAL DE "PUBLICACIONES" A GRUPOS
+        const pubLogs = data.history.filter(h => h.title && h.title.includes('Publicación'));
+        setHistoryList(pubLogs);
       }
     } catch (e) {} finally {
       setLoadingHistory(false);
@@ -211,6 +212,7 @@ export default function PublishTab({ userData, setUserData, t }) {
       }
       toast.success("OK!", { id: tid });
       setPostText(''); setImageUrl(''); setButtonConfig({ text: '', url: '', style: 'default' }); setSelectedGroups([]); setStep(1);
+      fetchPublishHistory();
     } catch (err) { toast.error(err.message || "Error", { id: tid }); } 
     finally { setIsPublishing(false); }
   };
@@ -420,7 +422,6 @@ export default function PublishTab({ userData, setUserData, t }) {
         </>
       )}
 
-      {/* 🔥 FIX: SUB-PESTAÑA DE HISTORIAL REAL (MUY CLARA) */}
       {activeTab === 'history' && (
         <div className="fade-in">
           <div style={neonStyles.card}>
@@ -446,13 +447,13 @@ export default function PublishTab({ userData, setUserData, t }) {
             )}
 
             {/* SECCIÓN 2: HISTORIAL DE LOGS */}
-            <div style={{ fontSize: '11px', color: '#ff41b4', fontWeight: '900', marginBottom: '8px', textTransform: 'uppercase' }}>Historial Completo</div>
+            <div style={{ fontSize: '11px', color: '#ff41b4', fontWeight: '900', marginBottom: '8px', textTransform: 'uppercase' }}>Historial de Campañas</div>
             {loadingHistory ? (
               <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px' }}>Cargando...</div>
             ) : historyList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px 10px' }}>
                 <div style={{ fontSize: '36px', marginBottom: '8px' }}>📜</div>
-                <p style={{ fontSize: '12px', color: '#ff99dd', margin: '0 0 16px 0', lineHeight: '1.5' }}>{t('pub_history_desc')}</p>
+                <p style={{ fontSize: '12px', color: '#ff99dd', margin: '0 0 16px 0', lineHeight: '1.5' }}>No has realizado publicaciones a la red.</p>
                 <button onClick={() => setShowAddGroupModal(true)} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#00f0ff', border: '2px dashed #00f0ff', borderRadius: '16px', fontWeight: '900', fontSize: '13px', cursor: 'pointer' }}>
                   {t('pub_btn_add_group')}
                 </button>
