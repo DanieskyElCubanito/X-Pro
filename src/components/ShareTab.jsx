@@ -43,11 +43,10 @@ const neon = {
   refItem: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#120822', padding: '12px 14px', borderRadius: '14px',
-    border: '1px solid #3d1b63'
+    border: '1px solid #3d1b63', marginBottom: '8px'
   }
 };
 
-// 🔥 AÑADIMOS 't' A LOS PROPS
 function ShareTab({ stats, userId, totalReferralEarnings, t }) {
   const [referralsList, setReferralsList] = useState(stats?.referralsList || []);
   const [earnings, setEarnings] = useState(totalReferralEarnings || stats?.c1 || 0);
@@ -73,6 +72,10 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
   };
 
   const n1 = referralsList.length;
+  // Calculamos Activos y Pendientes
+  const activeCount = referralsList.filter(r => r.referral_reward_granted).length;
+  const pendingCount = n1 - activeCount;
+
   const totalEarned = parseFloat(earnings).toFixed(2);
   const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userId}`;
 
@@ -85,27 +88,30 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
 
   const handleShare = () => {
     if (!userId) return toast.error("Error");
-    // Tomamos el texto de invitación del diccionario
-    const text = t('share_text');
+    const text = t('share_text') || "⚡ ¡Entra a la red y gana CLICK gratis! 🚀";
     WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
   };
 
   return (
     <div className="fade-in" style={{ paddingBottom: '20px' }}>
 
-      {/* TARJETA INVITACIÓN */}
       <div style={neon.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
           <span style={{ fontSize: '24px', filter: 'drop-shadow(0 0 10px rgba(0, 240, 255, 0.4))' }}>👥</span>
           <h4 style={{ margin: 0, color: '#00f0ff', fontSize: '16px', fontWeight: '900', letterSpacing: '1px' }}>
-            {t('ref_title')}
+            {t('ref_title') || "PROGRAMA DE AFILIADOS"}
           </h4>
         </div>
 
+        {/* 🔥 CAJAS SEPARADAS PARA ACTIVOS Y PENDIENTES */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
-          <div style={{ ...neon.statBox, flex: 1 }}>
-            <div style={{ color: '#ff99dd', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>{t('ref_active_network')}</div>
-            <div style={{ color: '#ffe600', fontSize: '22px', fontWeight: '900' }}>{n1}</div>
+          <div style={{ ...neon.statBox, flex: 1, borderColor: '#00ffaa', background: 'rgba(0, 255, 170, 0.05)' }}>
+            <div style={{ color: '#00ffaa', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>ACTIVOS</div>
+            <div style={{ color: '#ffffff', fontSize: '22px', fontWeight: '900' }}>{activeCount}</div>
+          </div>
+          <div style={{ ...neon.statBox, flex: 1, borderColor: '#ffe600', background: 'rgba(255, 230, 0, 0.05)' }}>
+            <div style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>PENDIENTES</div>
+            <div style={{ color: '#ffffff', fontSize: '22px', fontWeight: '900' }}>{pendingCount}</div>
           </div>
           <button 
             onClick={fetchReferrals} 
@@ -113,25 +119,24 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
             style={{ ...neon.statBox, background: loading ? '#555' : '#2b0b47', border: '1px solid #ff41b4', padding: '10px', cursor: loading ? 'not-allowed' : 'pointer' }}
           >
             <div style={{ fontSize: '18px', animation: loading ? 'spin 1s linear infinite' : 'none' }}>🔄</div>
-            <div style={{ color: '#fff', fontSize: '9px', fontWeight: 'bold', marginTop: '4px' }}>{t('ref_update')}</div>
+            <div style={{ color: '#fff', fontSize: '9px', fontWeight: 'bold', marginTop: '4px' }}>{t('ref_update') || "ACTUALIZAR"}</div>
           </button>
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button style={{ ...neon.btnPrimary, flex: 1 }} onClick={handleShare}>
-            {t('ref_btn_invite')}
+            {t('ref_btn_invite') || "🚀 INVITAR"}
           </button>
           <button style={{ ...neon.btnOutline, flex: 1 }} onClick={handleCopy}>
-            {t('ref_btn_copy')}
+            {t('ref_btn_copy') || "📋 COPIAR"}
           </button>
         </div>
       </div>
 
-      {/* TARJETA DE ESTADÍSTICAS GLOBALES */}
       <div style={{ ...neon.card, borderColor: '#8a2be2' }}>
         <div style={neon.totalCard}>
           <div>
-            <p style={{ fontSize: '11px', color: '#ff99dd', margin: '0 0 4px 0', fontWeight: '900' }}>{t('ref_earnings_title')}</p>
+            <p style={{ fontSize: '11px', color: '#ff99dd', margin: '0 0 4px 0', fontWeight: '900' }}>{t('ref_earnings_title') || "GANANCIAS POR INVITADOS"}</p>
             <p style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
               {totalEarned} <span style={{ fontSize: '14px', color: '#ffe600' }}>CLICK</span>
             </p>
@@ -144,27 +149,31 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
         </div>
       </div>
 
-      {/* LISTA DE AFILIADOS DETALLADA */}
       <div style={{ ...neon.card, borderColor: '#ff41b4' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h4 style={{ color: '#00f0ff', fontSize: '15px', margin: 0, fontWeight: '900' }}>
-            {t('ref_network_title')} ({n1})
+            {t('ref_network_title') || "📊 Tu Red"} ({n1})
           </h4>
         </div>
 
         {loading && n1 === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px', fontWeight: 'bold' }}>{t('ref_syncing')}</div>
+          <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px', fontWeight: 'bold' }}>{t('ref_syncing') || "Sincronizando..."}</div>
         ) : n1 === 0 ? (
           <div style={{ textAlign: 'center', padding: '20px 0', backgroundColor: 'rgba(255, 65, 180, 0.05)', borderRadius: '14px', border: '1px dashed #ff41b4' }}>
             <span style={{ fontSize: '30px', display: 'block', marginBottom: '10px' }}>👻</span>
             <span style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', fontWeight: 'bold', whiteSpace: 'pre-wrap' }}>
-              {t('ref_empty_desc')}
+              {t('ref_empty_desc') || "Aún no tienes afiliados registrados."}
             </span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '5px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
             {referralsList.map((ref, idx) => {
               const avatarLetter = ref.username ? ref.username.charAt(0).toUpperCase() : 'U';
+              
+              // 🔥 CÁLCULO DE CUÁNTO HA GENERADO ESTE USUARIO: 1 CLICK de registro + 20% de lo que ha ganado.
+              const childTotal = Number(ref.total_earnings || 0);
+              const generatedFromTasks = childTotal * 0.20;
+              const generatedTotal = (ref.referral_reward_granted ? 1 : 0) + generatedFromTasks;
 
               return (
                 <div key={ref.id || idx} style={neon.refItem}>
@@ -179,20 +188,25 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
                       {avatarLetter}
                     </div>
                     <div>
-                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{ref.username || t('operator')}</div>
+                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{ref.username || t('operator') || "Usuario"}</div>
                       <div style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace' }}>ID: {ref.id}</div>
                     </div>
                   </div>
 
-                  {ref.referral_reward_granted ? (
-                    <span style={{ color: '#00ffaa', fontSize: '12px', fontWeight: '900', background: 'rgba(0, 255, 170, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px solid #00ffaa' }}>
-                      {t('ref_status_active')}
-                    </span>
-                  ) : (
-                    <span style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', background: 'rgba(255, 230, 0, 0.1)', padding: '4px 8px', borderRadius: '8px', border: '1px dashed #ffe600' }}>
-                      {t('ref_status_pending')}
-                    </span>
-                  )}
+                  <div style={{ textAlign: 'right' }}>
+                    {ref.referral_reward_granted ? (
+                      <span style={{ color: '#00ffaa', fontSize: '10px', fontWeight: '900', background: 'rgba(0, 255, 170, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px solid #00ffaa' }}>
+                        {t('ref_status_active') || "ACTIVO"}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', background: 'rgba(255, 230, 0, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px dashed #ffe600' }}>
+                        {t('ref_status_pending') || "PENDIENTE"}
+                      </span>
+                    )}
+                    <div style={{ color: '#00f0ff', fontSize: '12px', fontWeight: 'bold', marginTop: '6px' }}>
+                      Generado: +{generatedTotal.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -201,7 +215,7 @@ function ShareTab({ stats, userId, totalReferralEarnings, t }) {
 
         <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '12px', marginTop: '16px', border: '1px dashed #8a2be2' }}>
           <p style={{ textAlign: 'center', fontSize: '11px', color: '#00f0ff', margin: 0, lineHeight: '1.5', fontWeight: 'bold' }}>
-            {t('ref_footer_p1')} <strong style={{color: '#ffe600'}}>1.0 CLICK</strong> {t('ref_footer_p2')}<br/>+ <strong style={{color: '#00ffaa'}}>20%</strong> {t('ref_footer_p3')}
+            {t('ref_footer_p1') || "Recibes"} <strong style={{color: '#ffe600'}}>1.0 CLICK</strong> {t('ref_footer_p2') || "por cada afiliado verificado"}<br/>+ <strong style={{color: '#00ffaa'}}>20%</strong> {t('ref_footer_p3') || "de cada tarea que ellos completen."}
           </p>
         </div>
       </div>
