@@ -122,9 +122,6 @@ export default async function handler(req, res) {
 
     const { user, action, userId, start_param } = req.body; 
 
-    // ==========================================
-    // MODO DIOS: PANEL DE ADMINISTRACIÓN
-    // ==========================================
     if (action === 'admin-stats') {
       const { adminId } = req.body;
       if (!ADMIN_IDS.includes(String(adminId))) return res.status(403).json({ success: false });
@@ -160,9 +157,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, tasks: allTasks || [] });
     }
 
-    // ==========================================
-    // GRUPOS COMUNITARIOS (AÑADIR Y LEER)
-    // ==========================================
     if (action === 'add-publish-group') {
       const { url } = req.body;
       const targetId = String(userId);
@@ -196,9 +190,7 @@ export default async function handler(req, res) {
        return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
     }
 
-    // ==========================================
-    // PUBLICAR POST (ECONOMÍA JUSTA)
-    // ==========================================
+    // 🔥 FIX: ENLACES SIN VISTA PREVIA Y BOTONES CON ESTILOS
     if (action === 'publish-post') {
       const { userId: pubUserId, chatId, text, link, photoData, buttonConfig } = req.body;
       const targetId = String(pubUserId);
@@ -211,16 +203,33 @@ export default async function handler(req, res) {
       if (!dbUser || Number(dbUser.balance || 0) < COST_PER_GROUP) return res.status(400).json({ success: false, error: 'Saldo insuficiente.' });
 
       let inline_keyboard = [];
-      if (buttonConfig && buttonConfig.url) inline_keyboard.push([{ text: buttonConfig.text || "Abrir Enlace", url: buttonConfig.url }]);
-      else if (link) inline_keyboard.push([{ text: "Abrir App", url: link }]);
+      if (buttonConfig && buttonConfig.url) {
+        inline_keyboard.push([{ 
+          text: buttonConfig.text || "Abrir Enlace", 
+          url: buttonConfig.url,
+          style: buttonConfig.style !== 'default' ? buttonConfig.style : undefined,
+          color: buttonConfig.style !== 'default' ? buttonConfig.style : undefined
+        }]);
+      } else if (link) {
+        inline_keyboard.push([{ text: "Abrir App", url: link }]);
+      }
 
-      let payload = { chat_id: chatId, parse_mode: "HTML" };
+      let payload = { 
+        chat_id: chatId, 
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true }, // Bloquea la vista previa de los enlaces (API Nueva)
+        disable_web_page_preview: true // Bloquea la vista previa (API Legacy)
+      };
       if (inline_keyboard.length > 0) payload.reply_markup = { inline_keyboard };
 
       let tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
       if (photoData && photoData.startsWith('data:image')) {
-         tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`; payload.photo = photoData; payload.caption = text;
-      } else { payload.text = text; }
+         tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`; 
+         payload.photo = photoData; 
+         payload.caption = text;
+      } else { 
+         payload.text = text; 
+      }
 
       const tgRes = await fetch(tgEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const tgData = await tgRes.json();
@@ -229,7 +238,7 @@ export default async function handler(req, res) {
       if (!isOwner) {
         const newBalance = Number((dbUser.balance - COST_PER_GROUP).toFixed(2));
         await supabase.from('users').update({ balance: newBalance }).eq('id', targetId);
-        await supabase.from('history_logs').insert([{ user_id: targetId, title: '📢 Publicación de Campaña', description: `Envío al grupo ${chatId}.`, amount: -COST_PER_GROUP }]);
+        await supabase.from('history_logs').insert([{ user_id: targetId, title: '📢 Publicación de Campaña', description: `Pago por envío a ${chatId}.`, amount: -COST_PER_GROUP }]);
 
         if (groupInfo && groupInfo.creator_id) {
            const { data: owner } = await supabase.from('users').select('balance, total_earnings').eq('id', groupInfo.creator_id).single();
@@ -367,9 +376,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, task: newTask, balance: newBalance });
     }
 
-    // ==========================================
-    // OBTENER TAREAS (INCLUYENDO COMUNITARIAS Y RE-UNIÓN)
-    // ==========================================
+    // 🔥 FIX: AHORA SIN FILTROS PARA QUE LAS TAREAS DE GRUPOS SALGAN EN EL MERCADO
     if (action === 'get-tasks') {
       const targetId = String(userId);
       const { data: allTasks } = await supabase.from('tasks').select('*').or(`status.in.(active,paused),creator_id.eq.${targetId}`).order('created_at', { ascending: false });
@@ -387,7 +394,6 @@ export default async function handler(req, res) {
          });
       }
 
-      // Verificamos si en las comunitarias el usuario aún es miembro o se salió
       const communityTasks = (allTasks || []).filter(t => t.type === 'publish_group');
       const membershipMap = {};
       for (const cTask of communityTasks) {
@@ -416,9 +422,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, tasks: mappedTasks });
     }
 
-    // ==========================================
-    // COMPLETAR TAREA (SOPORTE COMUNITARIAS Y RE-UNIÓN)
-    // ==========================================
     if (action === 'complete-task') {
       const { taskId } = req.body; const targetId = String(userId);
       const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).single();
@@ -439,7 +442,6 @@ export default async function handler(req, res) {
          return res.status(400).json({ success: false, error: 'Ya completaste esta tarea.' });
       }
 
-      // Verificación de membresía en Telegram
       if (baseType === 'group' || baseType === 'channel' || isCommunity) {
         const chatId = extractTelegramUsername(task.url);
         if (chatId) {
@@ -448,7 +450,7 @@ export default async function handler(req, res) {
             const isBotStillAdmin = await checkAdminStatus(chatId);
             if (!isBotStillAdmin) {
               await supabase.from('tasks').update({ status: 'paused' }).eq('id', taskId);
-              return res.status(400).json({ success: false, error: 'El bot ya no es administrador del grupo. Campaña pausada.' });
+              return res.status(400).json({ success: false, error: 'El bot ya no es administrador del grupo. La campaña se ha pausado automáticamente.' });
             }
             return res.status(400).json({ success: false, error: 'No te has unido al canal o grupo.' });
           }
@@ -457,7 +459,6 @@ export default async function handler(req, res) {
         try { await axios.post(`https://api.telegram.org/bot${task.bot_token}/sendChatAction`, { chat_id: targetId, action: 'typing' }); } catch (e) { return res.status(400).json({ success: false, error: 'Asegúrate de darle a INICIAR (/start) al bot.' }); }
       }
 
-      // Reconciliación de re-unión en grupos comunitarios sin pagar de más
       if (isCommunity && alreadyDone) {
         return res.status(200).json({ success: true, is_rejoin: true, message: '¡Unión verificada!' });
       }
