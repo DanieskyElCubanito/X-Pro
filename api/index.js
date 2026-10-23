@@ -7,7 +7,7 @@ import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 
 const supabase = createClient(
   "https://klrargyceafqfitqyctd.supabase.co",
-  "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
+  "sb_secret_S_KbmVj8yZQaoDIzuSjpfw_sdrvS_KD",
   { auth: { persistSession: false }, realtime: { transport: WebSocket }, global: { WebSocket: WebSocket } }
 );
 
