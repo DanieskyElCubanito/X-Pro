@@ -11,7 +11,7 @@ const supabase = createClient(
   { auth: { persistSession: false }, realtime: { transport: WebSocket }, global: { WebSocket: WebSocket } }
 );
 
-const BOT_TOKEN = "8954086426:AAGNgUtmREvFLI2SAapaOroLuiy6_05nRlM";
+const BOT_TOKEN = "8954086426:AAEkDtxPVSRxhvtpBGkjkalusc4zby_tnIY";
 const BOT_ID = BOT_TOKEN.split(':')[0];
 const ADMIN_IDS = ['8968109534', '8892196101'];
 const MAIN_ADMIN_ID = '8968109534'; 
