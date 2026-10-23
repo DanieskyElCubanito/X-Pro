@@ -6,7 +6,7 @@ import { TonClient, WalletContractV4, internal } from '@ton/ton';
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 
 const supabase = createClient(
-  "https://shfogfihzkwmusarhlxv.supabase.co",
+  "https://klrargyceafqfitqyctd.supabase.co",
   "sb_secret_g_KaYGOEQVt0EOYcFENy7g_gzGYQfdx",
   { auth: { persistSession: false }, realtime: { transport: WebSocket }, global: { WebSocket: WebSocket } }
 );
