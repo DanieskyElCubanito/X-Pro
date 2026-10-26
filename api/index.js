@@ -552,13 +552,12 @@ export default async function handler(req, res) {
     }
 
     await tryGrantReferralReward(targetUser);
-    
-    // 🔥 CALCULAR CLICKS GLOBALES Y RECIBIDOS REALES
-    const { data: totalTasks } = await supabase.from('tasks').select('completions_done, creator_id').neq('type', 'publish_group');
-    
+
+    const { data: totalTasks } = await supabase.from('tasks').select('completions_done, creator_id');
+
     let globalclicks = 0;
     let receivedclicks = 0;
-    
+
     if (totalTasks) {
       totalTasks.forEach(t => {
         const done = t.completions_done || 0;
@@ -576,7 +575,7 @@ export default async function handler(req, res) {
     dbUser.received_clicks = formattedReceived;
 
     const { count: refCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('referred_by', targetId);
-    
+
     return res.status(200).json({ success: true, user: dbUser, stats: { n1: refCount || 0, c1: String(dbUser?.referral_earnings || 0) } });
 
   } catch (error) { return res.status(500).json({ success: false, error: error.message }); }
