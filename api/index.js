@@ -190,8 +190,8 @@ export default async function handler(req, res) {
        return res.status(200).json({ success: true, communityGroups: dbGroups || [] });
     }
 
-    if (action === 'publish-post') {
-      const { userId: pubUserId, chatId, text, link, photoData, buttonConfig } = req.body;
+        if (action === 'publish-post') {
+      const { userId: pubUserId, chatId, text, link, buttonConfig } = req.body;
       const targetId = String(pubUserId);
 
       const { data: groupInfo } = await supabase.from('tasks').select('creator_id').eq('type', 'publish_group').eq('url', chatId).maybeSingle();
@@ -216,21 +216,19 @@ export default async function handler(req, res) {
       let payload = { 
         chat_id: chatId, 
         parse_mode: "HTML",
+        text: text, // Forzamos texto plano seguro
         link_preview_options: { is_disabled: true }, 
         disable_web_page_preview: true 
       };
+      
       if (inline_keyboard.length > 0) payload.reply_markup = { inline_keyboard };
 
-      let tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-      if (photoData && photoData.startsWith('data:image')) {
-         tgEndpoint = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`; 
-         payload.photo = photoData; 
-         payload.caption = text;
-      } else { 
-         payload.text = text; 
-      }
-
-      const tgRes = await fetch(tgEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const tgRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+      });
+      
       const tgData = await tgRes.json();
       if (!tgData.ok) return res.status(400).json({ success: false, error: tgData.description });
 
