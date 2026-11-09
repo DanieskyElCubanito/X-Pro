@@ -2,9 +2,6 @@ export const translations = {
   es: {
     // App & BottomNav
     loading: "INICIANDO SISTEMA...",
-    access_interrupted: "Conexión Perdida",
-    access_denied: "Acceso denegado: El protocolo de seguridad requiere iniciar desde el cliente oficial de Telegram.",
-    retry: "🔄 RECONECTAR",
     nav_home: "Panel",
     nav_goods: "Zapatillas",
     nav_team: "Equipo",
@@ -12,8 +9,7 @@ export const translations = {
     nav_user: "Perfil",
     nav_admin: "Comando",
     share_text: "¡Únete a mi equipo en la mejor plataforma Web3 de inversión de zapatillas en Telegram y genera USDT diarios!",
-    connection_error: "Error de conexión con el servidor",
-
+    
     // ProfileHeader
     profile_global: "Globales",
     profile_earned: "Recibidos",
@@ -118,9 +114,6 @@ export const translations = {
   en: {
     // App & BottomNav
     loading: "INITIALIZING SYSTEM...",
-    access_interrupted: "Signal Lost",
-    access_denied: "Access denied: Security protocol requires launching from the official Telegram client.",
-    retry: "🔄 REESTABLISH CONNECTION",
     nav_home: "Dashboard",
     nav_goods: "Sneakers",
     nav_team: "Team",
@@ -128,8 +121,7 @@ export const translations = {
     nav_user: "Profile",
     nav_admin: "Command",
     share_text: "Join my squad on the premier Web3 sneaker investment platform on Telegram and earn daily USDT!",
-    connection_error: "Server connection error",
-
+    
     // ProfileHeader
     profile_global: "Global",
     profile_earned: "Earned",
