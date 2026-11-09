@@ -4,7 +4,6 @@ import toast, { Toaster } from 'react-hot-toast';
  
 import { translations } from './translations'; 
 
-import ProfileHeader from './components/ProfileHeader';
 import HomeTab from './components/HomeTab';        
 import GoodsTab from './components/GoodsTab';      
 import TeamTab from './components/TeamTab';        
@@ -30,7 +29,6 @@ const neonTheme = {
 };
 
 function App() {
-  // 🔥 MODO DIOS ACTIVADO: Arrancamos directo en 'member' con usuario falso. Cero bloqueos.
   const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState({
     id: "999999",
@@ -63,18 +61,12 @@ function App() {
       <Toaster position="top-center" toastOptions={{ style: { background: '#120422', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)', fontWeight: '900', fontSize: '14px', borderRadius: '16px' } }} />
       
       <div style={neonTheme.main}>
-        {/* ESTILOS DE ANIMACIÓN GLOBALES */}
         <style>{`
           .fade-in { animation: fadeIn 0.4s ease-out forwards; }
           @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         `}</style>
 
-        {(activeTab !== 'user' && activeTab !== 'admin') && (
-          <div className="fade-in" style={{ marginBottom: '20px' }}>
-            <ProfileHeader userData={userData} t={t} lang={lang} setLang={setLang} />
-          </div>
-        )}
-
+        {/* LAS PESTAÑAS (El perfil ahora solo vive dentro de UserTab) */}
         {activeTab === 'home' && <div className="fade-in"><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} t={t} /></div>}
         {activeTab === 'goods' && <div className="fade-in"><GoodsTab userData={userData} setUserData={setUserData} t={t} /></div>}
         {activeTab === 'team' && <div className="fade-in"><TeamTab userData={userData} t={t} /></div>}
