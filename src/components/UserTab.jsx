@@ -1,5 +1,5 @@
 import React from 'react';
-import ProfileHeader from './ProfileHeader'; 
+import ProfileHeader from './ProfileHeader';
 
 export default function UserTab({ userData, t, lang, setLang }) {
   return (
