@@ -1,6 +1,6 @@
  import { useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
-import toast, { Toaster } from 'react-hot-toast'; 
+import toast, { Toaster } from 'react-hot-toast';  
  
 // Archivos de la app (Asegúrate de renombrar/crear estos componentes)
 import { botApi } from './api/botApi';
