@@ -1,17 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
 import WebApp from '@twa-dev/sdk';
-import toast, { Toaster } from 'react-hot-toast'; 
+import toast, { Toaster } from 'react-hot-toast';  
  
-// Archivos de la app (Asegúrate de renombrar/crear estos componentes)
 import { botApi } from './api/botApi';
 import { translations } from './translations'; 
 
 import ProfileHeader from './components/ProfileHeader';
-import HomeTab from './components/HomeTab';        // "Home"
-import GoodsTab from './components/GoodsTab';      // "Goods" (Antes Ads/Publish)
-import TeamTab from './components/TeamTab';        // "Team" (Antes ShareTab)
-import EarnTab from './components/EarnTab';        // "Earn" (Antes AdsTab)
-import UserTab from './components/UserTab';        // "User" (Perfil completo)
+import HomeTab from './components/HomeTab';        
+import GoodsTab from './components/GoodsTab';      
+import TeamTab from './components/TeamTab';        
+import EarnTab from './components/EarnTab';        
+import UserTab from './components/UserTab';        
 import BottomNav from './components/BottomNav';
 import AdminDashboard from './components/AdminDashboard';
 
@@ -57,7 +56,7 @@ const neonTheme = {
 
 function App() {
   const [status, setStatus] = useState('loading'); 
-  const [activeTab, setActiveTab] = useState('home'); // Tabs: home, goods, team, earn, user, admin
+  const [activeTab, setActiveTab] = useState('home'); 
   const [userData, setUserData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -66,9 +65,25 @@ function App() {
 
   const t = (key) => translations[lang]?.[key] || key;
 
-  // 🔥 LÓGICA DE VERIFICACIÓN LIMPIA (Sin FingerprintJS, solo Telegram ID)
+  // 🔥 LÓGICA DE VERIFICACIÓN CON BYPASS TOTAL PARA NAVEGADOR
   const verifyUser = async (teleUser, startParam) => {
     try {
+      // Si detectamos que es el usuario de prueba (Navegador), no llamamos al backend
+      if (teleUser.id === "999999") {
+        setUserData({
+          id: "999999",
+          username: "DevTester (PC)",
+          balance: 5000, 
+          total_earnings: 150,
+          global_clicks: "1.5K",
+          received_clicks: 250,
+          is_human: true
+        });
+        setStatus('member');
+        return; // Salimos de la función aquí, evitando el error de conexión
+      }
+
+      // Si entra desde Telegram real, consulta al backend
       const res = await fetch('/api', {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +123,7 @@ function App() {
           localStorage.setItem('click_lang', detectedLang);
         }
 
-        // 🔥 En entorno de desarrollo (fuera de TG), creamos un usuario de prueba
+        // 🔥 Detectar navegador y enviar datos falsos al verificador
         if (!user || !initData) { 
            console.warn("Ejecutando en navegador: Usando usuario de prueba.");
            const mockUser = { id: "999999", username: "DevTester", language_code: "es" };
@@ -161,14 +176,12 @@ function App() {
       <Toaster position="top-center" toastOptions={{ style: { background: '#120422', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)', fontWeight: '900', fontSize: '14px', borderRadius: '16px' } }} />
       
       <div style={neonTheme.main}>
-        {/* CABECERA GLOBAL (Muestra saldo y perfil. Si quieres moverla dentro de la pestaña User, quítala de aquí) */}
         {(activeTab !== 'user' && activeTab !== 'admin') && (
           <div className="fade-in" style={{ marginBottom: '20px' }}>
             <ProfileHeader userData={userData} t={t} lang={lang} setLang={setLang} />
           </div>
         )}
 
-        {/* PESTAÑAS (Gamificadas con fade-in) */}
         {activeTab === 'home' && <div className="fade-in"><HomeTab userData={userData} setUserData={setUserData} setActiveTab={setActiveTab} t={t} /></div>}
         {activeTab === 'goods' && <div className="fade-in"><GoodsTab userData={userData} setUserData={setUserData} t={t} /></div>}
         {activeTab === 'team' && <div className="fade-in"><TeamTab userData={userData} t={t} /></div>}
@@ -177,7 +190,6 @@ function App() {
         {activeTab === 'admin' && <div className="fade-in"><AdminDashboard userData={userData} t={t} /></div>}
       </div>
 
-      {/* NUEVA BARRA DE NAVEGACIÓN */}
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} userData={userData} t={t} />
     </div>
   );
