@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
-
+ 
 const supabase = createClient(
   "https://shfogfihzkwmusarhlxv.supabase.co",
   "sb_secret_iJuny6yxjMzqrSj_hoMmJA_SoJhjYu5",
