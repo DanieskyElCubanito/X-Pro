@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import toast, { Toaster } from 'react-hot-toast';  
  
-import { botApi } from './api/botApi';
 import { translations } from './translations'; 
 
 import ProfileHeader from './components/ProfileHeader';
@@ -27,155 +26,49 @@ const neonTheme = {
     padding: '16px 16px 110px 16px', boxSizing: 'border-box', 
     overflowY: 'auto', WebkitOverflowScrolling: 'touch',
     scrollBehavior: 'smooth'
-  },
-  center: { 
-    minHeight: '100vh', display: 'flex', flexDirection: 'column', 
-    alignItems: 'center', justifyContent: 'center', backgroundColor: '#05010d', 
-    backgroundImage: 'radial-gradient(circle at center, #1b0730 0%, #05010d 85%)', 
-    padding: '24px', textAlign: 'center', boxSizing: 'border-box' 
-  },
-  loaderGlow: { 
-    width: '60px', height: '60px', borderRadius: '50%', 
-    border: '4px solid rgba(0, 240, 255, 0.1)', borderTopColor: '#00f0ff', 
-    borderRightColor: '#ff1493', animation: 'spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite', 
-    boxShadow: '0 0 30px rgba(0, 240, 255, 0.6), inset 0 0 20px rgba(255, 20, 147, 0.4)' 
-  },
-  errorCard: { 
-    background: 'linear-gradient(145deg, rgba(20, 5, 40, 0.9), rgba(10, 2, 20, 0.95))', 
-    border: '2px solid #ff1493', borderRadius: '24px', padding: '30px 20px', 
-    maxWidth: '340px', boxShadow: '0 0 35px rgba(255, 20, 147, 0.4)',
-    transform: 'translateY(0)', animation: 'float 3s ease-in-out infinite'
-  },
-  btnRetry: { 
-    marginTop: '24px', padding: '14px 32px', background: 'linear-gradient(90deg, #ff1493, #8a2be2)', 
-    color: '#fff', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '15px', 
-    letterSpacing: '1px', cursor: 'pointer', boxShadow: '0 6px 20px rgba(255, 20, 147, 0.5)',
-    transition: 'transform 0.2s', textTransform: 'uppercase'
   }
 };
 
 function App() {
-  const [status, setStatus] = useState('loading'); 
+  // 🔥 MODO DIOS ACTIVADO: Arrancamos directo en 'member' con usuario falso. Cero bloqueos.
   const [activeTab, setActiveTab] = useState('home'); 
-  const [userData, setUserData] = useState(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [userData, setUserData] = useState({
+    id: "999999",
+    username: "DevTester (Navegador)",
+    balance: 5000, 
+    total_earnings: 150,
+    global_clicks: "1.5K",
+    received_clicks: 250,
+    is_human: true
+  });
 
   const [lang, setLang] = useState(localStorage.getItem('click_lang') || 'es');
-  const initialized = useRef(false);
 
   const t = (key) => translations[lang]?.[key] || key;
 
-  // 🔥 LÓGICA DE VERIFICACIÓN CON BYPASS TOTAL PARA NAVEGADOR
-  const verifyUser = async (teleUser, startParam) => {
-    try {
-      // Si detectamos que es el usuario de prueba (Navegador), no llamamos al backend
-      if (teleUser.id === "999999") {
-        setUserData({
-          id: "999999",
-          username: "DevTester (PC)",
-          balance: 5000, 
-          total_earnings: 150,
-          global_clicks: "1.5K",
-          received_clicks: 250,
-          is_human: true
-        });
-        setStatus('member');
-        return; // Salimos de la función aquí, evitando el error de conexión
-      }
-
-      // Si entra desde Telegram real, consulta al backend
-      const res = await fetch('/api', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-user', user: teleUser, start_param: startParam })
-      });
-      const data = await res.json();
-
-      if (data && data.success && data.user) {
-        setUserData(data.user);
-        setStatus('member');
-      } else {
-        setErrorMessage(data?.message || data?.error || t('access_denied'));
-        setStatus('error');
-      }
-    } catch (err) {
-      setErrorMessage(t('connection_error') || "Error de conexión");
-      setStatus('error');
-    }
-  };
-
   useEffect(() => {
-    if (initialized.current) return;
-    const initTimer = setTimeout(() => {
-      try {
-        WebApp.ready(); WebApp.expand();
-        WebApp.setHeaderColor('#05010d');
-        WebApp.setBackgroundColor('#05010d');
-        if (WebApp.disableVerticalSwipes) WebApp.disableVerticalSwipes();
-        
-        const user = WebApp.initDataUnsafe?.user;
-        const initData = WebApp.initData;
-        const inviterId = WebApp.initDataUnsafe?.start_param;
-
-        if (!localStorage.getItem('click_lang') && user?.language_code) {
-          const detectedLang = user.language_code.startsWith('es') ? 'es' : 'en';
-          setLang(detectedLang);
-          localStorage.setItem('click_lang', detectedLang);
-        }
-
-        // 🔥 Detectar navegador y enviar datos falsos al verificador
-        if (!user || !initData) { 
-           console.warn("Ejecutando en navegador: Usando usuario de prueba.");
-           const mockUser = { id: "999999", username: "DevTester", language_code: "es" };
-           verifyUser(mockUser, null);
-           initialized.current = true;
-           return;
-        }
-
-        initialized.current = true;
-        verifyUser(user, inviterId);
-      } catch (e) { setErrorMessage("Error de SDK"); setStatus('error'); }
-    }, 150);
-    return () => clearTimeout(initTimer);
+    try {
+      WebApp.ready(); 
+      WebApp.expand();
+      WebApp.setHeaderColor('#05010d');
+      WebApp.setBackgroundColor('#05010d');
+      if (WebApp.disableVerticalSwipes) WebApp.disableVerticalSwipes();
+    } catch (e) { 
+      console.log("No estamos en Telegram. Cargando en navegador..."); 
+    }
   }, []);
-
-  if (status === 'loading') {
-    return (
-      <div style={neonTheme.center}>
-        <style>{`
-          @keyframes spin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.1); } 100% { transform: rotate(360deg) scale(1); } }
-          @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-          @keyframes pulseText { 0% { opacity: 0.6; text-shadow: 0 0 10px #00f0ff; } 50% { opacity: 1; text-shadow: 0 0 25px #00f0ff; } 100% { opacity: 0.6; text-shadow: 0 0 10px #00f0ff; } }
-          .fade-in { animation: fadeIn 0.4s ease-out forwards; }
-          @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        `}</style>
-        <div style={neonTheme.loaderGlow}></div>
-        <p style={{ marginTop: '28px', fontSize: '16px', fontWeight: '900', color: '#00f0ff', letterSpacing: '2px', textTransform: 'uppercase', animation: 'pulseText 2s infinite' }}>
-          {t('loading') || "Cargando..."}
-        </p>
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div style={neonTheme.center}>
-        <style>{`@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }`}</style>
-        <div style={neonTheme.errorCard}>
-          <div style={{ fontSize: '48px', marginBottom: '12px', filter: 'drop-shadow(0 0 15px #ff1493)' }}>⚠️</div>
-          <h2 style={{ color: '#fff', margin: '0 0 12px 0', fontSize: '22px', fontWeight: '900', textTransform: 'uppercase' }}>{t('access_interrupted') || "Error de Acceso"}</h2>
-          <p style={{ color: '#ff99dd', fontSize: '14px', lineHeight: '1.6', margin: 0, fontWeight: 'bold' }}>{errorMessage}</p>
-          <button style={neonTheme.btnRetry} onClick={() => window.location.reload()}>🔄 {t('retry') || "REINTENTAR"}</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={neonTheme.container}>
       <Toaster position="top-center" toastOptions={{ style: { background: '#120422', color: '#fff', border: '2px solid #00f0ff', boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)', fontWeight: '900', fontSize: '14px', borderRadius: '16px' } }} />
       
       <div style={neonTheme.main}>
+        {/* ESTILOS DE ANIMACIÓN GLOBALES */}
+        <style>{`
+          .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+          @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        `}</style>
+
         {(activeTab !== 'user' && activeTab !== 'admin') && (
           <div className="fade-in" style={{ marginBottom: '20px' }}>
             <ProfileHeader userData={userData} t={t} lang={lang} setLang={setLang} />
