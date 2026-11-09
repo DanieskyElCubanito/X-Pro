@@ -7,31 +7,37 @@ const TabIcons = {
       <path d="M9 22V12h6v10" />
     </svg>
   ),
-  tasks: (
+  goods: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(0,240,255,0.5))' }}>
-      <rect x="5" y="4" width="14" height="17" rx="2" />
-      <path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z" />
-      <line x1="9" y1="10" x2="15" y2="10" />
-      <line x1="9" y1="14" x2="15" y2="14" />
-      <line x1="9" y1="18" x2="13" y2="18" />
+      <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
+      <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
+      <path d="M18 14h-8" />
+      <path d="M18 18h-8" />
     </svg>
   ),
-  publish: (
+  team: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00ffaa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(0,255,170,0.5))' }}>
-      <path d="M22 2L11 13" />
-      <polygon points="22 2 15 22 11 13 2 9 22 2" fill="none" />
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
-  referrals: (
+  earn: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(255,230,0,0.5))' }}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v8" />
+      <path d="M8 12h8" />
+    </svg>
+  ),
+  user: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8a2be2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(138,43,226,0.5))' }}>
-      <circle cx="9" cy="7" r="3.5" />
-      <path d="M2 19a7 7 0 0 1 14 0v1H2v-1z" />
-      <circle cx="17" cy="8" r="2.5" />
-      <path d="M16 14.5a5.5 5.5 0 0 1 6 4.5v1h-3" />
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
     </svg>
   ),
   admin: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(255,230,0,0.5))' }}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff1493" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(255,20,147,0.5))' }}>
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
   )
@@ -41,22 +47,23 @@ export default function BottomNav({ activeTab, setActiveTab, userData, t }) {
   const ADMIN_IDS = ['8968109534', '8968109534'];
   const isAdmin = userData && ADMIN_IDS.includes(String(userData.id));
 
-  // 🔥 Se usan las traducciones
+  // 🔥 Se usan las traducciones (asegúrate de que en translations.js existan estos keys)
   const tabs = [
     { id: 'home', label: t('nav_home'), icon: TabIcons.home, color: '#ff41b4' },
-    { id: 'tasks', label: t('nav_tasks'), icon: TabIcons.tasks, color: '#00f0ff' },
-    { id: 'publish', label: t('nav_publish'), icon: TabIcons.publish, color: '#00ffaa' },
-    { id: 'referrals', label: t('nav_referrals'), icon: TabIcons.referrals, color: '#8a2be2' }
+    { id: 'goods', label: t('nav_goods'), icon: TabIcons.goods, color: '#00f0ff' },
+    { id: 'team', label: t('nav_team'), icon: TabIcons.team, color: '#00ffaa' },
+    { id: 'earn', label: t('nav_earn'), icon: TabIcons.earn, color: '#ffe600' },
+    { id: 'user', label: t('nav_user'), icon: TabIcons.user, color: '#8a2be2' }
   ];
 
   if (isAdmin) {
-    tabs.push({ id: 'admin', label: t('nav_admin'), icon: TabIcons.admin, color: '#ffe600' });
+    tabs.push({ id: 'admin', label: t('nav_admin'), icon: TabIcons.admin, color: '#ff1493' });
   }
 
   return (
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
-      backgroundColor: 'rgba(10, 3, 20, 0.95)', backdropFilter: 'blur(16px)',
+      backgroundColor: 'rgba(5, 1, 13, 0.95)', backdropFilter: 'blur(16px)',
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
       padding: '8px 8px 16px 8px', borderTop: '2px solid #8a2be2',
       boxShadow: '0 -4px 20px rgba(138, 43, 226, 0.3)', zIndex: 99999, userSelect: 'none'
