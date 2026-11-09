@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; 
 import toast, { Toaster } from 'react-hot-toast';
 import WebApp from '@twa-dev/sdk';
 
