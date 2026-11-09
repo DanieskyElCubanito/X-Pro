@@ -1,225 +1,128 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { botApi } from '../api/botApi';
 import WebApp from '@twa-dev/sdk';
 
-const neon = {
-  card: {
-    background: 'linear-gradient(145deg, rgba(46, 16, 77, 0.85), rgba(20, 8, 38, 0.95))',
-    border: '2px solid #00f0ff',
-    borderRadius: '24px',
-    padding: '20px',
-    marginBottom: '16px',
-    boxShadow: '0 8px 24px rgba(0, 240, 255, 0.15)'
-  },
-  btnPrimary: {
-    width: '100%', padding: '14px', background: 'linear-gradient(180deg, #ff66cc 0%, #ff1493 50%, #d80073 100%)',
-    color: '#ffffff', border: 'none', borderRadius: '16px', fontWeight: '900', fontSize: '14px',
-    cursor: 'pointer', boxShadow: '0 6px 0 #8b004b, 0 10px 20px rgba(255, 20, 147, 0.4)'
-  },
-  btnOutline: {
-    width: '100%', padding: '14px', background: 'rgba(0, 240, 255, 0.1)',
-    color: '#00f0ff', border: '2px solid #00f0ff', borderRadius: '16px', fontWeight: '900', fontSize: '14px',
-    cursor: 'pointer', boxShadow: '0 0 15px rgba(0, 240, 255, 0.2)'
-  },
-  statBox: {
-    background: 'rgba(15, 5, 28, 0.8)',
-    border: '1px solid #8a2be2',
-    borderRadius: '16px',
-    padding: '14px 10px',
-    textAlign: 'center',
-    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)'
-  },
-  totalCard: {
-    background: 'linear-gradient(90deg, #ff1493 0%, #8a2be2 100%)',
-    padding: '18px 20px',
-    borderRadius: '20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    boxShadow: '0 6px 20px rgba(255, 20, 147, 0.35)',
-    border: '2px solid rgba(255,255,255,0.2)'
-  },
-  refItem: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#120822', padding: '12px 14px', borderRadius: '14px',
-    border: '1px solid #3d1b63', marginBottom: '8px'
-  }
-};
+export default function TeamTab({ userData, t }) {
+  // Enlace de invitación dinámico basado en el ID del usuario
+  const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userData?.id || '999999'}`;
 
-function ShareTab({ stats, userId, totalReferralEarnings, t }) {
-  const [referralsList, setReferralsList] = useState(stats?.referralsList || []);
-  const [earnings, setEarnings] = useState(totalReferralEarnings || stats?.c1 || 0);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (userId) fetchReferrals();
-  }, [userId]);
-
-  const fetchReferrals = async () => {
-    setLoading(true);
-    try {
-      const data = await botApi.getReferrals(userId);
-      if (data && data.success) {
-        setReferralsList(data.referrals || []);
-        setEarnings(data.earnings || 0);
-      }
-    } catch (error) {
-      console.error("Error fetching referrals.");
-    } finally {
-      setLoading(false);
-    }
+  // Datos simulados para la interfaz (luego los conectaremos al backend)
+  const stats = {
+    totalTeam: 24,
+    totalInvestors: 7,
+    rechargeCommission: 145.50
   };
 
-  const n1 = referralsList.length;
-  // Calculamos Activos y Pendientes
-  const activeCount = referralsList.filter(r => r.referral_reward_granted).length;
-  const pendingCount = n1 - activeCount;
-
-  const totalEarned = parseFloat(earnings).toFixed(2);
-  const inviteLink = `https://t.me/ClickNetworkbot/app?startapp=${userId}`;
-
-  const handleCopy = () => {
-    if (!userId) return toast.error("Error");
-    navigator.clipboard.writeText(inviteLink)
-      .then(() => toast.success(t('ref_toast_copy_ok') || "¡Enlace copiado!"))
-      .catch(() => toast.error(t('ref_toast_copy_fail') || "Error al copiar"));
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    toast.success('¡Enlace de invitación copiado!');
   };
 
-  const handleShare = () => {
-    if (!userId) return toast.error("Error");
-    const text = t('share_text') || "⚡ ¡Entra a la red y gana CLICK gratis! 🚀";
-    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(text)}`);
+  const shareTelegram = () => {
+    const text = encodeURIComponent("¡Únete a mi equipo en ClickSneakers y gana 2% diario en USDT!");
+    WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${text}`);
+  };
+
+  const shareWhatsApp = () => {
+    const text = encodeURIComponent(`¡Únete a mi equipo en ClickSneakers y gana 2% diario en USDT! Únete aquí: ${inviteLink}`);
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  const shareTwitter = () => {
+    const text = encodeURIComponent("¡Gana 2% diario en USDT con Web3 Sneakers! Únete a mi equipo en Telegram 👇");
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(inviteLink)}`, '_blank');
+  };
+
+  const styles = {
+    container: { paddingBottom: '20px' },
+    sectionTitle: { color: '#fff', fontSize: '16px', fontWeight: '900', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' },
+    
+    // Tarjeta de Promoción
+    promoCard: { background: 'linear-gradient(145deg, rgba(20,5,40,0.9), rgba(10,2,20,0.95))', border: '2px solid #00ffaa', borderRadius: '24px', padding: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0, 255, 170, 0.2)', marginBottom: '24px', textAlign: 'center' },
+    promoGlow: { position: 'absolute', top: '-50%', left: '50%', transform: 'translateX(-50%)', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(0, 255, 170, 0.2) 0%, transparent 70%)', pointerEvents: 'none' },
+    promoTitle: { margin: '0 0 16px 0', color: '#00ffaa', fontSize: '20px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' },
+    linkBox: { background: 'rgba(0,0,0,0.4)', border: '1px dashed #00ffaa', borderRadius: '12px', padding: '14px', color: '#fff', fontSize: '13px', wordBreak: 'break-all', marginBottom: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' },
+    copyBtn: { width: '100%', background: 'linear-gradient(90deg, #00ffaa, #00b377)', border: 'none', borderRadius: '12px', padding: '14px', color: '#000', fontSize: '14px', fontWeight: '900', cursor: 'pointer', textTransform: 'uppercase', boxShadow: '0 4px 15px rgba(0, 255, 170, 0.4)' },
+
+    // Estadísticas del Equipo
+    statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' },
+    statBox: (color) => ({ background: 'rgba(0,0,0,0.3)', border: `1px solid ${color}40`, borderRadius: '16px', padding: '16px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px' }),
+    statLabel: { color: '#aaa', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' },
+    statValue: (color) => ({ color: color, fontSize: '24px', fontWeight: '900', textShadow: `0 0 10px ${color}50` }),
+    
+    // Comisiones por Recarga
+    rebateBox: { background: 'rgba(255, 20, 147, 0.1)', border: '1px solid #ff1493', borderRadius: '16px', padding: '20px', textAlign: 'center', marginBottom: '24px', boxShadow: '0 4px 15px rgba(255, 20, 147, 0.15)' },
+
+    // Social Promotion
+    socialGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '24px' },
+    socialBtn: (color) => ({ background: `${color}15`, border: `1px solid ${color}`, borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: 'transform 0.2s', boxShadow: `0 4px 10px ${color}20` }),
+    socialIcon: { fontSize: '24px' },
+    socialText: (color) => ({ color: color, fontSize: '11px', fontWeight: '900', textTransform: 'uppercase' })
   };
 
   return (
-    <div className="fade-in" style={{ paddingBottom: '20px' }}>
-
-      <div style={neon.card}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-          <span style={{ fontSize: '24px', filter: 'drop-shadow(0 0 10px rgba(0, 240, 255, 0.4))' }}>👥</span>
-          <h4 style={{ margin: 0, color: '#00f0ff', fontSize: '16px', fontWeight: '900', letterSpacing: '1px' }}>
-            {t('ref_title') || "PROGRAMA DE AFILIADOS"}
-          </h4>
+    <div style={styles.container}>
+      
+      {/* MY PROMOTION CARD */}
+      <div className="fade-in" style={styles.promoCard}>
+        <div style={styles.promoGlow}></div>
+        <h3 style={styles.promoTitle}>💳 My Promotion Card</h3>
+        <p style={{ color: '#aaa', fontSize: '12px', marginBottom: '16px' }}>Comparte tu enlace y gana hasta un 20% de las inversiones de tus referidos directos.</p>
+        
+        <div style={styles.linkBox}>
+          <span>{inviteLink}</span>
         </div>
+        
+        <button style={styles.copyBtn} onClick={handleCopyLink}>
+          📋 Copiar Enlace
+        </button>
+      </div>
 
-        {/* 🔥 CAJAS SEPARADAS PARA ACTIVOS Y PENDIENTES */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '18px' }}>
-          <div style={{ ...neon.statBox, flex: 1, borderColor: '#00ffaa', background: 'rgba(0, 255, 170, 0.05)' }}>
-            <div style={{ color: '#00ffaa', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>ACTIVOS</div>
-            <div style={{ color: '#ffffff', fontSize: '22px', fontWeight: '900' }}>{activeCount}</div>
-          </div>
-          <div style={{ ...neon.statBox, flex: 1, borderColor: '#ffe600', background: 'rgba(255, 230, 0, 0.05)' }}>
-            <div style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', letterSpacing: '0.5px', marginBottom: '4px' }}>PENDIENTES</div>
-            <div style={{ color: '#ffffff', fontSize: '22px', fontWeight: '900' }}>{pendingCount}</div>
-          </div>
-          <button 
-            onClick={fetchReferrals} 
-            disabled={loading}
-            style={{ ...neon.statBox, background: loading ? '#555' : '#2b0b47', border: '1px solid #ff41b4', padding: '10px', cursor: loading ? 'not-allowed' : 'pointer' }}
-          >
-            <div style={{ fontSize: '18px', animation: loading ? 'spin 1s linear infinite' : 'none' }}>🔄</div>
-            <div style={{ color: '#fff', fontSize: '9px', fontWeight: 'bold', marginTop: '4px' }}>{t('ref_update') || "ACTUALIZAR"}</div>
-          </button>
+      {/* MY TEAM STATS */}
+      <h3 style={styles.sectionTitle}>👥 My Team Stats</h3>
+      <div className="fade-in" style={styles.statsGrid}>
+        <div style={styles.statBox('#00f0ff')}>
+          <div style={styles.statLabel}>Total Team</div>
+          <div style={styles.statValue('#00f0ff')}>{stats.totalTeam}</div>
+          <div style={{ fontSize: '9px', color: '#888' }}>Usuarios Registrados</div>
         </div>
-
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{ ...neon.btnPrimary, flex: 1 }} onClick={handleShare}>
-            {t('ref_btn_invite') || "🚀 INVITAR"}
-          </button>
-          <button style={{ ...neon.btnOutline, flex: 1 }} onClick={handleCopy}>
-            {t('ref_btn_copy') || "📋 COPIAR"}
-          </button>
+        <div style={styles.statBox('#ffe600')}>
+          <div style={styles.statLabel}>Total Inversores</div>
+          <div style={styles.statValue('#ffe600')}>{stats.totalInvestors}</div>
+          <div style={{ fontSize: '9px', color: '#888' }}>Con Planes Activos</div>
         </div>
       </div>
 
-      <div style={{ ...neon.card, borderColor: '#8a2be2' }}>
-        <div style={neon.totalCard}>
-          <div>
-            <p style={{ fontSize: '11px', color: '#ff99dd', margin: '0 0 4px 0', fontWeight: '900' }}>{t('ref_earnings_title') || "GANANCIAS POR INVITADOS"}</p>
-            <p style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
-              {totalEarned} <span style={{ fontSize: '14px', color: '#ffe600' }}>CLICK</span>
-            </p>
-          </div>
-          <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 5px rgba(255,230,0,0.5))' }}>
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-            </svg>
-          </div>
+      {/* TEAM RECHARGE COMMISSION REBATE */}
+      <div className="fade-in" style={styles.rebateBox}>
+        <div style={{ fontSize: '11px', color: '#ff99dd', fontWeight: '900', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '1px' }}>
+          Team Recharge Commission Rebate
         </div>
+        <div style={{ fontSize: '32px', color: '#ff1493', fontWeight: '900', textShadow: '0 0 15px rgba(255,20,147,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          {stats.rechargeCommission.toFixed(2)} <span style={{ fontSize: '16px', color: '#ff99dd' }}>USDT</span>
+        </div>
+        <button style={{ marginTop: '16px', background: 'transparent', border: '1px solid #ff1493', color: '#ff1493', padding: '8px 24px', borderRadius: '8px', fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', cursor: 'pointer' }}>
+          Ver Detalles
+        </button>
       </div>
 
-      <div style={{ ...neon.card, borderColor: '#ff41b4' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h4 style={{ color: '#00f0ff', fontSize: '15px', margin: 0, fontWeight: '900' }}>
-            {t('ref_network_title') || "📊 Tu Red"} ({n1})
-          </h4>
-        </div>
-
-        {loading && n1 === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: '#00f0ff', fontSize: '13px', fontWeight: 'bold' }}>{t('ref_syncing') || "Sincronizando..."}</div>
-        ) : n1 === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px 0', backgroundColor: 'rgba(255, 65, 180, 0.05)', borderRadius: '14px', border: '1px dashed #ff41b4' }}>
-            <span style={{ fontSize: '30px', display: 'block', marginBottom: '10px' }}>👻</span>
-            <span style={{ color: '#ff99dd', fontSize: '13px', lineHeight: '1.5', fontWeight: 'bold', whiteSpace: 'pre-wrap' }}>
-              {t('ref_empty_desc') || "Aún no tienes afiliados registrados."}
-            </span>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
-            {referralsList.map((ref, idx) => {
-              const avatarLetter = ref.username ? ref.username.charAt(0).toUpperCase() : 'U';
-
-              // 🔥 CÁLCULO DE CUÁNTO HA GENERADO ESTE USUARIO: 1 CLICK de registro + 20% de lo que ha ganado.
-              const childTotal = Number(ref.total_earnings || 0);
-              const generatedFromTasks = childTotal * 0.20;
-              const generatedTotal = (ref.referral_reward_granted ? 1 : 0) + generatedFromTasks;
-
-              return (
-                <div key={ref.id || idx} style={neon.refItem}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ 
-                      width: '36px', height: '36px', borderRadius: '50%', 
-                      background: 'linear-gradient(135deg, #00f0ff, #ff1493)', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      color: '#fff', fontWeight: '900', fontSize: '16px',
-                      border: '2px solid rgba(255, 255, 255, 0.2)'
-                    }}>
-                      {avatarLetter}
-                    </div>
-                    <div>
-                      <div style={{ color: '#fff', fontSize: '14px', fontWeight: '900' }}>{ref.username || t('operator') || "Usuario"}</div>
-                      <div style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace' }}>ID: {ref.id}</div>
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: 'right' }}>
-                    {ref.referral_reward_granted ? (
-                      <span style={{ color: '#00ffaa', fontSize: '10px', fontWeight: '900', background: 'rgba(0, 255, 170, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px solid #00ffaa' }}>
-                        {t('ref_status_active') || "ACTIVO"}
-                      </span>
-                    ) : (
-                      <span style={{ color: '#ffe600', fontSize: '10px', fontWeight: '900', background: 'rgba(255, 230, 0, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px dashed #ffe600' }}>
-                        {t('ref_status_pending') || "PENDIENTE"}
-                      </span>
-                    )}
-                    <div style={{ color: '#00f0ff', fontSize: '12px', fontWeight: 'bold', marginTop: '6px' }}>
-                      Generado: +{generatedTotal.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '12px', marginTop: '16px', border: '1px dashed #8a2be2' }}>
-          <p style={{ textAlign: 'center', fontSize: '11px', color: '#00f0ff', margin: 0, lineHeight: '1.5', fontWeight: 'bold' }}>
-            {t('ref_footer_p1') || "Recibes"} <strong style={{color: '#ffe600'}}>1.0 CLICK</strong> {t('ref_footer_p2') || "por cada afiliado verificado"}<br/>+ <strong style={{color: '#00ffaa'}}>20%</strong> {t('ref_footer_p3') || "de cada tarea que ellos completen."}
-          </p>
-        </div>
+      {/* SOCIAL PROMOTION */}
+      <h3 style={styles.sectionTitle}>🚀 Social Promotion</h3>
+      <div className="fade-in" style={styles.socialGrid}>
+        <button style={styles.socialBtn('#00a8ff')} onClick={shareTelegram}>
+          <div style={styles.socialIcon}>✈️</div>
+          <div style={styles.socialText('#00a8ff')}>Telegram</div>
+        </button>
+        <button style={styles.socialBtn('#25D366')} onClick={shareWhatsApp}>
+          <div style={styles.socialIcon}>💬</div>
+          <div style={styles.socialText('#25D366')}>WhatsApp</div>
+        </button>
+        <button style={styles.socialBtn('#1DA1F2')} onClick={shareTwitter}>
+          <div style={styles.socialIcon}>🐦</div>
+          <div style={styles.socialText('#1DA1F2')}>Twitter</div>
+        </button>
       </div>
+
     </div>
   );
 }
-export default ShareTab;
