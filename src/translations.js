@@ -9,6 +9,7 @@ export const translations = {
     nav_user: "Perfil",
     nav_admin: "Comando",
     share_text: "¡Únete a mi equipo en la mejor plataforma Web3 de inversión de zapatillas en Telegram y genera USDT diarios!",
+    connection_error: "Error de conexión con el servidor",
     
     // ProfileHeader
     profile_global: "Globales",
@@ -121,6 +122,7 @@ export const translations = {
     nav_user: "Profile",
     nav_admin: "Command",
     share_text: "Join my squad on the premier Web3 sneaker investment platform on Telegram and earn daily USDT!",
+    connection_error: "Server connection error",
     
     // ProfileHeader
     profile_global: "Global",
