@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import WebApp from '@twa-dev/sdk';
 import toast, { Toaster } from 'react-hot-toast';
 import { s } from './styles/appStyles';
-import { botApi } from './api/botApi'; 
+import { botApi } from './api/botApi';
 
 import { IconHome, IconProfile } from './components/Icons';
 import HomeView from './views/HomeView';
