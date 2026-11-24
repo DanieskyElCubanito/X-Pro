@@ -4,12 +4,12 @@ import toast, { Toaster } from 'react-hot-toast';
 import { s } from './styles/appStyles';
 import { botApi } from './api/botApi';
 
-import HomeView from './views/HomeView';
+import HomeTab from './components/HomeTab';
+import TeamTab from './components/TeamTab';
+import ProfileTab from './components/ProfileTab';
 import PortfolioView from './views/PortfolioView';
-import TeamView from './views/TeamView';
-import ProfileView from './views/ProfileView';
 
-// Íconos SVG integrados directamente (sin depender de ./components/Icons)
+// Íconos SVG integrados directamente
 const IconHome = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -95,7 +95,7 @@ export default function App() {
 
       <div style={s.main}>
         {activeTab === 'home' && (
-          <HomeView
+          <HomeTab
             userData={userData}
             activePlans={activePlans}
             onNavigate={handleNavigate}
@@ -131,14 +131,14 @@ export default function App() {
         )}
 
         {activeTab === 'team' && (
-          <TeamView
+          <TeamTab
             userData={userData}
             onBack={() => setActiveTab('home')}
           />
         )}
 
         {activeTab === 'profile' && (
-          <ProfileView
+          <ProfileTab
             userData={userData}
             transactions={transactions}
             onNavigate={handleNavigate}
