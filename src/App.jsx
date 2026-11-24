@@ -6,8 +6,7 @@ import { botApi } from './api/botApi';
 
 import HomeTab from './components/HomeTab';
 import TeamTab from './components/TeamTab';
-import ProfileTab from './components/ProfileTab';
-import PortfolioView from './views/PortfolioView';
+import ProfileHeader from './components/ProfileHeader';
 
 // Íconos SVG integrados directamente
 const IconHome = () => (
