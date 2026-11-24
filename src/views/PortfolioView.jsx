@@ -5,17 +5,21 @@ import { s } from '../styles/appStyles';
 import { botApi } from '../api/botApi';
 
 const DEFAULT_WALLETS = {
-  bep20: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-  ton: 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ'
+  BEP20: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+  TON: 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ'
 };
 
-export default function PortfolioView({ userData, activePlans = [], initialSection = 'deposit', onUpdate }) {
+const formatShortAddress = (addr = '') => {
+  if (!addr || addr.length <= 12) return addr;
+  return `${addr.slice(0, 5)}...${addr.slice(-4)}`;
+};
+
+export default function PortfolioView({ userData, initialSection = 'deposit', onUpdate }) {
   const [activeSection, setActiveSection] = useState(initialSection || 'deposit');
   const [selectedNetwork, setSelectedNetwork] = useState('BEP20'); // 'BEP20' | 'TON'
-  const [amount, setAmount] = useState('');
-  const [txHash, setTxHash] = useState('');
-  const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawNetwork, setWithdrawNetwork] = useState('BEP20');
+  const [amount, setAmount] = useState('');
+  const [withdrawAddress, setWithdrawAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -26,13 +30,15 @@ export default function PortfolioView({ userData, activePlans = [], initialSecti
 
   const balance = Number(userData?.balance || 0);
   const numericAmount = parseFloat(amount) || 0;
-  const dailyEstimate = (numericAmount * 0.05).toFixed(2);
-  const total40DaysEstimate = (numericAmount * 0.05 * 40).toFixed(2);
 
-  const depositAddress =
+  const currentDepositAddress =
     selectedNetwork === 'BEP20'
-      ? userData?.deposit_bep20 || DEFAULT_WALLETS.bep20
-      : userData?.deposit_ton || DEFAULT_WALLETS.ton;
+      ? userData?.deposit_bep20 || DEFAULT_WALLETS.BEP20
+      : userData?.deposit_ton || DEFAULT_WALLETS.TON;
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(
+    currentDepositAddress
+  )}`;
 
   const safeHaptic = (style = 'light') => {
     try {
@@ -43,57 +49,11 @@ export default function PortfolioView({ userData, activePlans = [], initialSecti
   const handleCopyAddress = () => {
     safeHaptic('light');
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(depositAddress);
+      navigator.clipboard.writeText(currentDepositAddress);
     }
-    toast.success(`Dirección ${selectedNetwork} copiada`, {
+    toast.success(`Dirección ${selectedNetwork === 'BEP20' ? 'USDT (BEP20)' : 'GRAM / TON'} copiada`, {
       style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
     });
-  };
-
-  const handleConfirmDeposit = async (e) => {
-    e.preventDefault();
-    if (numericAmount < 1) {
-      safeHaptic('heavy');
-      return toast.error('El monto mínimo de depósito es $1.00 USD', {
-        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
-      });
-    }
-    if (!txHash.trim()) {
-      safeHaptic('heavy');
-      return toast.error('Ingresa el Hash (TxID) de la transacción', {
-        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
-      });
-    }
-
-    setLoading(true);
-    safeHaptic('medium');
-
-    try {
-      const payload = {
-        user_id: userData?.id,
-        amount: numericAmount,
-        network: selectedNetwork,
-        tx_hash: txHash.trim(),
-        plan: '5_DAILY_40D'
-      };
-
-      if (botApi?.submitDeposit) {
-        await botApi.submitDeposit(payload);
-      }
-
-      toast.success('¡Depósito enviado a verificación! Se invertirá al 5% diario.', {
-        style: { background: '#111C2E', color: '#22C55E', border: '1px solid #22C55E' }
-      });
-      setAmount('');
-      setTxHash('');
-      if (onUpdate) onUpdate();
-    } catch (err) {
-      toast.error('No se pudo registrar el depósito. Intenta de nuevo.', {
-        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleConfirmWithdraw = async (e) => {
@@ -149,270 +109,219 @@ export default function PortfolioView({ userData, activePlans = [], initialSecti
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '16px' }}>
-      {/* Resumen de Saldo y Plan Único */}
-      <div
-        style={{
-          background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
-          border: '1px solid #1E324A',
-          borderRadius: '18px',
-          padding: '16px'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: '#94A3B8' }}>SALDO DISPONIBLE</span>
-          <span
+      {/* Título principal */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>
+          {activeSection === 'deposit' ? 'Depositar' : 'Retirar'}
+        </h2>
+
+        {/* Switch rápido entre Depositar y Retirar */}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('light');
+              setActiveSection('deposit');
+            }}
             style={{
-              backgroundColor: 'rgba(34, 211, 238, 0.14)',
-              color: '#22D3EE',
-              fontSize: '11px',
-              fontWeight: '800',
-              padding: '3px 8px',
+              backgroundColor: activeSection === 'deposit' ? '#111C2E' : 'transparent',
+              color: activeSection === 'deposit' ? '#22D3EE' : '#94A3B8',
+              border: activeSection === 'deposit' ? '1px solid #22D3EE' : '1px solid #1E293B',
               borderRadius: '999px',
-              border: '1px solid rgba(34, 211, 238, 0.35)'
+              padding: '5px 10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer'
             }}
           >
-            5% Diario • 40 Días
-          </span>
-        </div>
-
-        <div style={{ fontSize: '28px', fontWeight: '800', color: '#F8FAFC' }}>
-          ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-          <span style={{ fontSize: '15px', color: '#94A3B8', fontWeight: '700' }}>USD</span>
-        </div>
-
-        <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#CBD5E1' }}>
-          Planes activos: <strong>{activePlans.length}</strong> • Todo depósito entra al plan automáticamente.
-        </p>
-      </div>
-
-      {/* Selector de Pestaña: Depositar / Retirar */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '8px',
-          backgroundColor: '#0F172A',
-          padding: '5px',
-          borderRadius: '999px',
-          border: '1px solid #1E293B'
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            safeHaptic('light');
-            setActiveSection('deposit');
-          }}
-          style={{
-            background: activeSection === 'deposit' ? 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)' : 'transparent',
-            color: activeSection === 'deposit' ? '#06101C' : '#94A3B8',
-            border: 'none',
-            borderRadius: '999px',
-            padding: '10px',
-            fontWeight: '800',
-            fontSize: '13px',
-            cursor: 'pointer'
-          }}
-        >
-          Depositar
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            safeHaptic('light');
-            setActiveSection('withdraw');
-          }}
-          style={{
-            background: activeSection === 'withdraw' ? 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)' : 'transparent',
-            color: activeSection === 'withdraw' ? '#06101C' : '#94A3B8',
-            border: 'none',
-            borderRadius: '999px',
-            padding: '10px',
-            fontWeight: '800',
-            fontSize: '13px',
-            cursor: 'pointer'
-          }}
-        >
-          Retirar
-        </button>
-      </div>
-
-      {/* SECCIÓN DEPÓSITO */}
-      {activeSection === 'deposit' && (
-        <form
-          onSubmit={handleConfirmDeposit}
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}
-        >
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#F1F5F9' }}>
-            1. Selecciona la Red de Depósito
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => setSelectedNetwork('BEP20')}
-              style={{
-                backgroundColor: selectedNetwork === 'BEP20' ? '#102033' : '#111C2E',
-                color: selectedNetwork === 'BEP20' ? '#22D3EE' : '#CBD5E1',
-                border: selectedNetwork === 'BEP20' ? '1px solid #22D3EE' : '1px solid #1E293B',
-                borderRadius: '12px',
-                padding: '10px',
-                fontWeight: '800',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
-            >
-              USDT (BEP-20)
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedNetwork('TON')}
-              style={{
-                backgroundColor: selectedNetwork === 'TON' ? '#102033' : '#111C2E',
-                color: selectedNetwork === 'TON' ? '#38BDF8' : '#CBD5E1',
-                border: selectedNetwork === 'TON' ? '1px solid #38BDF8' : '1px solid #1E293B',
-                borderRadius: '12px',
-                padding: '10px',
-                fontWeight: '800',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
-            >
-              GRAM / TON
-            </button>
-          </div>
-
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#F1F5F9', marginTop: '2px' }}>
-            2. Envía tu monto (Mín. $1 USD) a esta dirección:
-          </div>
-
-          <div
+            Depositar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('light');
+              setActiveSection('withdraw');
+            }}
             style={{
-              backgroundColor: '#0B1220',
-              border: '1px solid #243247',
-              borderRadius: '12px',
-              padding: '10px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px'
+              backgroundColor: activeSection === 'withdraw' ? '#111C2E' : 'transparent',
+              color: activeSection === 'withdraw' ? '#22D3EE' : '#94A3B8',
+              border: activeSection === 'withdraw' ? '1px solid #22D3EE' : '1px solid #1E293B',
+              borderRadius: '999px',
+              padding: '5px 10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer'
             }}
           >
-            <span
-              style={{
-                fontSize: '12px',
-                color: '#CBD5E1',
-                fontFamily: 'monospace',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {depositAddress}
-            </span>
+            Retirar
+          </button>
+        </div>
+      </div>
+
+      {/* VISTA DEPOSITAR (Como la imagen) */}
+      {activeSection === 'deposit' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Selector de Red: USDT (BEP20) | GRAM/TON */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               type="button"
-              onClick={handleCopyAddress}
+              onClick={() => {
+                safeHaptic('light');
+                setSelectedNetwork('BEP20');
+              }}
               style={{
-                backgroundColor: '#22D3EE',
-                color: '#06101C',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                fontSize: '11px',
+                background:
+                  selectedNetwork === 'BEP20'
+                    ? 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)'
+                    : '#0F172A',
+                color: selectedNetwork === 'BEP20' ? '#06101C' : '#CBD5E1',
+                border: selectedNetwork === 'BEP20' ? 'none' : '1px solid #1E293B',
+                borderRadius: '999px',
+                padding: '10px 14px',
+                fontSize: '13px',
                 fontWeight: '800',
                 cursor: 'pointer',
-                flexShrink: 0
+                boxShadow: selectedNetwork === 'BEP20' ? '0 0 16px rgba(34, 211, 238, 0.35)' : 'none'
               }}
             >
-              Copiar
+              USDT (BEP20)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                safeHaptic('light');
+                setSelectedNetwork('TON');
+              }}
+              style={{
+                background:
+                  selectedNetwork === 'TON'
+                    ? 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)'
+                    : '#0F172A',
+                color: selectedNetwork === 'TON' ? '#06101C' : '#CBD5E1',
+                border: selectedNetwork === 'TON' ? 'none' : '1px solid #1E293B',
+                borderRadius: '999px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                boxShadow: selectedNetwork === 'TON' ? '0 0 16px rgba(34, 211, 238, 0.35)' : 'none'
+              }}
+            >
+              GRAM/TON
             </button>
           </div>
 
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
-              Monto depositado (USD)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="1"
-              placeholder="Ej. 10.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              style={{ ...s.input, marginTop: 0 }}
-            />
-          </div>
-
-          {/* Proyección del Plan Único */}
+          {/* Tarjeta principal con QR, dirección, monto mínimo y nota */}
           <div
             style={{
-              backgroundColor: '#111C2E',
-              border: '1px solid #1E293B',
-              borderRadius: '12px',
-              padding: '10px 12px',
-              fontSize: '12px',
+              background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
+              border: '1px solid #1E324A',
+              borderRadius: '20px',
+              padding: '20px 16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px'
+              alignItems: 'center',
+              gap: '14px'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#CBD5E1' }}>
-              <span>Ganancia diaria estimada (5%):</span>
-              <strong style={{ color: '#22C55E' }}>+${dailyEstimate} USD</strong>
+            {/* Contenedor del QR */}
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.35)'
+              }}
+            >
+              <img
+                src={qrUrl}
+                alt={`QR ${selectedNetwork}`}
+                style={{ width: '176px', height: '176px', display: 'block', borderRadius: '8px' }}
+              />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#CBD5E1' }}>
-              <span>Retorno en 40 días:</span>
-              <strong style={{ color: '#22D3EE' }}>+${total40DaysEstimate} USD</strong>
+
+            {/* Dirección abreviada + Botón Copiar */}
+            <div
+              style={{
+                width: '100%',
+                backgroundColor: '#0B1220',
+                border: '1px solid #243247',
+                borderRadius: '12px',
+                padding: '8px 10px 8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}
+            >
+              <span
+                title={currentDepositAddress}
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#E2E8F0',
+                  fontFamily: 'monospace'
+                }}
+              >
+                {formatShortAddress(currentDepositAddress)}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleCopyAddress}
+                style={{
+                  background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
+                  color: '#06101C',
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                Copiar
+              </button>
+            </div>
+
+            {/* Monto mínimo y auto-inversión */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#F8FAFC', marginBottom: '4px' }}>
+                Monto Mínimo: $1 USD
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#CBD5E1' }}>
+                ⚡ <span style={{ color: '#22D3EE', fontWeight: '700' }}>¡Todo depósito se invierte automáticamente!</span>
+              </div>
+            </div>
+
+            {/* Aviso de red y acreditación */}
+            <div
+              style={{
+                width: '100%',
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                border: '1px solid #1E293B',
+                borderRadius: '14px',
+                padding: '12px',
+                fontSize: '12px',
+                color: '#CBD5E1',
+                lineHeight: '1.45',
+                textAlign: 'left'
+              }}
+            >
+              {selectedNetwork === 'BEP20'
+                ? 'Envía solo USDT (BEP20) a esta dirección. Los fondos se acreditarán automáticamente después de la confirmación de la red.'
+                : 'Envía solo GRAM o TON a esta dirección. Los fondos se acreditarán automáticamente después de la confirmación de la red.'}
             </div>
           </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
-              Hash de transacción (TxID)
-            </label>
-            <input
-              type="text"
-              placeholder="Pega aquí el hash de pago"
-              value={txHash}
-              onChange={(e) => setTxHash(e.target.value)}
-              style={{ ...s.input, marginTop: 0 }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
-              color: '#06101C',
-              border: 'none',
-              borderRadius: '999px',
-              padding: '14px',
-              fontSize: '14px',
-              fontWeight: '800',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              marginTop: '4px'
-            }}
-          >
-            {loading ? 'Procesando...' : 'Confirmar Depósito (Mín. $1 USD)'}
-          </button>
-        </form>
+        </div>
       )}
 
-      {/* SECCIÓN RETIRO */}
+      {/* VISTA RETIRAR */}
       {activeSection === 'withdraw' && (
         <form
           onSubmit={handleConfirmWithdraw}
@@ -426,8 +335,11 @@ export default function PortfolioView({ userData, activePlans = [], initialSecti
             gap: '12px'
           }}
         >
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#F1F5F9' }}>
-            Retirar Saldo (Mín. $1 USD)
+          <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '700' }}>
+            SALDO DISPONIBLE:{' '}
+            <span style={{ color: '#22D3EE', fontWeight: '800' }}>
+              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+            </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -468,13 +380,13 @@ export default function PortfolioView({ userData, activePlans = [], initialSecti
 
           <div>
             <label style={{ fontSize: '12px', fontWeight: '700', color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
-              Monto a retirar (USD)
+              Monto a retirar (Mín. $1 USD)
             </label>
             <input
               type="number"
               step="0.01"
               min="1"
-              placeholder="Mínimo $1.00 USD"
+              placeholder="Ej. 5.00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               style={{ ...s.input, marginTop: 0 }}
@@ -483,7 +395,7 @@ export default function PortfolioView({ userData, activePlans = [], initialSecti
 
           <div>
             <label style={{ fontSize: '12px', fontWeight: '700', color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
-              Tu billetera ({withdrawNetwork === 'BEP20' ? 'USDT BEP-20' : 'GRAM / TON'})
+              Dirección de billetera ({withdrawNetwork === 'BEP20' ? 'USDT BEP-20' : 'GRAM / TON'})
             </label>
             <input
               type="text"
