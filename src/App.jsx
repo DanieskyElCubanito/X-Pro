@@ -7,8 +7,9 @@ import { botApi } from './api/botApi';
 import HomeTab from './components/HomeTab';
 import TeamTab from './components/TeamTab';
 import ProfileHeader from './components/ProfileHeader';
+import PortfolioView from './views/PortfolioView';
 
-// Íconos SVG integrados directamente
+// Íconos SVG integrados directamente para la barra inferior
 const IconHome = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -38,7 +39,7 @@ export default function App() {
   const [portfolioMode, setPortfolioMode] = useState('deposit');
   const [userData, setUserData] = useState(null);
   const [activePlans, setActivePlans] = useState([]);
-  const [transactions, setTransactions] = useState([
+  const [transactions] = useState([
     { type: 'DEPOSIT', title: 'Depósito USDT', date: 'Hoy, 10:00 AM', amount: '50.00' },
     { type: 'YIELD', title: 'Rendimiento Diario', date: 'Ayer, 09:15 AM', amount: '2.50' }
   ]);
@@ -84,13 +85,40 @@ export default function App() {
     setActiveTab(tab);
   };
 
+  const handleReinvest = async (amountToReinvest) => {
+    try {
+      if (botApi?.reinvestBalance) {
+        await botApi.reinvestBalance({ user_id: userData?.id, amount: amountToReinvest });
+      }
+      toast.success(`¡$${Number(amountToReinvest).toFixed(2)} USD reinvertidos al 5% diario!`, {
+        style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+      });
+      verifyUser(WebApp.initDataUnsafe?.user || { id: currentUserId, username: 'TestUser' });
+    } catch (e) {
+      toast.error('No se pudo completar la reinversión');
+    }
+  };
+
   if (status === 'loading') {
-    return <div style={s.center}><div style={s.loader}></div></div>;
+    return (
+      <div style={s.center}>
+        <div style={s.loader}></div>
+      </div>
+    );
   }
 
   return (
     <div style={s.container}>
-      <Toaster position="top-center" toastOptions={{ style: { background: '#111C2E', color: '#F1F5F9', border: '1px solid #243247' } }} />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#111C2E',
+            color: '#F1F5F9',
+            border: '1px solid #243247'
+          }
+        }}
+      />
 
       <div style={s.main}>
         {activeTab === 'home' && (
@@ -98,6 +126,7 @@ export default function App() {
             userData={userData}
             activePlans={activePlans}
             onNavigate={handleNavigate}
+            onReinvest={handleReinvest}
           />
         )}
 
@@ -124,7 +153,9 @@ export default function App() {
               userData={userData}
               activePlans={activePlans}
               initialSection={portfolioMode}
-              onUpdate={() => verifyUser(WebApp.initDataUnsafe?.user || { id: 8968109534, username: 'TestUser' })}
+              onUpdate={() =>
+                verifyUser(WebApp.initDataUnsafe?.user || { id: currentUserId, username: 'TestUser' })
+              }
             />
           </div>
         )}
@@ -137,7 +168,7 @@ export default function App() {
         )}
 
         {activeTab === 'profile' && (
-          <ProfileTab
+          <ProfileHeader
             userData={userData}
             transactions={transactions}
             onNavigate={handleNavigate}
