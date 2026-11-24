@@ -50,7 +50,7 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '12px' }}>
-      
+
       {/* 1. TARJETA PRINCIPAL: SALDO ACTIVO */}
       <div
         style={{
