@@ -15,21 +15,33 @@ const formatShortAddress = (addr = '') => {
 };
 
 export default function PortfolioView({ userData, initialSection = 'deposit', onUpdate }) {
-  const [activeSection, setActiveSection] = useState(initialSection || 'deposit');
+  const [activeSection, setActiveSection] = useState(initialSection || 'deposit'); // 'deposit' | 'withdraw' | 'reinvest'
   const [selectedNetwork, setSelectedNetwork] = useState('BEP20'); // 'BEP20' | 'TON'
   const [withdrawNetwork, setWithdrawNetwork] = useState('BEP20');
   const [amount, setAmount] = useState('');
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (initialSection === 'deposit' || initialSection === 'withdraw') {
-      setActiveSection(initialSection);
-    }
-  }, [initialSection]);
+  const availableBalance = Number(userData?.balance ?? 45.8);
+  const currentActiveBalance = Number(userData?.active_investments ?? 1245.8);
 
-  const balance = Number(userData?.balance ?? 45.8);
+  useEffect(() => {
+    if (
+      initialSection === 'deposit' ||
+      initialSection === 'withdraw' ||
+      initialSection === 'reinvest'
+    ) {
+      setActiveSection(initialSection);
+      if (initialSection === 'reinvest' && availableBalance > 0) {
+        setAmount(availableBalance.toFixed(2));
+      } else {
+        setAmount('');
+      }
+    }
+  }, [initialSection, availableBalance]);
+
   const numericAmount = parseFloat(amount) || 0;
+  const estimatedNewActiveBalance = currentActiveBalance + numericAmount;
 
   const currentDepositAddress =
     selectedNetwork === 'BEP20'
@@ -71,7 +83,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
       }
     } catch (e) {}
 
-    // Fallback si el navegador bloquea readText en el WebView de Telegram
     toast('Toca el campo y pega tu dirección manualmente', {
       style: { background: '#111C2E', color: '#CBD5E1', border: '1px solid #243247' }
     });
@@ -79,12 +90,48 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
 
   const handleMaxAmount = () => {
     safeHaptic('light');
-    if (balance <= 0) {
-      return toast.error('No tienes saldo disponible para retirar', {
+    if (availableBalance <= 0) {
+      return toast.error('No tienes saldo disponible', {
         style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
       });
     }
-    setAmount(balance.toFixed(2));
+    setAmount(availableBalance.toFixed(2));
+  };
+
+  const handleConfirmReinvest = async (e) => {
+    e.preventDefault();
+    if (numericAmount < 1) {
+      safeHaptic('heavy');
+      return toast.error('El monto mínimo de reinversión es $1 USD', {
+        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
+      });
+    }
+    if (numericAmount > availableBalance) {
+      safeHaptic('heavy');
+      return toast.error('Supera tu saldo disponible para reinvertir', {
+        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
+      });
+    }
+
+    setLoading(true);
+    safeHaptic('medium');
+
+    try {
+      if (botApi?.reinvestBalance) {
+        await botApi.reinvestBalance({ user_id: userData?.id, amount: numericAmount });
+      }
+      toast.success(`¡$${numericAmount.toFixed(2)} USD añadidos a tu Saldo Activo!`, {
+        style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+      });
+      setAmount('');
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      toast.error('No se pudo completar la reinversión.', {
+        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConfirmWithdraw = async (e) => {
@@ -95,7 +142,7 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
         style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
       });
     }
-    if (numericAmount > balance) {
+    if (numericAmount > availableBalance) {
       safeHaptic('heavy');
       return toast.error('Saldo disponible insuficiente', {
         style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
@@ -138,12 +185,19 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
     }
   };
 
+  const pageTitle =
+    activeSection === 'reinvest'
+      ? 'Reinvertir'
+      : activeSection === 'withdraw'
+      ? 'Retirar'
+      : 'Depositar';
+
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '16px' }}>
       {/* Título principal + switch rápido */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>
-          {activeSection === 'deposit' ? 'Depositar' : 'Retirar'}
+          {pageTitle}
         </h2>
 
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -170,12 +224,12 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
             type="button"
             onClick={() => {
               safeHaptic('light');
-              setActiveSection('withdraw');
+              setActiveSection('reinvest');
             }}
             style={{
-              backgroundColor: activeSection === 'withdraw' ? '#111C2E' : 'transparent',
-              color: activeSection === 'withdraw' ? '#22D3EE' : '#94A3B8',
-              border: activeSection === 'withdraw' ? '1px solid #22D3EE' : '1px solid #1E293B',
+              backgroundColor: activeSection === 'reinvest' ? '#111C2E' : 'transparent',
+              color: activeSection === 'reinvest' ? '#22D3EE' : '#94A3B8',
+              border: activeSection === 'reinvest' ? '1px solid #22D3EE' : '1px solid #1E293B',
               borderRadius: '999px',
               padding: '5px 10px',
               fontSize: '11px',
@@ -183,10 +237,168 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               cursor: 'pointer'
             }}
           >
-            Retirar
+            Reinvertir
           </button>
         </div>
       </div>
+
+      {/* VISTA REINVENTIR (Como la imagen) */}
+      {activeSection === 'reinvest' && (
+        <form onSubmit={handleConfirmReinvest} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Saldo Disponible para Reinvertir */}
+          <div
+            style={{
+              background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
+              border: '1px solid #1E324A',
+              borderRadius: '18px',
+              padding: '14px 16px',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#E2E8F0', marginBottom: '4px' }}>
+              Saldo Disponible para Reinvertir:
+            </div>
+            <div style={{ fontSize: '28px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '-0.5px' }}>
+              ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+              <span style={{ fontSize: '16px', fontWeight: '800', color: '#E2E8F0' }}>USD</span>
+            </div>
+          </div>
+
+          {/* Tarjeta PLAN ÚNICO: 5% DIARIO */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '18px',
+              padding: '14px 16px'
+            }}
+          >
+            <div style={{ fontSize: '12px', fontWeight: '800', color: '#E2E8F0', letterSpacing: '0.4px', marginBottom: '8px' }}>
+              PLAN ÚNICO: 5% DIARIO
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#F8FAFC', lineHeight: '1.2' }}>Durante</div>
+                <div style={{ fontSize: '26px', fontWeight: '800', color: '#22C55E', lineHeight: '1.15' }}>40 días</div>
+              </div>
+
+              <div
+                style={{
+                  width: '104px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  backgroundColor: '#111C2E',
+                  border: '1px solid #1E293B'
+                }}
+              />
+            </div>
+
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#E2E8F0', lineHeight: '1.45' }}>
+              <div>Rendimiento Total: 200%</div>
+              <div>Monto mínimo de reinversión: $1 USD</div>
+            </div>
+          </div>
+
+          {/* Monto a Reinvertir + MAX + Resultado */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '18px',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}
+          >
+            <label style={{ fontSize: '13px', fontWeight: '700', color: '#E2E8F0' }}>
+              Monto a Reinvertir
+            </label>
+
+            <div
+              style={{
+                backgroundColor: '#0B1220',
+                border: '1px solid #243247',
+                borderRadius: '12px',
+                padding: '6px 8px 6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}
+            >
+              <input
+                type="number"
+                step="0.01"
+                min="1"
+                placeholder="45.80"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#F8FAFC',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  minWidth: 0
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleMaxAmount}
+                style={{
+                  backgroundColor: '#0891B2',
+                  color: '#FFFFFF',
+                  border: '1px solid #22D3EE',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                MAX
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '12px', color: '#CBD5E1', lineHeight: '1.45', textAlign: 'center' }}>
+              Resultado: Se añadirán{' '}
+              <strong style={{ color: '#22D3EE' }}>
+                ${numericAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              </strong>{' '}
+              a tu Saldo Activo. Nuevo Saldo Activo estimado:{' '}
+              <strong style={{ color: '#F8FAFC' }}>
+                ${estimatedNewActiveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD.
+              </strong>
+            </p>
+          </div>
+
+          {/* Botón Confirmar Reinversión */}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
+              color: '#06101C',
+              border: 'none',
+              borderRadius: '999px',
+              padding: '15px 20px',
+              fontSize: '15px',
+              fontWeight: '800',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              boxShadow: '0 0 22px rgba(34, 211, 238, 0.35)'
+            }}
+          >
+            {loading ? 'Reinvirtiendo...' : 'Confirmar Reinversión'}
+          </button>
+        </form>
+      )}
 
       {/* VISTA DEPOSITAR */}
       {activeSection === 'deposit' && (
@@ -345,10 +557,9 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
         </div>
       )}
 
-      {/* VISTA RETIRAR (Como la imagen) */}
+      {/* VISTA RETIRAR */}
       {activeSection === 'withdraw' && (
         <form onSubmit={handleConfirmWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Tarjeta Saldo Disponible */}
           <div
             style={{
               background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
@@ -362,12 +573,11 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               Saldo Disponible:
             </div>
             <div style={{ fontSize: '30px', fontWeight: '800', color: '#22D3EE', letterSpacing: '-0.5px' }}>
-              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+              ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
               <span style={{ fontSize: '16px', fontWeight: '800' }}>USD</span>
             </div>
           </div>
 
-          {/* Selector de Red: USDT (BEP20) | GRAM/TON */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               type="button"
@@ -418,7 +628,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
             </button>
           </div>
 
-          {/* Contenedor de campos: Dirección de Billetera + Monto a Retirar */}
           <div
             style={{
               backgroundColor: '#0F172A',
@@ -430,7 +639,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               gap: '14px'
             }}
           >
-            {/* Dirección de Billetera + Pegar */}
             <div>
               <label style={{ fontSize: '13px', fontWeight: '700', color: '#E2E8F0', display: 'block', marginBottom: '8px' }}>
                 Dirección de Billetera
@@ -482,7 +690,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               </div>
             </div>
 
-            {/* Monto a Retirar + MAX */}
             <div>
               <label style={{ fontSize: '13px', fontWeight: '700', color: '#E2E8F0', display: 'block', marginBottom: '8px' }}>
                 Monto a Retirar
@@ -541,7 +748,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
             </div>
           </div>
 
-          {/* Botón Confirmar Retiro */}
           <button
             type="submit"
             disabled={loading}
