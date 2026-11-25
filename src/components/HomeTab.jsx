@@ -238,26 +238,6 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
         </div>
       </div>
 
-      <button
-  onClick={() => {
-    safeHaptic('medium');
-    onNavigate('portfolio', 'reinvest');
-  }}
-  style={{
-    flex: 1,
-    backgroundColor: '#1E293B',
-    color: '#F1F5F9',
-    border: '1px solid #334155',
-    borderRadius: '999px',
-    padding: '11px',
-    fontSize: '13px',
-    fontWeight: '700',
-    cursor: 'pointer'
-  }}
->
-  Reinvertir
-</button>
-
       {/* 5. BANNER PROMOCIONAL: +10% BONO */}
       <div
         onClick={() => {
