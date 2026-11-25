@@ -194,13 +194,13 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '16px' }}>
-      {/* Título principal + switch rápido */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>
+           {/* Título principal + switch rápido de 3 modos */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '800', color: '#F8FAFC', flexShrink: 0 }}>
           {pageTitle}
         </h2>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button
             type="button"
             onClick={() => {
@@ -212,7 +212,7 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               color: activeSection === 'deposit' ? '#22D3EE' : '#94A3B8',
               border: activeSection === 'deposit' ? '1px solid #22D3EE' : '1px solid #1E293B',
               borderRadius: '999px',
-              padding: '5px 10px',
+              padding: '5px 9px',
               fontSize: '11px',
               fontWeight: '700',
               cursor: 'pointer'
@@ -220,6 +220,27 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
           >
             Depositar
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('light');
+              setActiveSection('withdraw');
+            }}
+            style={{
+              backgroundColor: activeSection === 'withdraw' ? '#111C2E' : 'transparent',
+              color: activeSection === 'withdraw' ? '#22D3EE' : '#94A3B8',
+              border: activeSection === 'withdraw' ? '1px solid #22D3EE' : '1px solid #1E293B',
+              borderRadius: '999px',
+              padding: '5px 9px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Retirar
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -231,7 +252,7 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               color: activeSection === 'reinvest' ? '#22D3EE' : '#94A3B8',
               border: activeSection === 'reinvest' ? '1px solid #22D3EE' : '1px solid #1E293B',
               borderRadius: '999px',
-              padding: '5px 10px',
+              padding: '5px 9px',
               fontSize: '11px',
               fontWeight: '700',
               cursor: 'pointer'
@@ -241,6 +262,7 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
           </button>
         </div>
       </div>
+
 
       {/* VISTA REINVENTIR (Como la imagen) */}
       {activeSection === 'reinvest' && (
