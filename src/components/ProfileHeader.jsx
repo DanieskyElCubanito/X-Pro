@@ -3,33 +3,12 @@ import WebApp from '@twa-dev/sdk';
 import toast from 'react-hot-toast';
 import { s } from '../styles/appStyles';
 
-const IconUSDT = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="11" fill="#26A17B" />
-    <path
-      d="M13.2 10.6V8.8H16.8V6.5H7.2V8.8H10.8V10.6C8.1 10.8 6.1 11.4 6.1 12.1C6.1 12.8 8.1 13.4 10.8 13.6V18.2H13.2V13.6C15.9 13.4 17.9 12.8 17.9 12.1C17.9 11.4 15.9 10.8 13.2 10.6ZM12 12.9C9.4 12.9 7.5 12.5 7.5 12.1C7.5 11.7 9.4 11.3 12 11.3C14.6 11.3 16.5 11.7 16.5 12.1C16.5 12.5 14.6 12.9 12 12.9Z"
-      fill="#FFFFFF"
-    />
-  </svg>
-);
-
-const IconTON = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="11" fill="#0098EA" />
-    <path
-      d="M15.8 7.5H8.2C7.3 7.5 6.8 8.5 7.3 9.2L11.4 16.3C11.7 16.8 12.3 16.8 12.6 16.3L16.7 9.2C17.2 8.5 16.7 7.5 15.8 7.5ZM11.3 13.8L8.9 9.5C8.8 9.3 8.9 9 9.2 9H11.3V13.8ZM15.1 9.5L12.7 13.8V9H14.8C15.1 9 15.2 9.3 15.1 9.5Z"
-      fill="#FFFFFF"
-    />
-  </svg>
-);
-
 const IconChevronRight = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 
-// Ícono de Escudo Verificado
 const IconShieldCheck = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -37,7 +16,7 @@ const IconShieldCheck = () => (
   </svg>
 );
 
-export default function ProfileHeader({ userData, transactions = [], onNavigate, onBack }) {
+export default function ProfileHeader({ userData, transactions = [], onBack }) {
   const tgUser = WebApp.initDataUnsafe?.user;
   const username = tgUser?.username ? `@${tgUser.username}` : userData?.username || '@usuario_tg';
   const userId = tgUser?.id || userData?.id || '987654321';
@@ -65,6 +44,18 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
   const formatUSD = (val) =>
     val.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  const openTelegramUrl = (url, label) => {
+    safeHaptic('light');
+    try {
+      WebApp.openTelegramLink(url);
+    } catch (e) {
+      window.open(url, '_blank');
+      toast(`${label}: ${url}`, {
+        style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+      });
+    }
+  };
+
   const handleSaveWallets = () => {
     safeHaptic('heavy');
     toast.success('Billeteras guardadas en tu perfil', {
@@ -87,7 +78,6 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
       id: 'history',
       label: 'Historial de transacciones',
       labelColor: '#CBD5E1',
-      bold: false,
       onClick: () => {
         safeHaptic('light');
         setActiveModal('history');
@@ -97,62 +87,61 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
       id: 'wallets',
       label: 'Configurar billeteras (USDT/TON)',
       labelColor: '#CBD5E1',
-      bold: false,
       onClick: () => {
         safeHaptic('light');
         setActiveModal('wallets');
       }
     },
     {
-      id: 'support',
-      label: 'Soporte y Comunidad',
+      id: 'payments_channel',
+      label: 'Canal de pagos',
+      labelColor: '#22D3EE',
+      onClick: () => openTelegramUrl('https://t.me/CryptoWeb3Pay', 'Canal de pagos')
+    },
+    {
+      id: 'info_channel',
+      label: 'Canal de información',
       labelColor: '#CBD5E1',
-      bold: false,
-      onClick: () => {
-        safeHaptic('light');
-        try {
-          WebApp.openTelegramLink('https://t.me/CryptoWeb3Pay');
-        } catch (e) {
-          toast('Abre nuestro canal oficial en Telegram', {
-            style: { background: '#111C2E', color: '#F1F5F9', border: '1px solid #243247' }
-          });
-        }
-      }
+      onClick: () => openTelegramUrl('https://t.me/TheDannyDev', 'Canal de información')
+    },
+    {
+      id: 'support_group',
+      label: 'Grupo de ayuda y soporte',
+      labelColor: '#CBD5E1',
+      onClick: () => openTelegramUrl('https://t.me/CryptoWeb3Pay', 'Grupo de ayuda y soporte')
     },
     {
       id: 'lang',
       label: `Idioma: ${lang}`,
       labelColor: '#CBD5E1',
-      bold: false,
       onClick: handleToggleLang
     }
   ];
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '16px' }}>
-      {/* Encabezado Superior */}
+      {/* Encabezado Superior (sin botón Atrás en la vista principal de Perfil) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button
-          onClick={() => {
-            safeHaptic('light');
-            if (activeModal) {
+        {activeModal && (
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('light');
               setActiveModal(null);
-            } else if (onBack) {
-              onBack();
-            }
-          }}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#94A3B8',
-            fontSize: '14px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            padding: '4px 0'
-          }}
-        >
-          ← Atrás
-        </button>
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94A3B8',
+              fontSize: '14px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              padding: '4px 0'
+            }}
+          >
+            ← Atrás
+          </button>
+        )}
         <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>
           {activeModal === 'wallets'
             ? 'Configurar Billeteras'
@@ -204,6 +193,7 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
           </div>
 
           <button
+            type="button"
             onClick={handleSaveWallets}
             style={{
               width: '100%',
@@ -285,7 +275,7 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
             <span>Profit Core • Entidad & Operación Verificada</span>
           </div>
           <p style={{ margin: 0, fontSize: '13px', color: '#CBD5E1', lineHeight: '1.5' }}>
-            Operación respaldada bajo protocolos de trazabilidad en redes <strong>BNB Smart Chain (BEP-20)</strong> y <strong>The Open Network (TON)</strong>, con registro contable en tiempo real y soporte activo para la comunidad.
+            Operación respaldada bajo protocolos de trazabilidad en redes <strong>BNB Smart Chain (BEP-20)</strong> y <strong>The Open Network (TON)</strong>, con registro contable en tiempo real y canales oficiales activos.
           </p>
         </div>
       )}
@@ -353,39 +343,6 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
                 Total Retirado:{' '}
                 <span style={{ color: '#F8FAFC', fontWeight: '700' }}>${formatUSD(totalWithdrawn)} USD</span>
               </div>
-            </div>
-          </div>
-
-          {/* Botón Retirar Saldo + Badges Cripto */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-            <button
-              onClick={() => {
-                safeHaptic('medium');
-                if (onNavigate) onNavigate('portfolio', 'withdraw');
-              }}
-              style={{
-                width: '100%',
-                background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
-                color: '#06101C',
-                border: 'none',
-                borderRadius: '999px',
-                padding: '13px 18px',
-                fontSize: '14px',
-                fontWeight: '800',
-                cursor: 'pointer',
-                boxShadow: '0 0 18px rgba(34, 211, 238, 0.3)'
-              }}
-            >
-              Retirar Saldo <span style={{ fontWeight: '700' }}>(Mín. $1 USD)</span>
-            </button>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12px', fontWeight: '700', color: '#CBD5E1' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <IconUSDT /> USDT (BEP20)
-              </span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                <IconTON /> GRAM/TON
-              </span>
             </div>
           </div>
 
@@ -463,7 +420,7 @@ export default function ProfileHeader({ userData, transactions = [], onNavigate,
                 <span
                   style={{
                     fontSize: '13px',
-                    fontWeight: item.bold ? '800' : '600',
+                    fontWeight: item.id === 'payments_channel' ? '800' : '600',
                     color: item.labelColor
                   }}
                 >
