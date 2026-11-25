@@ -216,8 +216,11 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
             Invertir
           </button>
 
-          <button
-            onClick={handleReinvestClick}
+              <button
+  onClick={() => {
+    safeHaptic('medium');
+    onNavigate('portfolio', 'reinvest');
+  }}
             style={{
               flex: 1,
               backgroundColor: '#1E293B',
