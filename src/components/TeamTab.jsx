@@ -75,7 +75,7 @@ const IconShare = () => (
   </svg>
 );
 
-export default function TeamTab({ userData, onBack }) {
+export default function TeamTab({ userData }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'invested' | 'uninvested'
 
@@ -339,29 +339,10 @@ export default function TeamTab({ userData, onBack }) {
     );
   }
 
-  // --- VISTA GENERAL DE MI EQUIPO ---
+  // --- VISTA GENERAL DE MI EQUIPO (Sin botón Atrás) ---
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {onBack && (
-          <button
-            onClick={() => {
-              safeHaptic('light');
-              onBack();
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#94A3B8',
-              fontSize: '14px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              padding: '4px 0'
-            }}
-          >
-            ← Atrás
-          </button>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>Mi Equipo</h2>
       </div>
 
