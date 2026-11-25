@@ -33,12 +33,147 @@ const IconProfile = () => (
   </svg>
 );
 
+// Pantalla de carga estilo cubo neón cian + auditoría activa
+function LoadingSplash() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        width: '100%',
+        background: 'radial-gradient(circle at 50% 35%, #0F233A 0%, #070E1A 70%, #050912 100%)',
+        color: '#F8FAFC',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '48px 24px 28px 24px',
+        boxSizing: 'border-box',
+        textAlign: 'center'
+      }}
+    >
+      <style>{`
+        @keyframes pulseGlow {
+          0%, 100% { filter: drop-shadow(0 0 12px rgba(34, 211, 238, 0.55)); transform: scale(1); }
+          50% { filter: drop-shadow(0 0 24px rgba(34, 211, 238, 0.9)); transform: scale(1.03); }
+        }
+        @keyframes loadProgress {
+          0% { width: 18%; }
+          50% { width: 68%; }
+          100% { width: 92%; }
+        }
+      `}</style>
+
+      <div />
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          width: '100%',
+          maxWidth: '300px'
+        }}
+      >
+        <div style={{ animation: 'pulseGlow 2.2s ease-in-out infinite', marginBottom: '26px' }}>
+          <svg width="112" height="112" viewBox="0 0 120 120" fill="none">
+            <polygon
+              points="60,12 102,36 102,84 60,108 18,84 18,36"
+              stroke="#22D3EE"
+              strokeWidth="4.5"
+              strokeLinejoin="round"
+            />
+            <line x1="60" y1="60" x2="60" y2="12" stroke="#22D3EE" strokeWidth="3.5" />
+            <line x1="60" y1="60" x2="102" y2="84" stroke="#22D3EE" strokeWidth="3.5" />
+            <line x1="60" y1="60" x2="18" y2="84" stroke="#22D3EE" strokeWidth="3.5" />
+            <polygon
+              points="60,34 82,47 82,73 60,86 38,73 38,47"
+              stroke="#67E8F9"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+              opacity="0.85"
+            />
+          </svg>
+        </div>
+
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '7px',
+            backgroundColor: 'rgba(15, 35, 58, 0.9)',
+            border: '1px solid rgba(34, 211, 238, 0.35)',
+            borderRadius: '999px',
+            padding: '7px 14px',
+            marginBottom: '18px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
+          }}
+        >
+          <span
+            style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              backgroundColor: '#22C55E',
+              color: '#06101C',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '10px',
+              fontWeight: '900'
+            }}
+          >
+            ✓
+          </span>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: '#E2E8F0' }}>
+            Verificado • Auditoría Activa
+          </span>
+        </div>
+
+        <div
+          style={{
+            width: '100%',
+            height: '8px',
+            backgroundColor: '#0E1C2F',
+            border: '1px solid rgba(34, 211, 238, 0.45)',
+            borderRadius: '999px',
+            overflow: 'hidden',
+            padding: '1px',
+            boxSizing: 'border-box',
+            marginBottom: '12px'
+          }}
+        >
+          <div
+            style={{
+              height: '100%',
+              borderRadius: '999px',
+              background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
+              animation: 'loadProgress 2.4s ease-out forwards',
+              boxShadow: '0 0 12px rgba(34, 211, 238, 0.7)'
+            }}
+          />
+        </div>
+
+        <div style={{ fontSize: '12px', fontWeight: '600', color: '#CBD5E1', letterSpacing: '0.2px' }}>
+          Seguridad • Rapidez • Transparencia
+        </div>
+      </div>
+
+      <div style={{ fontSize: '11px', color: '#94A3B8', lineHeight: '1.45' }}>
+        Infraestructura auditada • Emblema de
+        <br />
+        Confianza Global
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [status, setStatus] = useState('loading');
   const [activeTab, setActiveTab] = useState('home');
   const [portfolioMode, setPortfolioMode] = useState('deposit');
   const [userData, setUserData] = useState(null);
   const [activePlans, setActivePlans] = useState([]);
+  const [currentLang, setCurrentLang] = useState('ES');
   const [transactions] = useState([
     { type: 'DEPOSIT', title: 'Depósito USDT', date: 'Hoy, 10:00 AM', amount: '50.00' },
     { type: 'YIELD', title: 'Rendimiento Diario', date: 'Ayer, 09:15 AM', amount: '2.50' }
@@ -47,8 +182,14 @@ export default function App() {
   const currentUserId = WebApp.initDataUnsafe?.user?.id || 8968109534;
 
   const verifyUser = useCallback(async (user) => {
+    const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1800));
+
     try {
-      const data = await botApi.verifyUser(user);
+      const [data] = await Promise.all([
+        botApi.verifyUser(user),
+        minSplashTime
+      ]);
+
       if (data && data.success) {
         setUserData({
           ...data.user,
@@ -62,6 +203,7 @@ export default function App() {
         setStatus('member');
       }
     } catch (err) {
+      await minSplashTime;
       setUserData({ id: currentUserId, balance: 0 });
       setStatus('member');
     }
@@ -100,11 +242,7 @@ export default function App() {
   };
 
   if (status === 'loading') {
-    return (
-      <div style={s.center}>
-        <div style={s.loader}></div>
-      </div>
-    );
+    return <LoadingSplash />;
   }
 
   return (
@@ -127,6 +265,8 @@ export default function App() {
             activePlans={activePlans}
             onNavigate={handleNavigate}
             onReinvest={handleReinvest}
+            currentLang={currentLang}
+            onLanguageChange={setCurrentLang}
           />
         )}
 
