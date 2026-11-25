@@ -314,26 +314,62 @@ export default function HomeTab({ userData, onNavigate, onLanguageChange, curren
         </div>
       </div>
 
-      {/* 5. BANNER PROMOCIONAL: +10% BONO */}
-      <div
-        onClick={() => {
-          safeHaptic('light');
-          onNavigate('portfolio', 'deposit');
-        }}
-        style={{
-          background: 'linear-gradient(90deg, #0284C7 0%, #6366F1 50%, #9333EA 100%)',
-          borderRadius: '14px',
-          padding: '12px 14px',
-          textAlign: 'center',
-          fontSize: '13px',
-          fontWeight: '800',
-          color: '#FFFFFF',
-          cursor: 'pointer',
-          boxShadow: '0 4px 16px rgba(147, 51, 234, 0.35)'
-        }}
-      >
-        ✨ <span style={{ color: '#FDE047' }}>+10% BONO</span> en tu 1er Depósito ✨
-      </div>
-    </div>
-  );
-}
+      {/* 5. BANNER PROMOCIONAL RENOVADO: +10% BONO */}
+<div
+  onClick={() => {
+    safeHaptic('light');
+    onNavigate('portfolio', 'deposit');
+  }}
+  style={{
+    background: 'linear-gradient(135deg, rgba(16, 32, 51, 0.95) 0%, rgba(24, 24, 58, 0.95) 55%, rgba(45, 22, 75, 0.92) 100%)',
+    border: '1px solid rgba(34, 211, 238, 0.35)',
+    borderRadius: '16px',
+    padding: '13px 16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+    cursor: 'pointer',
+    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+  }}
+>
+  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+    <span
+      style={{
+        width: '28px',
+        height: '28px',
+        borderRadius: '9px',
+        backgroundColor: 'rgba(34, 211, 238, 0.14)',
+        border: '1px solid rgba(34, 211, 238, 0.35)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+    </span>
+
+    <span style={{ fontSize: '13px', fontWeight: '800', color: '#F8FAFC', letterSpacing: '0.2px' }}>
+      <span style={{ color: '#22D3EE' }}>+10% BONO</span> en tu 1er Depósito
+    </span>
+  </div>
+
+  <span
+    style={{
+      backgroundColor: 'rgba(34, 211, 238, 0.16)',
+      color: '#22D3EE',
+      border: '1px solid rgba(34, 211, 238, 0.35)',
+      borderRadius: '999px',
+      padding: '4px 10px',
+      fontSize: '11px',
+      fontWeight: '800',
+      flexShrink: 0
+    }}
+  >
+    Activar
+  </span>
+</div>
+
