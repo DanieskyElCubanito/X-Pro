@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import toast from 'react-hot-toast';
 
-// Íconos circulares de USDT y TON para la barra de retiro
+// Ícono circular de USDT y TON para la barra de retiro
 const IconUSDT = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="11" fill="#26A17B" />
@@ -23,9 +23,28 @@ const IconTON = () => (
   </svg>
 );
 
-export default function HomeView({ userData, onNavigate, onReinvest }) {
-  const balance = Number(userData?.balance || 0);
-  const dailyChange = userData?.daily_change ?? '+5.0% hoy';
+// Ícono de Idioma (Globo / Mundo)
+const IconLanguage = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+// Ícono de Soporte (Auriculares / Headset)
+const IconSupport = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+  </svg>
+);
+
+export default function HomeTab({ userData, onNavigate, onLanguageChange, currentLang }) {
+  const [lang, setLang] = useState(currentLang || 'ES');
+
+  const balance = Number(userData?.balance ?? 1245.8);
+  const dailyChange = userData?.daily_change ?? '-2.4% hoy';
   const isNegative = String(dailyChange).includes('-');
 
   const safeHaptic = (style = 'medium') => {
@@ -34,22 +53,76 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
     } catch (e) {}
   };
 
-  const handleReinvestClick = () => {
-    safeHaptic('heavy');
-    if (balance < 1) {
-      return toast.error('Necesitas al menos $1.00 USD para reinvertir', {
-        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
+  const handleToggleLanguage = () => {
+    safeHaptic('light');
+    const nextLang = lang === 'ES' ? 'EN' : 'ES';
+    setLang(nextLang);
+    if (onLanguageChange) onLanguageChange(nextLang);
+    toast.success(nextLang === 'ES' ? 'Idioma: Español (ES)' : 'Language: English (EN)', {
+      style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+    });
+  };
+
+  const handleOpenSupport = () => {
+    safeHaptic('light');
+    try {
+      WebApp.openTelegramLink('https://t.me/CryptoWeb3Pay');
+    } catch (e) {
+      toast('Soporte disponible en @CryptoWeb3Pay', {
+        style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
       });
-    }
-    if (onReinvest) {
-      onReinvest(balance);
-    } else {
-      toast.success(`¡$${balance.toFixed(2)} USD reinvertidos al 5% diario!`);
     }
   };
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '12px' }}>
+
+      {/* BARRA SUPERIOR: LENGUAJE Y SOPORTE */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={handleToggleLanguage}
+          aria-label="Cambiar idioma"
+          style={{
+            backgroundColor: '#0F172A',
+            border: '1px solid #1E293B',
+            borderRadius: '999px',
+            padding: '6px 11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: '#F8FAFC',
+            fontSize: '12px',
+            fontWeight: '800',
+            cursor: 'pointer'
+          }}
+        >
+          <IconLanguage />
+          <span>{lang}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleOpenSupport}
+          aria-label="Soporte"
+          style={{
+            backgroundColor: '#0F172A',
+            border: '1px solid #1E293B',
+            borderRadius: '999px',
+            padding: '6px 11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: '#F8FAFC',
+            fontSize: '12px',
+            fontWeight: '800',
+            cursor: 'pointer'
+          }}
+        >
+          <IconSupport />
+          <span>{lang === 'ES' ? 'Soporte' : 'Support'}</span>
+        </button>
+      </div>
 
       {/* 1. TARJETA PRINCIPAL: SALDO ACTIVO */}
       <div
@@ -104,6 +177,7 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
 
       {/* 2. BOTÓN PRINCIPAL: DEPOSITAR */}
       <button
+        type="button"
         onClick={() => {
           safeHaptic('medium');
           onNavigate('portfolio', 'deposit');
@@ -197,6 +271,7 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
         {/* Botones Invertir y Reinvertir */}
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
+            type="button"
             onClick={() => {
               safeHaptic('medium');
               onNavigate('portfolio', 'deposit');
@@ -216,11 +291,12 @@ export default function HomeView({ userData, onNavigate, onReinvest }) {
             Invertir
           </button>
 
-              <button
-  onClick={() => {
-    safeHaptic('medium');
-    onNavigate('portfolio', 'reinvest');
-  }}
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('medium');
+              onNavigate('portfolio', 'reinvest');
+            }}
             style={{
               flex: 1,
               backgroundColor: '#1E293B',
