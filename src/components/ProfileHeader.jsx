@@ -29,7 +29,15 @@ const IconChevronRight = () => (
   </svg>
 );
 
-export default function ProfileView({ userData, transactions = [], onNavigate, onBack }) {
+// Ícono de Escudo Verificado
+const IconShieldCheck = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <polyline points="9 12 11 14 15 10" />
+  </svg>
+);
+
+export default function ProfileHeader({ userData, transactions = [], onNavigate, onBack }) {
   const tgUser = WebApp.initDataUnsafe?.user;
   const username = tgUser?.username ? `@${tgUser.username}` : userData?.username || '@usuario_tg';
   const userId = tgUser?.id || userData?.id || '987654321';
@@ -43,7 +51,7 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
   const totalReinvested = Number(userData?.total_reinvested ?? 140.0);
   const totalWithdrawn = Number(userData?.total_withdrawn ?? 320.0);
 
-  const [activeModal, setActiveModal] = useState(null); // null | 'wallets' | 'history' | 'security'
+  const [activeModal, setActiveModal] = useState(null); // null | 'wallets' | 'history' | 'verified'
   const [lang, setLang] = useState(tgUser?.language_code === 'en' ? 'English' : 'Español');
   const [bep20Wallet, setBep20Wallet] = useState(userData?.wallet_bep20 || '');
   const [tonWallet, setTonWallet] = useState(userData?.wallet_ton || '');
@@ -60,7 +68,7 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
   const handleSaveWallets = () => {
     safeHaptic('heavy');
     toast.success('Billeteras guardadas en tu perfil', {
-      style: { background: '#22D3EE', color: '#06101C', fontWeight: 'bold' }
+      style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
     });
     setActiveModal(null);
   };
@@ -75,18 +83,6 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
   };
 
   const menuItems = [
-    {
-      id: 'bonus',
-      label: 'Bono de Registro (+10%)',
-      labelColor: '#22D3EE',
-      bold: true,
-      onClick: () => {
-        safeHaptic('medium');
-        toast.success('¡Tu +10% de bono está activo en tu primer depósito!', {
-          style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
-        });
-      }
-    },
     {
       id: 'history',
       label: 'Historial de transacciones',
@@ -105,16 +101,6 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
       onClick: () => {
         safeHaptic('light');
         setActiveModal('wallets');
-      }
-    },
-    {
-      id: 'security',
-      label: 'Seguridad',
-      labelColor: '#CBD5E1',
-      bold: false,
-      onClick: () => {
-        safeHaptic('light');
-        setActiveModal('security');
       }
     },
     {
@@ -172,8 +158,8 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
             ? 'Configurar Billeteras'
             : activeModal === 'history'
             ? 'Historial'
-            : activeModal === 'security'
-            ? 'Seguridad'
+            : activeModal === 'verified'
+            ? 'Plataforma Verificada'
             : 'Mi Perfil'}
         </h2>
       </div>
@@ -281,8 +267,8 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
         </div>
       )}
 
-      {/* SUBVISTA: SEGURIDAD */}
-      {activeModal === 'security' && (
+      {/* SUBVISTA: DETALLE DE PLATAFORMA VERIFICADA */}
+      {activeModal === 'verified' && (
         <div
           style={{
             backgroundColor: '#0F172A',
@@ -294,16 +280,17 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
             gap: '10px'
           }}
         >
-          <div style={{ fontSize: '14px', fontWeight: '800', color: '#22D3EE' }}>
-            Sesión Verificada por Telegram
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22D3EE', fontWeight: '800', fontSize: '14px' }}>
+            <IconShieldCheck />
+            <span>Profit Core • Entidad & Operación Verificada</span>
           </div>
-          <p style={{ margin: 0, fontSize: '13px', color: '#CBD5E1', lineHeight: '1.45' }}>
-            Tu cuenta está vinculada de forma segura a tu ID de Telegram (<strong>{userId}</strong>). Todas las operaciones sensibles y retiros requieren validación directa.
+          <p style={{ margin: 0, fontSize: '13px', color: '#CBD5E1', lineHeight: '1.5' }}>
+            Operación respaldada bajo protocolos de trazabilidad en redes <strong>BNB Smart Chain (BEP-20)</strong> y <strong>The Open Network (TON)</strong>, con registro contable en tiempo real y soporte activo para la comunidad.
           </p>
         </div>
       )}
 
-      {/* VISTA PRINCIPAL DE MI PERFIL (Como la imagen) */}
+      {/* VISTA PRINCIPAL DE MI PERFIL */}
       {!activeModal && (
         <>
           {/* Tarjeta Superior: Avatar + Usuario + ID + Resumen de Saldos */}
@@ -400,6 +387,53 @@ export default function ProfileView({ userData, transactions = [], onNavigate, o
                 <IconTON /> GRAM/TON
               </span>
             </div>
+          </div>
+
+          {/* Sello de Confianza / Plataforma Verificada */}
+          <div
+            onClick={() => {
+              safeHaptic('light');
+              setActiveModal('verified');
+            }}
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid rgba(34, 211, 238, 0.35)',
+              borderRadius: '16px',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(34, 211, 238, 0.12)',
+                  border: '1px solid rgba(34, 211, 238, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <IconShieldCheck />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#22D3EE', lineHeight: '1.2' }}>
+                  Plataforma Verificada • Profit Core
+                </div>
+                <div style={{ fontSize: '11px', color: '#CBD5E1', marginTop: '2px' }}>
+                  Red auditada BEP-20 & TON • Operación 100% transparente
+                </div>
+              </div>
+            </div>
+            <IconChevronRight />
           </div>
 
           {/* Lista de Opciones */}
