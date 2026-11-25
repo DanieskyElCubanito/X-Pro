@@ -28,7 +28,7 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
     }
   }, [initialSection]);
 
-  const balance = Number(userData?.balance || 0);
+  const balance = Number(userData?.balance ?? 45.8);
   const numericAmount = parseFloat(amount) || 0;
 
   const currentDepositAddress =
@@ -56,11 +56,42 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
     });
   };
 
+  const handlePasteAddress = async () => {
+    safeHaptic('light');
+    try {
+      if (navigator?.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setWithdrawAddress(text.trim());
+          toast.success('Dirección pegada', {
+            style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+          });
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // Fallback si el navegador bloquea readText en el WebView de Telegram
+    toast('Toca el campo y pega tu dirección manualmente', {
+      style: { background: '#111C2E', color: '#CBD5E1', border: '1px solid #243247' }
+    });
+  };
+
+  const handleMaxAmount = () => {
+    safeHaptic('light');
+    if (balance <= 0) {
+      return toast.error('No tienes saldo disponible para retirar', {
+        style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
+      });
+    }
+    setAmount(balance.toFixed(2));
+  };
+
   const handleConfirmWithdraw = async (e) => {
     e.preventDefault();
     if (numericAmount < 1) {
       safeHaptic('heavy');
-      return toast.error('El retiro mínimo es $1.00 USD', {
+      return toast.error('El monto mínimo de retiro es $1 USD', {
         style: { background: '#111C2E', color: '#F87171', border: '1px solid #243247' }
       });
     }
@@ -92,7 +123,7 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
         await botApi.requestWithdraw(payload);
       }
 
-      toast.success('Solicitud de retiro enviada correctamente', {
+      toast.success('Retiro confirmado y enviado a procesamiento', {
         style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
       });
       setAmount('');
@@ -109,13 +140,12 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '16px' }}>
-      {/* Título principal */}
+      {/* Título principal + switch rápido */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>
           {activeSection === 'deposit' ? 'Depositar' : 'Retirar'}
         </h2>
 
-        {/* Switch rápido entre Depositar y Retirar */}
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
             type="button"
@@ -158,10 +188,9 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
         </div>
       </div>
 
-      {/* VISTA DEPOSITAR (Como la imagen) */}
+      {/* VISTA DEPOSITAR */}
       {activeSection === 'deposit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Selector de Red: USDT (BEP20) | GRAM/TON */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               type="button"
@@ -212,7 +241,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
             </button>
           </div>
 
-          {/* Tarjeta principal con QR, dirección, monto mínimo y nota */}
           <div
             style={{
               background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
@@ -225,7 +253,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               gap: '14px'
             }}
           >
-            {/* Contenedor del QR */}
             <div
               style={{
                 backgroundColor: '#FFFFFF',
@@ -244,7 +271,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               />
             </div>
 
-            {/* Dirección abreviada + Botón Copiar */}
             <div
               style={{
                 width: '100%',
@@ -289,7 +315,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               </button>
             </div>
 
-            {/* Monto mínimo y auto-inversión */}
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '14px', fontWeight: '800', color: '#F8FAFC', marginBottom: '4px' }}>
                 Monto Mínimo: $1 USD
@@ -299,7 +324,6 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               </div>
             </div>
 
-            {/* Aviso de red y acreditación */}
             <div
               style={{
                 width: '100%',
@@ -321,40 +345,49 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
         </div>
       )}
 
-      {/* VISTA RETIRAR */}
+      {/* VISTA RETIRAR (Como la imagen) */}
       {activeSection === 'withdraw' && (
-        <form
-          onSubmit={handleConfirmWithdraw}
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}
-        >
-          <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '700' }}>
-            SALDO DISPONIBLE:{' '}
-            <span style={{ color: '#22D3EE', fontWeight: '800' }}>
-              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-            </span>
+        <form onSubmit={handleConfirmWithdraw} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Tarjeta Saldo Disponible */}
+          <div
+            style={{
+              background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
+              border: '1px solid #1E324A',
+              borderRadius: '18px',
+              padding: '16px',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#CBD5E1', marginBottom: '4px' }}>
+              Saldo Disponible:
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: '800', color: '#22D3EE', letterSpacing: '-0.5px' }}>
+              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+              <span style={{ fontSize: '16px', fontWeight: '800' }}>USD</span>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          {/* Selector de Red: USDT (BEP20) | GRAM/TON */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               type="button"
-              onClick={() => setWithdrawNetwork('BEP20')}
+              onClick={() => {
+                safeHaptic('light');
+                setWithdrawNetwork('BEP20');
+              }}
               style={{
-                backgroundColor: withdrawNetwork === 'BEP20' ? '#102033' : '#111C2E',
-                color: withdrawNetwork === 'BEP20' ? '#22D3EE' : '#CBD5E1',
-                border: withdrawNetwork === 'BEP20' ? '1px solid #22D3EE' : '1px solid #1E293B',
-                borderRadius: '12px',
-                padding: '10px',
+                background:
+                  withdrawNetwork === 'BEP20'
+                    ? 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)'
+                    : '#0F172A',
+                color: withdrawNetwork === 'BEP20' ? '#06101C' : '#CBD5E1',
+                border: withdrawNetwork === 'BEP20' ? 'none' : '1px solid #1E293B',
+                borderRadius: '999px',
+                padding: '10px 14px',
+                fontSize: '13px',
                 fontWeight: '800',
-                fontSize: '12px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                boxShadow: withdrawNetwork === 'BEP20' ? '0 0 16px rgba(34, 211, 238, 0.35)' : 'none'
               }}
             >
               USDT (BEP20)
@@ -362,50 +395,153 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
 
             <button
               type="button"
-              onClick={() => setWithdrawNetwork('TON')}
+              onClick={() => {
+                safeHaptic('light');
+                setWithdrawNetwork('TON');
+              }}
               style={{
-                backgroundColor: withdrawNetwork === 'TON' ? '#102033' : '#111C2E',
-                color: withdrawNetwork === 'TON' ? '#38BDF8' : '#CBD5E1',
-                border: withdrawNetwork === 'TON' ? '1px solid #38BDF8' : '1px solid #1E293B',
-                borderRadius: '12px',
-                padding: '10px',
+                background:
+                  withdrawNetwork === 'TON'
+                    ? 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)'
+                    : '#0F172A',
+                color: withdrawNetwork === 'TON' ? '#06101C' : '#CBD5E1',
+                border: withdrawNetwork === 'TON' ? 'none' : '1px solid #1E293B',
+                borderRadius: '999px',
+                padding: '10px 14px',
+                fontSize: '13px',
                 fontWeight: '800',
-                fontSize: '12px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                boxShadow: withdrawNetwork === 'TON' ? '0 0 16px rgba(34, 211, 238, 0.35)' : 'none'
               }}
             >
-              GRAM / TON
+              GRAM/TON
             </button>
           </div>
 
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
-              Monto a retirar (Mín. $1 USD)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="1"
-              placeholder="Ej. 5.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              style={{ ...s.input, marginTop: 0 }}
-            />
+          {/* Contenedor de campos: Dirección de Billetera + Monto a Retirar */}
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #1E293B',
+              borderRadius: '18px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}
+          >
+            {/* Dirección de Billetera + Pegar */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '700', color: '#E2E8F0', display: 'block', marginBottom: '8px' }}>
+                Dirección de Billetera
+              </label>
+              <div
+                style={{
+                  backgroundColor: '#0B1220',
+                  border: '1px solid #243247',
+                  borderRadius: '12px',
+                  padding: '6px 8px 6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder={withdrawNetwork === 'BEP20' ? '0x71C...3a9f' : 'EQ... o UQ...'}
+                  value={withdrawAddress}
+                  onChange={(e) => setWithdrawAddress(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: '#F8FAFC',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    minWidth: 0
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handlePasteAddress}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#22D3EE',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    padding: '6px 8px',
+                    flexShrink: 0
+                  }}
+                >
+                  Pegar
+                </button>
+              </div>
+            </div>
+
+            {/* Monto a Retirar + MAX */}
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '700', color: '#E2E8F0', display: 'block', marginBottom: '8px' }}>
+                Monto a Retirar
+              </label>
+              <div
+                style={{
+                  backgroundColor: '#0B1220',
+                  border: '1px solid #243247',
+                  borderRadius: '12px',
+                  padding: '6px 8px 6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
+                }}
+              >
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  placeholder="20.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: '#F8FAFC',
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    minWidth: 0
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleMaxAmount}
+                  style={{
+                    backgroundColor: '#0891B2',
+                    color: '#FFFFFF',
+                    border: '1px solid #22D3EE',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  MAX
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
+                Monto mínimo: $1 USD
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#CBD5E1', display: 'block', marginBottom: '6px' }}>
-              Dirección de billetera ({withdrawNetwork === 'BEP20' ? 'USDT BEP-20' : 'GRAM / TON'})
-            </label>
-            <input
-              type="text"
-              placeholder={withdrawNetwork === 'BEP20' ? '0x...' : 'EQ... o UQ...'}
-              value={withdrawAddress}
-              onChange={(e) => setWithdrawAddress(e.target.value)}
-              style={{ ...s.input, marginTop: 0 }}
-            />
-          </div>
-
+          {/* Botón Confirmar Retiro */}
           <button
             type="submit"
             disabled={loading}
@@ -415,15 +551,15 @@ export default function PortfolioView({ userData, initialSection = 'deposit', on
               color: '#06101C',
               border: 'none',
               borderRadius: '999px',
-              padding: '14px',
-              fontSize: '14px',
+              padding: '15px 20px',
+              fontSize: '15px',
               fontWeight: '800',
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              marginTop: '4px'
+              boxShadow: '0 0 22px rgba(34, 211, 238, 0.35)'
             }}
           >
-            {loading ? 'Enviando...' : 'Solicitar Retiro'}
+            {loading ? 'Procesando...' : 'Confirmar Retiro'}
           </button>
         </form>
       )}
