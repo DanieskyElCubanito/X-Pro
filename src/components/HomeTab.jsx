@@ -314,7 +314,7 @@ export default function HomeTab({ userData, onNavigate, onLanguageChange, curren
         </div>
       </div>
 
-      {/* 5. BANNER PROMOCIONAL RENOVADO: +10% BONO */}
+      // 5. BANNER PROMOCIONAL RENOVADO: +10% BONO 
 <div
   onClick={() => {
     safeHaptic('light');
