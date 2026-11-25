@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <!-- Evita parpadeos blancos en la barra de estado del celular -->
-    <meta name="theme-color" content="#0a0314" />
+    <meta name="theme-color" content="#070E1A" />
 
-    <title>Red Neón ⚡</title>
+    <title>Profit Core</title>
 
     <!-- 1. Telegram Web App SDK (Carga prioritaria) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -19,18 +19,18 @@
     <script src="https://ad.gigapub.tech/script?id=8567"></script>
 
     <style>
-      /* FONDO NEÓN Y SCROLL DESBLOQUEADO */
+      /* FONDO OSCURO CON ACENTOS CIAN Y SCROLL DESBLOQUEADO */
       body, html {
         margin: 0;
         padding: 0;
         height: 100%;
-        background-color: #0a0314;
-        color: #ffffff;
+        background-color: #070E1A;
+        color: #F8FAFC;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
         /* Bloqueamos el rebote nativo de iOS/Android pero PERMITIMOS el deslizamiento táctil */
-        overflow: hidden; 
-        touch-action: pan-y; 
+        overflow: hidden;
+        touch-action: pan-y;
       }
 
       #root {
@@ -41,33 +41,113 @@
       #fallback-loader {
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: space-between;
         align-items: center;
-        height: 100vh;
+        min-height: 100vh;
         width: 100vw;
         position: fixed;
         top: 0;
         left: 0;
         z-index: 9999;
-        background-color: #0a0314;
-        background-image: radial-gradient(circle at center, #260b3f 0%, #0a0314 85%);
+        padding: 48px 24px 28px 24px;
+        box-sizing: border-box;
+        text-align: center;
+        background: radial-gradient(circle at 50% 35%, #0F233A 0%, #070E1A 70%, #050912 100%);
       }
 
-      /* Círculo de carga con brillo Neón */
-      .spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid rgba(255, 65, 180, 0.2);
-        border-top-color: #00f0ff;
-        border-right-color: #ff1493;
+      .splash-center {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 300px;
+      }
+
+      .neon-cube {
+        margin-bottom: 26px;
+        animation: pulseGlow 2.2s ease-in-out infinite;
+      }
+
+      @keyframes pulseGlow {
+        0%, 100% {
+          filter: drop-shadow(0 0 12px rgba(34, 211, 238, 0.55));
+          transform: scale(1);
+        }
+        50% {
+          filter: drop-shadow(0 0 24px rgba(34, 211, 238, 0.9));
+          transform: scale(1.03);
+        }
+      }
+
+      .verified-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background-color: rgba(15, 35, 58, 0.9);
+        border: 1px solid rgba(34, 211, 238, 0.35);
+        border-radius: 999px;
+        padding: 7px 14px;
+        margin-bottom: 18px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      }
+
+      .verified-check {
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
-        animation: spin 0.9s linear infinite;
-        box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        background-color: #22C55E;
+        color: #06101C;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
       }
 
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+      .verified-text {
+        font-size: 12px;
+        font-weight: 700;
+        color: #E2E8F0;
+      }
+
+      .progress-track {
+        width: 100%;
+        height: 8px;
+        background-color: #0E1C2F;
+        border: 1px solid rgba(34, 211, 238, 0.45);
+        border-radius: 999px;
+        overflow: hidden;
+        padding: 1px;
+        box-sizing: border-box;
+        margin-bottom: 12px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%);
+        animation: loadProgress 2.4s ease-out forwards;
+        box-shadow: 0 0 12px rgba(34, 211, 238, 0.7);
+      }
+
+      @keyframes loadProgress {
+        0% { width: 18%; }
+        50% { width: 68%; }
+        100% { width: 92%; }
+      }
+
+      .splash-pillars {
+        font-size: 12px;
+        font-weight: 600;
+        color: #CBD5E1;
+        letter-spacing: 0.2px;
+      }
+
+      .splash-footer {
+        font-size: 11px;
+        color: #94A3B8;
+        line-height: 1.45;
       }
 
       .fade-in {
@@ -83,8 +163,48 @@
   <body>
     <div id="root">
       <div id="fallback-loader">
-        <div class="spinner"></div>
-        <p style="margin-top: 20px; font-size: 14px; font-weight: 900; color: #ff66cc; letter-spacing: 1px;">CARGANDO Click Network...</p>
+        <div />
+
+        <div class="splash-center">
+          <div class="neon-cube">
+            <svg width="112" height="112" viewBox="0 0 120 120" fill="none">
+              <polygon
+                points="60,12 102,36 102,84 60,108 18,84 18,36"
+                stroke="#22D3EE"
+                stroke-width="4.5"
+                stroke-linejoin="round"
+              />
+              <line x1="60" y1="60" x2="60" y2="12" stroke="#22D3EE" stroke-width="3.5" />
+              <line x1="60" y1="60" x2="102" y2="84" stroke="#22D3EE" stroke-width="3.5" />
+              <line x1="60" y1="60" x2="18" y2="84" stroke="#22D3EE" stroke-width="3.5" />
+              <polygon
+                points="60,34 82,47 82,73 60,86 38,73 38,47"
+                stroke="#67E8F9"
+                stroke-width="2.5"
+                stroke-linejoin="round"
+                opacity="0.85"
+              />
+            </svg>
+          </div>
+
+          <div class="verified-pill">
+            <span class="verified-check">✓</span>
+            <span class="verified-text">Verificado • Auditoría Activa</span>
+          </div>
+
+          <div class="progress-track">
+            <div class="progress-fill"></div>
+          </div>
+
+          <div class="splash-pillars">
+            Seguridad • Rapidez • Transparencia
+          </div>
+        </div>
+
+        <div class="splash-footer">
+          Infraestructura auditada • Emblema de<br />
+          Confianza Global
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.jsx"></script>
