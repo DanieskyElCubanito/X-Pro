@@ -3,55 +3,51 @@ import WebApp from '@twa-dev/sdk';
 import toast from 'react-hot-toast';
 import { s } from '../styles/appStyles';
 
-const IconChevronRight = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="9 18 15 12 9 6" />
+const IconUser = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
-const IconShieldCheck = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    <polyline points="9 12 11 14 15 10" />
+const IconGear = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
 );
 
-export default function ProfileHeader({ userData, transactions = [], onBack }) {
+export default function ProfileHeader({
+  userData,
+  transactions = [],
+  lang = 'es',
+  setLang,
+  activeModal,
+  setActiveModal,
+  t
+}) {
   const tgUser = WebApp.initDataUnsafe?.user;
-  const username = tgUser?.username ? `@${tgUser.username}` : userData?.username || '@usuario_tg';
-  const userId = tgUser?.id || userData?.id || '987654321';
-  const photoUrl =
-    tgUser?.photo_url ||
-    userData?.photo_url ||
-    'https://i.pravatar.cc/120?img=12';
+  const displayName =
+    userData?.username && userData.username !== 'Usuario'
+      ? userData.username
+      : tgUser?.first_name || tgUser?.username || 'User123';
 
-  const availableBalance = Number(userData?.balance ?? 45.8);
-  const activeInvestments = Number(userData?.active_investments ?? 1245.8);
-  const totalReinvested = Number(userData?.total_reinvested ?? 140.0);
-  const totalWithdrawn = Number(userData?.total_withdrawn ?? 320.0);
-
-  const [activeModal, setActiveModal] = useState(null); // null | 'wallets' | 'history' | 'verified'
-  const [lang, setLang] = useState(tgUser?.language_code === 'en' ? 'English' : 'Español');
   const [bep20Wallet, setBep20Wallet] = useState(userData?.wallet_bep20 || '');
   const [tonWallet, setTonWallet] = useState(userData?.wallet_ton || '');
 
   const safeHaptic = (style = 'light') => {
     try {
       if (WebApp.HapticFeedback) WebApp.HapticFeedback.impactOccurred(style);
-    } catch (e) {}
+    } catch {}
   };
 
-  const formatUSD = (val) =>
-    val.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const openTelegramUrl = (url, label) => {
+  const handleToggleLang = () => {
     safeHaptic('light');
-    try {
-      WebApp.openTelegramLink(url);
-    } catch (e) {
-      window.open(url, '_blank');
-      toast(`${label}: ${url}`, {
-        style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+    if (typeof setLang === 'function') {
+      const next = lang === 'es' ? 'en' : 'es';
+      setLang(next);
+      toast.success(`Idioma: ${next.toUpperCase()}`, {
+        style: { background: '#0F172A', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.14)' }
       });
     }
   };
@@ -59,115 +55,210 @@ export default function ProfileHeader({ userData, transactions = [], onBack }) {
   const handleSaveWallets = () => {
     safeHaptic('heavy');
     toast.success('Billeteras guardadas en tu perfil', {
-      style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+      style: { background: '#0F172A', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.14)' }
     });
-    setActiveModal(null);
+    if (typeof setActiveModal === 'function') setActiveModal(null);
   };
 
-  const handleToggleLang = () => {
-    safeHaptic('light');
-    const nextLang = lang === 'Español' ? 'English' : 'Español';
-    setLang(nextLang);
-    toast.success(`Idioma: ${nextLang}`, {
-      style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
-    });
-  };
-
-  const menuItems = [
-    {
-      id: 'history',
-      label: 'Historial de transacciones',
-      labelColor: '#CBD5E1',
-      onClick: () => {
-        safeHaptic('light');
-        setActiveModal('history');
-      }
-    },
-    {
-      id: 'wallets',
-      label: 'Configurar billeteras (USDT/TON)',
-      labelColor: '#CBD5E1',
-      onClick: () => {
-        safeHaptic('light');
-        setActiveModal('wallets');
-      }
-    },
-    {
-      id: 'payments_channel',
-      label: 'Canal de pagos',
-      labelColor: '#22D3EE',
-      onClick: () => openTelegramUrl('https://t.me/CryptoWeb3Pay', 'Canal de pagos')
-    },
-    {
-      id: 'info_channel',
-      label: 'Canal de información',
-      labelColor: '#CBD5E1',
-      onClick: () => openTelegramUrl('https://t.me/TheDannyDev', 'Canal de información')
-    },
-    {
-      id: 'support_group',
-      label: 'Grupo de ayuda y soporte',
-      labelColor: '#CBD5E1',
-      onClick: () => openTelegramUrl('https://t.me/CryptoWeb3Pay', 'Grupo de ayuda y soporte')
-    },
-    {
-      id: 'lang',
-      label: `Idioma: ${lang}`,
-      labelColor: '#CBD5E1',
-      onClick: handleToggleLang
-    }
-  ];
+  const currentLangCode = String(lang || 'es').toUpperCase();
 
   return (
-    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '16px' }}>
-      {/* Encabezado Superior (sin botón Atrás en la vista principal de Perfil) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {activeModal && (
-          <button
-            type="button"
-            onClick={() => {
-              safeHaptic('light');
-              setActiveModal(null);
-            }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {/* Barra superior: Avatar + Nombre a la izquierda, Idioma a la derecha */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '4px 2px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          {activeModal ? (
+            <button
+              type="button"
+              onClick={() => {
+                safeHaptic('light');
+                setActiveModal(null);
+              }}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '10px',
+                color: '#E2E8F0',
+                fontSize: '12px',
+                fontWeight: '700',
+                padding: '6px 10px',
+                cursor: 'pointer'
+              }}
+            >
+              ← Atrás
+            </button>
+          ) : (
+            <div
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <IconUser />
+            </div>
+          )}
+
+          <span
             style={{
-              background: 'none',
-              border: 'none',
-              color: '#94A3B8',
-              fontSize: '14px',
+              fontSize: '15px',
               fontWeight: '700',
-              cursor: 'pointer',
-              padding: '4px 0'
+              color: '#F8FAFC',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
           >
-            ← Atrás
-          </button>
-        )}
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: '#F8FAFC' }}>
-          {activeModal === 'wallets'
-            ? 'Configurar Billeteras'
-            : activeModal === 'history'
-            ? 'Historial'
-            : activeModal === 'verified'
-            ? 'Plataforma Verificada'
-            : 'Mi Perfil'}
-        </h2>
+            {activeModal === 'about'
+              ? t?.('home_about') || 'ACERCA'
+              : activeModal === 'terms'
+              ? t?.('home_terms') || 'TÉRMINOS'
+              : activeModal === 'history'
+              ? t?.('home_history') || 'Historial'
+              : activeModal === 'wallets'
+              ? 'Billeteras'
+              : displayName}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleToggleLang}
+          style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '10px',
+            padding: '6px 10px',
+            color: '#E2E8F0',
+            fontSize: '12px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            flexShrink: 0
+          }}
+        >
+          <IconGear />
+          <span>Idioma: {currentLangCode}</span>
+        </button>
       </div>
 
-      {/* SUBVISTA: CONFIGURAR BILLETERAS */}
+      {/* Subvistas al pulsar Acerca, Términos, Historial o Billeteras */}
+      {activeModal === 'about' && (
+        <div
+          style={{
+            background: 'linear-gradient(180deg, rgba(20, 27, 38, 0.95) 0%, rgba(10, 14, 21, 0.98) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            padding: '16px',
+            fontSize: '13px',
+            color: '#CBD5E1',
+            lineHeight: 1.55
+          }}
+        >
+          <div style={{ fontWeight: '800', color: '#F8FAFC', marginBottom: '6px' }}>
+            Acerca de la Plataforma
+          </div>
+          Plataforma de tráfico y misiones en Telegram con conversión fija de 1 USD = 1,000 Créditos / $TGM.
+        </div>
+      )}
+
+      {activeModal === 'terms' && (
+        <div
+          style={{
+            background: 'linear-gradient(180deg, rgba(20, 27, 38, 0.95) 0%, rgba(10, 14, 21, 0.98) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            padding: '16px',
+            fontSize: '13px',
+            color: '#CBD5E1',
+            lineHeight: 1.55
+          }}
+        >
+          <div style={{ fontWeight: '800', color: '#F8FAFC', marginBottom: '6px' }}>
+            Términos y Condiciones
+          </div>
+          No se permiten multicuentas ni automatizaciones fraudulentas. Los fondos de campaña se destinan a la creación de anuncios y los saldos ganados en $TGM se liquidan según las reglas de la red.
+        </div>
+      )}
+
+      {activeModal === 'history' && (
+        <div
+          style={{
+            background: 'linear-gradient(180deg, rgba(20, 27, 38, 0.95) 0%, rgba(10, 14, 21, 0.98) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}
+        >
+          {transactions.length === 0 ? (
+            <div style={{ fontSize: '12px', color: '#94A3B8', textAlign: 'center', padding: '14px 0' }}>
+              Sin movimientos registrados todavía.
+            </div>
+          ) : (
+            transactions.slice(0, 15).map((tx, idx) => (
+              <div
+                key={tx.id || idx}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.07)'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#F8FAFC' }}>
+                    {tx.title || 'Movimiento'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94A3B8' }}>
+                    {tx.description || tx.date || ''}
+                  </div>
+                </div>
+                {tx.amount !== undefined && (
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: '#E2E8F0' }}>
+                    {Number(tx.amount) >= 0 ? `+${tx.amount}` : tx.amount}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {activeModal === 'wallets' && (
         <div
           style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
+            background: 'linear-gradient(180deg, rgba(20, 27, 38, 0.95) 0%, rgba(10, 14, 21, 0.98) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '10px'
           }}
         >
           <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#22D3EE', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>
               Billetera USDT (BEP-20)
             </label>
             <input
@@ -178,259 +269,36 @@ export default function ProfileHeader({ userData, transactions = [], onBack }) {
               style={{ ...s.input, marginTop: 0 }}
             />
           </div>
-
           <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#38BDF8', display: 'block', marginBottom: '6px' }}>
-              Billetera GRAM / TON
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>
+              Billetera TON
             </label>
             <input
               type="text"
-              placeholder="EQ... o UQ..."
+              placeholder="UQ... o EQ..."
               value={tonWallet}
               onChange={(e) => setTonWallet(e.target.value)}
               style={{ ...s.input, marginTop: 0 }}
             />
           </div>
-
           <button
             type="button"
             onClick={handleSaveWallets}
             style={{
               width: '100%',
-              background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
-              color: '#06101C',
-              border: 'none',
-              borderRadius: '999px',
-              padding: '13px',
-              fontWeight: '800',
-              fontSize: '14px',
-              cursor: 'pointer',
-              marginTop: '4px'
+              padding: '11px',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '10px',
+              color: '#F8FAFC',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: 'pointer'
             }}
           >
-            Guardar Billeteras
+            Guardar
           </button>
         </div>
-      )}
-
-      {/* SUBVISTA: HISTORIAL DE TRANSACCIONES */}
-      {activeModal === 'history' && (
-        <div
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}
-        >
-          {transactions.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>
-              No hay transacciones registradas todavía.
-            </p>
-          ) : (
-            transactions.map((tx, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '10px 12px',
-                  borderRadius: '12px',
-                  backgroundColor: '#111C2E',
-                  border: '1px solid #1E293B'
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#F8FAFC' }}>{tx.title}</div>
-                  <div style={{ fontSize: '11px', color: '#94A3B8' }}>{tx.date}</div>
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#22C55E' }}>
-                  +${tx.amount} USD
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* SUBVISTA: DETALLE DE PLATAFORMA VERIFICADA */}
-      {activeModal === 'verified' && (
-        <div
-          style={{
-            backgroundColor: '#0F172A',
-            border: '1px solid #1E293B',
-            borderRadius: '18px',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22D3EE', fontWeight: '800', fontSize: '14px' }}>
-            <IconShieldCheck />
-            <span>Profit Core • Entidad & Operación Verificada</span>
-          </div>
-          <p style={{ margin: 0, fontSize: '13px', color: '#CBD5E1', lineHeight: '1.5' }}>
-            Operación respaldada bajo protocolos de trazabilidad en redes <strong>BNB Smart Chain (BEP-20)</strong> y <strong>The Open Network (TON)</strong>, con registro contable en tiempo real y canales oficiales activos.
-          </p>
-        </div>
-      )}
-
-      {/* VISTA PRINCIPAL DE MI PERFIL */}
-      {!activeModal && (
-        <>
-          {/* Tarjeta Superior: Avatar + Usuario + ID + Resumen de Saldos */}
-          <div
-            style={{
-              background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
-              border: '1px solid #1E324A',
-              borderRadius: '18px',
-              padding: '14px 16px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <img
-                src={photoUrl}
-                alt={username}
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid #22D3EE',
-                  flexShrink: 0
-                }}
-              />
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: '17px',
-                    fontWeight: '800',
-                    color: '#F8FAFC',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {username}
-                </div>
-                <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: '600' }}>
-                  ID: {userId}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ height: '1px', backgroundColor: 'rgba(148, 163, 184, 0.14)', marginBottom: '12px' }} />
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-              <div style={{ color: '#E2E8F0', fontWeight: '700' }}>
-                Saldo Disponible:{' '}
-                <span style={{ color: '#FFFFFF', fontWeight: '800' }}>${formatUSD(availableBalance)} USD</span>
-              </div>
-              <div style={{ color: '#CBD5E1', fontWeight: '600' }}>
-                Inversiones Activas:{' '}
-                <span style={{ color: '#F8FAFC', fontWeight: '700' }}>${formatUSD(activeInvestments)} USD</span>
-              </div>
-              <div style={{ color: '#CBD5E1', fontWeight: '600' }}>
-                Reinvertido Total:{' '}
-                <span style={{ color: '#F8FAFC', fontWeight: '700' }}>${formatUSD(totalReinvested)} USD</span>
-              </div>
-              <div style={{ color: '#CBD5E1', fontWeight: '600' }}>
-                Total Retirado:{' '}
-                <span style={{ color: '#F8FAFC', fontWeight: '700' }}>${formatUSD(totalWithdrawn)} USD</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Sello de Confianza / Plataforma Verificada */}
-          <div
-            onClick={() => {
-              safeHaptic('light');
-              setActiveModal('verified');
-            }}
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid rgba(34, 211, 238, 0.35)',
-              borderRadius: '16px',
-              padding: '12px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(34, 211, 238, 0.12)',
-                  border: '1px solid rgba(34, 211, 238, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}
-              >
-                <IconShieldCheck />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#22D3EE', lineHeight: '1.2' }}>
-                  Plataforma Verificada • Profit Core
-                </div>
-                <div style={{ fontSize: '11px', color: '#CBD5E1', marginTop: '2px' }}>
-                  Red auditada BEP-20 & TON • Operación 100% transparente
-                </div>
-              </div>
-            </div>
-            <IconChevronRight />
-          </div>
-
-          {/* Lista de Opciones */}
-          <div
-            style={{
-              backgroundColor: '#0F172A',
-              border: '1px solid #1E293B',
-              borderRadius: '18px',
-              overflow: 'hidden',
-              marginTop: '2px'
-            }}
-          >
-            {menuItems.map((item, idx) => (
-              <div
-                key={item.id}
-                onClick={item.onClick}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '13px 16px',
-                  cursor: 'pointer',
-                  borderBottom: idx !== menuItems.length - 1 ? '1px solid rgba(148, 163, 184, 0.12)' : 'none',
-                  backgroundColor: '#0F172A'
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: item.id === 'payments_channel' ? '800' : '600',
-                    color: item.labelColor
-                  }}
-                >
-                  {item.label}
-                </span>
-                <IconChevronRight />
-              </div>
-            ))}
-          </div>
-        </>
       )}
     </div>
   );
