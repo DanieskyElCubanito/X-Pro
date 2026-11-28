@@ -277,7 +277,7 @@ export default function HomeTab({ userData, activePlans = [], onNavigate, onLang
               boxShadow: '0 4px 12px rgba(34, 211, 238, 0.25)'
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: '800', lineHeight: '1.25' }}>Reinversión Manual</div>
+            <div style={{ fontSize: '12px', fontWeight: '800', lineHeight: '1.25' }}>Reinversión</div>
             <div style={{ fontSize: '10px', fontWeight: '700', marginTop: '2px', opacity: 0.85 }}>(Mín. $1 USD)</div>
           </div>
         </div>
