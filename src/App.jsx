@@ -167,6 +167,22 @@ function LoadingSplash() {
   );
 }
 
+const formatTransactions = (rawList = []) =>
+  rawList.map((tx) => ({
+    type: tx.type,
+    title: tx.title,
+    date: tx.created_at
+      ? new Date(tx.created_at).toLocaleString('es-ES', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : tx.date || '',
+    amount: Number(tx.amount || 0).toFixed(2),
+    status: tx.status || 'completed'
+  }));
+
 export default function App() {
   const [status, setStatus] = useState('loading');
   const [activeTab, setActiveTab] = useState('home');
@@ -174,51 +190,59 @@ export default function App() {
   const [userData, setUserData] = useState(null);
   const [activePlans, setActivePlans] = useState([]);
   const [currentLang, setCurrentLang] = useState('ES');
-  const [transactions] = useState([
-    { type: 'DEPOSIT', title: 'Depósito USDT', date: 'Hoy, 10:00 AM', amount: '50.00' },
-    { type: 'YIELD', title: 'Rendimiento Diario', date: 'Ayer, 09:15 AM', amount: '2.50' }
-  ]);
+  const [transactions, setTransactions] = useState([]);
 
-  const currentUserId = WebApp.initDataUnsafe?.user?.id || 8968109534;
+  const tgUser = WebApp.initDataUnsafe?.user;
+  const currentUserId = tgUser?.id || 8968109534;
+  const startParam = WebApp.initDataUnsafe?.start_param || null;
 
-  const verifyUser = useCallback(async (user) => {
-    const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1800));
+  const verifyUser = useCallback(
+    async (user) => {
+      const minSplashTime = new Promise((resolve) => setTimeout(resolve, 1800));
 
-    try {
-      const [data] = await Promise.all([
-        botApi.verifyUser(user),
-        minSplashTime
-      ]);
+      try {
+        const [data] = await Promise.all([
+          botApi.verifyUser(user, startParam),
+          minSplashTime
+        ]);
 
-      if (data && data.success) {
-        setUserData({
-          ...data.user,
-          id: currentUserId,
-          photo_url: WebApp.initDataUnsafe?.user?.photo_url || 'https://via.placeholder.com/100'
-        });
-        setActivePlans(data.plans || []);
-        setStatus('member');
-      } else {
+        if (data && data.success) {
+          setUserData({
+            ...data.user,
+            id: currentUserId,
+            photo_url:
+              tgUser?.photo_url ||
+              data.user?.photo_url ||
+              'https://i.pravatar.cc/120?img=12'
+          });
+          setActivePlans(data.plans || []);
+          if (Array.isArray(data.transactions)) {
+            setTransactions(formatTransactions(data.transactions));
+          }
+          setStatus('member');
+        } else {
+          setUserData({ id: currentUserId, balance: 0 });
+          setStatus('member');
+        }
+      } catch (err) {
+        await minSplashTime;
         setUserData({ id: currentUserId, balance: 0 });
         setStatus('member');
       }
-    } catch (err) {
-      await minSplashTime;
-      setUserData({ id: currentUserId, balance: 0 });
-      setStatus('member');
-    }
-  }, [currentUserId]);
+    },
+    [currentUserId, startParam, tgUser?.photo_url]
+  );
 
   useEffect(() => {
     try {
       WebApp.ready();
       WebApp.expand();
-      const user = WebApp.initDataUnsafe?.user || { id: 8968109534, username: 'TestUser' };
+      const user = tgUser || { id: 8968109534, username: 'TestUser' };
       verifyUser(user);
     } catch (e) {
       setStatus('error');
     }
-  }, [verifyUser]);
+  }, [verifyUser, tgUser]);
 
   const handleNavigate = (tab, mode = 'deposit') => {
     if (tab === 'portfolio') {
@@ -230,14 +254,14 @@ export default function App() {
   const handleReinvest = async (amountToReinvest) => {
     try {
       if (botApi?.reinvestBalance) {
-        await botApi.reinvestBalance({ user_id: userData?.id, amount: amountToReinvest });
+        await botApi.reinvestBalance({ user_id: userData?.id || currentUserId, amount: amountToReinvest });
       }
       toast.success(`¡$${Number(amountToReinvest).toFixed(2)} USD reinvertidos al 5% diario!`, {
         style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
       });
-      verifyUser(WebApp.initDataUnsafe?.user || { id: currentUserId, username: 'TestUser' });
+      await verifyUser(tgUser || { id: currentUserId, username: 'TestUser' });
     } catch (e) {
-      toast.error('No se pudo completar la reinversión');
+      toast.error(e?.message || 'No se pudo completar la reinversión');
     }
   };
 
@@ -294,7 +318,7 @@ export default function App() {
               activePlans={activePlans}
               initialSection={portfolioMode}
               onUpdate={() =>
-                verifyUser(WebApp.initDataUnsafe?.user || { id: currentUserId, username: 'TestUser' })
+                verifyUser(tgUser || { id: currentUserId, username: 'TestUser' })
               }
             />
           </div>
