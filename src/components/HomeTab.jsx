@@ -1,285 +1,390 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import WebApp from '@twa-dev/sdk';
 import toast from 'react-hot-toast';
-import ProfileHeader from './ProfileHeader';
 
-const IconClock = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <polyline points="12 7 12 12 15 15" />
+// Ícono circular de USDT y TON para la barra de retiro
+const IconUSDT = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="11" fill="#26A17B" />
+    <path
+      d="M13.2 10.6V8.8H16.8V6.5H7.2V8.8H10.8V10.6C8.1 10.8 6.1 11.4 6.1 12.1C6.1 12.8 8.1 13.4 10.8 13.6V18.2H13.2V13.6C15.9 13.4 17.9 12.8 17.9 12.1C17.9 11.4 15.9 10.8 13.2 10.6ZM12 12.9C9.4 12.9 7.5 12.5 7.5 12.1C7.5 11.7 9.4 11.3 12 11.3C14.6 11.3 16.5 11.7 16.5 12.1C16.5 12.5 14.6 12.9 12 12.9Z"
+      fill="#FFFFFF"
+    />
   </svg>
 );
 
-const formatCompactStat = (val, isCurrency = false) => {
-  const num = Number(val || 0);
-  const abs = Math.abs(num);
-  const prefix = isCurrency ? '$' : '';
-  if (abs >= 1_000_000) return `${prefix}${(num / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${prefix}${(num / 1_000).toFixed(1)}K`;
-  return isCurrency ? `${prefix}${num.toFixed(2)}` : `${Math.round(num)}`;
-};
+const IconTON = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="11" fill="#0098EA" />
+    <path
+      d="M15.8 7.5H8.2C7.3 7.5 6.8 8.5 7.3 9.2L11.4 16.3C11.7 16.8 12.3 16.8 12.6 16.3L16.7 9.2C17.2 8.5 16.7 7.5 15.8 7.5ZM11.3 13.8L8.9 9.5C8.8 9.3 8.9 9 9.2 9H11.3V13.8ZM15.1 9.5L12.7 13.8V9H14.8C15.1 9 15.2 9.3 15.1 9.5Z"
+      fill="#FFFFFF"
+    />
+  </svg>
+);
 
-const styles = {
-  container: {
-    color: '#F3F4F6',
-    paddingBottom: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  },
-  subNav: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '4px 2px 10px 2px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.07)'
-  },
-  subNavBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: '#94A3B8',
-    fontSize: '11px',
-    fontWeight: '700',
-    letterSpacing: '0.5px',
-    cursor: 'pointer',
-    padding: '4px 0',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    textTransform: 'uppercase'
-  },
-  card: {
-    background: 'linear-gradient(180deg, rgba(20, 27, 38, 0.94) 0%, rgba(10, 14, 21, 0.98) 100%)',
-    border: '1px solid rgba(255, 255, 255, 0.13)',
-    borderRadius: '16px',
-    padding: '16px',
-    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
-  },
-  cardTitle: {
-    margin: '0 0 14px 0',
-    fontSize: '15px',
-    fontWeight: '700',
-    color: '#F1F5F9',
-    letterSpacing: '0.1px'
-  },
-  grid2x2: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '14px 18px'
-  },
-  statLabel: {
-    fontSize: '12px',
-    color: '#94A3B8',
-    fontWeight: '500',
-    marginBottom: '2px'
-  },
-  statValue: {
-    fontSize: '21px',
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: '-0.3px',
-    lineHeight: 1.2
-  },
-  sectionTitle: {
-    margin: '4px 2px 0 2px',
-    fontSize: '15px',
-    fontWeight: '700',
-    color: '#F1F5F9'
-  },
-  balLabel: {
-    fontSize: '13px',
-    color: '#CBD5E1',
-    fontWeight: '600',
-    marginBottom: '4px'
-  },
-  balAmount: {
-    fontSize: '25px',
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: '-0.4px',
-    lineHeight: 1.2,
-    marginBottom: '4px'
-  },
-  balSub: {
-    fontSize: '12px',
-    color: '#94A3B8',
-    marginBottom: '14px'
-  },
-  outlineBtn: {
-    width: '100%',
-    padding: '10px 14px',
-    background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%)',
-    border: '1px solid rgba(255, 255, 255, 0.18)',
-    borderRadius: '10px',
-    color: '#F8FAFC',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12)'
-  }
-};
+// Ícono de Idioma (Globo)
+const IconLanguage = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
 
-export default function HomeTab({ userData, setActiveTab, t, lang, setLang }) {
-  const [activeModal, setActiveModal] = useState(null); // null | 'about' | 'terms' | 'history' | 'wallets'
-  const [historyList, setHistoryList] = useState([]);
-  const [globalStats, setGlobalStats] = useState({
-    users: 0,
-    withdrawn: 0,
-    deposited: 0,
-    daysOnline: 1
-  });
+// Ícono de Soporte (Auriculares)
+const IconSupport = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+  </svg>
+);
 
-  const apiHeaders = {
-    'Content-Type': 'application/json',
-    'X-Telegram-Init-Data': WebApp.initData || ''
+// Ícono de Estrella para el banner de bono
+const IconSpark = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
+
+export default function HomeTab({ userData, activePlans = [], onNavigate, onLanguageChange, currentLang }) {
+  const [lang, setLang] = useState(currentLang || 'ES');
+
+  const availableBalance = Number(userData?.balance ?? 0);
+  const activeInvestmentTotal = Number(
+    userData?.active_investments ??
+      activePlans.reduce((acc, p) => acc + Number(p.principal_amount || 0), 0)
+  );
+  const dailyChange = userData?.daily_change ?? '+5.0% diario';
+  const isNegative = String(dailyChange).includes('-');
+
+  const safeHaptic = (style = 'medium') => {
+    try {
+      if (WebApp.HapticFeedback) WebApp.HapticFeedback.impactOccurred(style);
+    } catch (e) {}
   };
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api', {
-      method: 'POST',
-      headers: apiHeaders,
-      body: JSON.stringify({ action: 'get-global-stats' })
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (active && data?.success && data.stats) {
-          setGlobalStats({
-            users: Number(data.stats.users || 0),
-            withdrawn: Number(data.stats.withdrawn || 0),
-            deposited: Number(data.stats.deposited || 0),
-            daysOnline: Number(data.stats.daysOnline || 1)
-          });
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const handleOpenHistory = async () => {
-    setActiveModal('history');
-    try {
-      const res = await fetch('/api', {
-        method: 'POST',
-        headers: apiHeaders,
-        body: JSON.stringify({ action: 'get-history' })
-      });
-      const data = await res.json();
-      if (data?.success) setHistoryList(data.history || []);
-    } catch {
-      toast.error('No se pudo cargar el historial.');
-    }
+  const handleToggleLanguage = () => {
+    safeHaptic('light');
+    const nextLang = lang === 'ES' ? 'EN' : 'ES';
+    setLang(nextLang);
+    if (onLanguageChange) onLanguageChange(nextLang);
+    toast.success(nextLang === 'ES' ? 'Idioma: Español (ES)' : 'Language: English (EN)', {
+      style: { background: '#111C2E', color: '#22D3EE', border: '1px solid #22D3EE' }
+    });
   };
 
   const handleOpenSupport = () => {
+    safeHaptic('light');
     try {
-      WebApp.openTelegramLink('https://t.me/TheDannyWeb3');
-    } catch {
-      window.open('https://t.me/TheDannyWeb3', '_blank');
+      WebApp.openTelegramLink('https://t.me/CryptoWeb3Pay');
+    } catch (e) {
+      window.open('https://t.me/CryptoWeb3Pay', '_blank');
     }
   };
 
-  const handleGoWallet = (mode) => {
-    try {
-      localStorage.setItem('preferred_wallet_tab', mode);
-    } catch {}
-    if (typeof setActiveTab === 'function') setActiveTab('wallet');
-  };
-
-  // deposit_balance en USD -> Créditos (1 USD = 1,000 Créditos)
-  const vaultUsd = Number(userData?.deposit_balance || 0);
-  const creditsEquiv = vaultUsd * 1000;
-
-  // balance en USD -> $TGM (1 USD = 1,000 $TGM)
-  const withdrawableUsd = Number(userData?.balance || 0);
-  const tgmBalance = Number((withdrawableUsd * 1000).toFixed(0));
+  const formatUSD = (val) =>
+    Number(val || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
 
   return (
-    <div style={styles.container} className="fade-in">
-      <ProfileHeader
-        userData={userData}
-        transactions={historyList}
-        lang={lang}
-        setLang={setLang}
-        activeModal={activeModal}
-        setActiveModal={setActiveModal}
-        t={t}
-      />
+    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '12px' }}>
 
-      {!activeModal && (
-        <>
-          {/* Barra secundaria: SOPORTE | ACERCA | TÉRMINOS | Historial */}
-          <div style={styles.subNav}>
-            <button type="button" onClick={handleOpenSupport} style={styles.subNavBtn}>
-              {t?.('home_support') || 'SOPORTE'}
-            </button>
-            <button type="button" onClick={() => setActiveModal('about')} style={styles.subNavBtn}>
-              {t?.('home_about') || 'ACERCA'}
-            </button>
-            <button type="button" onClick={() => setActiveModal('terms')} style={styles.subNavBtn}>
-              {t?.('home_terms') || 'TÉRMINOS'}
-            </button>
-            <button type="button" onClick={handleOpenHistory} style={styles.subNavBtn}>
-              <IconClock />
-              <span>{t?.('home_history') || 'Historial'}</span>
-            </button>
+      {/* BARRA SUPERIOR: LENGUAJE Y SOPORTE */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={handleToggleLanguage}
+          aria-label="Cambiar idioma"
+          style={{
+            backgroundColor: '#0F172A',
+            border: '1px solid #1E293B',
+            borderRadius: '999px',
+            padding: '6px 11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: '#F8FAFC',
+            fontSize: '12px',
+            fontWeight: '800',
+            cursor: 'pointer'
+          }}
+        >
+          <IconLanguage />
+          <span>{lang}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleOpenSupport}
+          aria-label="Soporte"
+          style={{
+            backgroundColor: '#0F172A',
+            border: '1px solid #1E293B',
+            borderRadius: '999px',
+            padding: '6px 11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: '#F8FAFC',
+            fontSize: '12px',
+            fontWeight: '800',
+            cursor: 'pointer'
+          }}
+        >
+          <IconSupport />
+          <span>{lang === 'ES' ? 'Soporte' : 'Support'}</span>
+        </button>
+      </div>
+
+      {/* 1. TARJETA PRINCIPAL: SALDO DISPONIBLE / ACTIVO */}
+      <div
+        style={{
+          background: 'linear-gradient(180deg, #102033 0%, #0B1322 100%)',
+          border: '1px solid #1E324A',
+          borderRadius: '20px',
+          padding: '20px 16px',
+          textAlign: 'center',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: '#94A3B8', letterSpacing: '1px' }}>
+            SALDO DISPONIBLE
+          </span>
+          <span
+            style={{
+              backgroundColor: 'rgba(34, 197, 94, 0.16)',
+              color: '#22C55E',
+              fontSize: '11px',
+              fontWeight: '800',
+              padding: '2px 8px',
+              borderRadius: '999px',
+              border: '1px solid rgba(34, 197, 94, 0.35)'
+            }}
+          >
+            +5% diario
+          </span>
+        </div>
+
+        <h1 style={{ margin: '0 0 4px 0', fontSize: '34px', fontWeight: '800', color: '#F8FAFC', letterSpacing: '-0.5px' }}>
+          ${formatUSD(availableBalance)}{' '}
+          <span style={{ fontSize: '18px', fontWeight: '700', color: '#CBD5E1' }}>USD</span>
+        </h1>
+
+        <p
+          style={{
+            margin: '0 0 8px 0',
+            fontSize: '13px',
+            fontWeight: '700',
+            color: isNegative ? '#F87171' : '#22C55E'
+          }}
+        >
+          ({dailyChange})
+        </p>
+
+        <p style={{ margin: 0, fontSize: '12px', color: '#CBD5E1', fontWeight: '500' }}>
+          Inversión activa: <strong style={{ color: '#22D3EE' }}>${formatUSD(activeInvestmentTotal)} USD</strong> • Todo depósito entra al plan automático
+        </p>
+      </div>
+
+      {/* 2. BOTÓN PRINCIPAL: DEPOSITAR */}
+      <button
+        type="button"
+        onClick={() => {
+          safeHaptic('medium');
+          onNavigate('portfolio', 'deposit');
+        }}
+        style={{
+          width: '100%',
+          background: 'linear-gradient(90deg, #06B6D4 0%, #22D3EE 100%)',
+          color: '#06101C',
+          border: 'none',
+          borderRadius: '999px',
+          padding: '15px 20px',
+          fontSize: '14px',
+          fontWeight: '800',
+          cursor: 'pointer',
+          boxShadow: '0 0 20px rgba(34, 211, 238, 0.35)',
+          letterSpacing: '0.3px'
+        }}
+      >
+        DEPOSITAR (Mín. $1 USD)
+      </button>
+
+      {/* 3. BARRA SECUNDARIA: RETIRAR + ÍCONOS CRIPTO */}
+      <div
+        onClick={() => {
+          safeHaptic('light');
+          onNavigate('portfolio', 'withdraw');
+        }}
+        style={{
+          backgroundColor: '#111C2E',
+          border: '1px solid #1E293B',
+          borderRadius: '999px',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer'
+        }}
+      >
+        <div>
+          <span style={{ color: '#F1F5F9', fontWeight: '700', fontSize: '14px' }}>Retirar </span>
+          <span style={{ color: '#94A3B8', fontSize: '12px' }}>(Mín. $1 USD)</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <IconUSDT />
+          <IconTON />
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.05', textAlign: 'left' }}>
+            <span style={{ fontSize: '9px', fontWeight: '800', color: '#CBD5E1' }}>GRAM</span>
+            <span style={{ fontSize: '9px', fontWeight: '700', color: '#94A3B8' }}>/ TON</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. TARJETA DEL PLAN ÚNICO: 5% DIARIO */}
+      <div
+        style={{
+          backgroundColor: '#0F172A',
+          border: '1px solid #1E293B',
+          borderRadius: '20px',
+          padding: '16px',
+          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.25)'
+        }}
+      >
+        <h3 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '800', color: '#F1F5F9', letterSpacing: '0.5px' }}>
+          PLAN ÚNICO: 5% DIARIO
+        </h3>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#F1F5F9', lineHeight: '1.2' }}>Durante</div>
+            <div style={{ fontSize: '26px', fontWeight: '800', color: '#22C55E', lineHeight: '1.15' }}>40 días</div>
           </div>
 
-          {/* Tarjeta Datos Globales */}
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>{t?.('home_global_data') || 'Datos Globales'}</h3>
-            <div style={styles.grid2x2}>
-              <div>
-                <div style={styles.statLabel}>{t?.('home_stat_users') || 'Usuarios:'}</div>
-                <div style={styles.statValue}>{globalStats.users}</div>
-              </div>
-              <div>
-                <div style={styles.statLabel}>{t?.('home_stat_withdrawn') || 'Retirado:'}</div>
-                <div style={styles.statValue}>{formatCompactStat(globalStats.withdrawn, false)}</div>
-              </div>
-              <div>
-                <div style={styles.statLabel}>{t?.('home_stat_vault') || 'Fondos Bóveda:'}</div>
-                <div style={styles.statValue}>{formatCompactStat(globalStats.deposited, true)}</div>
-              </div>
-              <div>
-                <div style={styles.statLabel}>{t?.('home_stat_days') || 'Días en Línea:'}</div>
-                <div style={styles.statValue}>{globalStats.daysOnline}</div>
-              </div>
-            </div>
+          <div
+            style={{
+              flex: 1,
+              background: 'linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%)',
+              color: '#06101C',
+              borderRadius: '14px',
+              padding: '10px 12px',
+              textAlign: 'center',
+              boxShadow: '0 4px 12px rgba(34, 211, 238, 0.25)'
+            }}
+          >
+            <div style={{ fontSize: '12px', fontWeight: '800', lineHeight: '1.25' }}>Reinversión Manual</div>
+            <div style={{ fontSize: '10px', fontWeight: '700', marginTop: '2px', opacity: 0.85 }}>(Mín. $1 USD)</div>
           </div>
+        </div>
 
-          {/* Sección Fondo de Campaña */}
-          <h3 style={styles.sectionTitle}>{t?.('home_campaign_fund') || 'Fondo de Campaña'}</h3>
+        {/* Botones Invertir y Reinvertir */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('medium');
+              onNavigate('portfolio', 'deposit');
+            }}
+            style={{
+              flex: 1,
+              backgroundColor: '#22D3EE',
+              color: '#06101C',
+              border: 'none',
+              borderRadius: '999px',
+              padding: '11px',
+              fontSize: '13px',
+              fontWeight: '800',
+              cursor: 'pointer'
+            }}
+          >
+            Invertir
+          </button>
 
-          {/* Tarjeta 1: USD (Fondos para Campañas) -> Depositar */}
-          <div style={styles.card}>
-            <div style={styles.balLabel}>
-              {t?.('home_vault_usd_label') || 'USD (Fondos para Campañas)'}
-            </div>
-            <div style={styles.balAmount}>{vaultUsd.toFixed(2)} USD</div>
-            <div style={styles.balSub}>
-              Equivale a {creditsEquiv.toFixed(2)} CRÉDITOS
-            </div>
-            <button type="button" onClick={() => handleGoWallet('deposit')} style={styles.outlineBtn}>
-              {t?.('home_btn_deposit') || 'Depositar'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              safeHaptic('medium');
+              onNavigate('portfolio', 'reinvest');
+            }}
+            style={{
+              flex: 1,
+              backgroundColor: '#1E293B',
+              color: '#F1F5F9',
+              border: '1px solid #334155',
+              borderRadius: '999px',
+              padding: '11px',
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Reinvertir
+          </button>
+        </div>
+      </div>
 
-          {/* Tarjeta 2: Saldo Retirable ($TGM) -> Retirar */}
-          <div style={styles.card}>
-            <div style={styles.balLabel}>
-              {t?.('home_withdrawable_label') || 'Saldo Retirable ($TGM)'}
-            </div>
-            <div style={styles.balAmount}>{tgmBalance.toLocaleString('en-US')} $TGM</div>
-            <div style={styles.balSub}>1000 $TGM = 1 USD</div>
-            <button type="button" onClick={() => handleGoWallet('withdraw')} style={styles.outlineBtn}>
-              {t?.('home_btn_withdraw') || 'Retirar'}
-            </button>
-          </div>
-        </>
-      )}
+      {/* 5. BANNER PROMOCIONAL RENOVADO: +10% BONO */}
+      <div
+        onClick={() => {
+          safeHaptic('light');
+          onNavigate('portfolio', 'deposit');
+        }}
+        style={{
+          background: 'linear-gradient(135deg, rgba(16, 32, 51, 0.95) 0%, rgba(24, 24, 58, 0.95) 55%, rgba(45, 22, 75, 0.92) 100%)',
+          border: '1px solid rgba(34, 211, 238, 0.35)',
+          borderRadius: '16px',
+          padding: '13px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+          cursor: 'pointer',
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <span
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '9px',
+              backgroundColor: 'rgba(34, 211, 238, 0.14)',
+              border: '1px solid rgba(34, 211, 238, 0.35)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <IconSpark />
+          </span>
+
+          <span style={{ fontSize: '13px', fontWeight: '800', color: '#F8FAFC', letterSpacing: '0.2px' }}>
+            <span style={{ color: '#22D3EE' }}>+10% BONO</span> en tu 1er Depósito
+          </span>
+        </div>
+
+        <span
+          style={{
+            backgroundColor: 'rgba(34, 211, 238, 0.16)',
+            color: '#22D3EE',
+            border: '1px solid rgba(34, 211, 238, 0.35)',
+            borderRadius: '999px',
+            padding: '4px 10px',
+            fontSize: '11px',
+            fontWeight: '800',
+            flexShrink: 0
+          }}
+        >
+          Activar
+        </span>
+      </div>
+
     </div>
   );
 }
