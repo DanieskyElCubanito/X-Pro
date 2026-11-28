@@ -8,6 +8,7 @@ import HomeTab from './components/HomeTab';
 import TeamTab from './components/TeamTab';
 import ProfileHeader from './components/ProfileHeader';
 import PortfolioView from './views/PortfolioView';
+import AdminPanelView from './views/AdminPanelView';
 
 // Íconos SVG integrados directamente para la barra inferior
 const IconHome = () => (
@@ -184,6 +185,11 @@ const formatTransactions = (rawList = []) =>
   }));
 
 export default function App() {
+  const isAdminRoute =
+    typeof window !== 'undefined' &&
+    (new URLSearchParams(window.location.search).get('admin') === '1' ||
+      window.location.hash === '#admin');
+
   const [status, setStatus] = useState('loading');
   const [activeTab, setActiveTab] = useState('home');
   const [portfolioMode, setPortfolioMode] = useState('deposit');
@@ -237,12 +243,14 @@ export default function App() {
     try {
       WebApp.ready();
       WebApp.expand();
-      const user = tgUser || { id: 8968109534, username: 'TestUser' };
-      verifyUser(user);
+      if (!isAdminRoute) {
+        const user = tgUser || { id: 8968109534, username: 'TestUser' };
+        verifyUser(user);
+      }
     } catch (e) {
       setStatus('error');
     }
-  }, [verifyUser, tgUser]);
+  }, [verifyUser, tgUser, isAdminRoute]);
 
   const handleNavigate = (tab, mode = 'deposit') => {
     if (tab === 'portfolio') {
@@ -264,6 +272,27 @@ export default function App() {
       toast.error(e?.message || 'No se pudo completar la reinversión');
     }
   };
+
+  // PANEL DE ADMINISTRACIÓN SEPARADO (?admin=1 o #admin)
+  if (isAdminRoute) {
+    return (
+      <div style={{ ...s.container, overflowY: 'auto' }}>
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: '#111C2E',
+              color: '#F1F5F9',
+              border: '1px solid #243247'
+            }
+          }}
+        />
+        <div style={{ ...s.main, paddingBottom: '32px' }}>
+          <AdminPanelView currentTelegramId={tgUser?.id || null} />
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'loading') {
     return <LoadingSplash />;
