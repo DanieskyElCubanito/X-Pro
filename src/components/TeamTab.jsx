@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import WebApp from '@twa-dev/sdk';
 import toast from 'react-hot-toast';
 import { s } from '../styles/appStyles';
+import { botApi } from '../api/botApi';
 
 const LEVEL_CONFIG = [
   { level: 1, tag: 'L1', commission: 50, color: '#22D3EE', badgeBg: '#0284C7' },
@@ -10,60 +11,6 @@ const LEVEL_CONFIG = [
   { level: 4, tag: 'L4', commission: 5, color: '#FBBF24', badgeBg: '#B45309' },
   { level: 5, tag: 'L5', commission: 5, color: '#C084FC', badgeBg: '#7E22CE' }
 ];
-
-const MOCK_BY_LEVEL = {
-  1: {
-    activeCount: 42,
-    earned: 150.0,
-    totalInvested: 150.0,
-    myEarnings: 75.0,
-    members: [
-      { id: 'u1', handle: '@carlos_g', invested: 100.0, active: true, avatar: 'https://i.pravatar.cc/80?img=11' },
-      { id: 'u2', handle: '@maria_t', invested: 0.0, active: false, avatar: 'https://i.pravatar.cc/80?img=5' },
-      { id: 'u3', handle: '@juan_perez', invested: 50.0, active: true, avatar: 'https://i.pravatar.cc/80?img=12' }
-    ]
-  },
-  2: {
-    activeCount: 216,
-    earned: 150.0,
-    totalInvested: 500.0,
-    myEarnings: 150.0,
-    members: [
-      { id: 'u4', handle: '@sofia_r', invested: 300.0, active: true, avatar: 'https://i.pravatar.cc/80?img=9' },
-      { id: 'u5', handle: '@diego_m', invested: 200.0, active: true, avatar: 'https://i.pravatar.cc/80?img=14' },
-      { id: 'u6', handle: '@valeria_c', invested: 0.0, active: false, avatar: 'https://i.pravatar.cc/80?img=20' }
-    ]
-  },
-  3: {
-    activeCount: 36,
-    earned: 120.0,
-    totalInvested: 1200.0,
-    myEarnings: 120.0,
-    members: [
-      { id: 'u7', handle: '@andres_v', invested: 800.0, active: true, avatar: 'https://i.pravatar.cc/80?img=15' },
-      { id: 'u8', handle: '@camila_s', invested: 400.0, active: true, avatar: 'https://i.pravatar.cc/80?img=24' }
-    ]
-  },
-  4: {
-    activeCount: 154,
-    earned: 20.0,
-    totalInvested: 400.0,
-    myEarnings: 20.0,
-    members: [
-      { id: 'u9', handle: '@mateo_l', invested: 400.0, active: true, avatar: 'https://i.pravatar.cc/80?img=18' },
-      { id: 'u10', handle: '@lucia_p', invested: 0.0, active: false, avatar: 'https://i.pravatar.cc/80?img=26' }
-    ]
-  },
-  5: {
-    activeCount: 35,
-    earned: 0.0,
-    totalInvested: 0.0,
-    myEarnings: 0.0,
-    members: [
-      { id: 'u11', handle: '@brayan_k', invested: 0.0, active: false, avatar: 'https://i.pravatar.cc/80?img=33' }
-    ]
-  }
-};
 
 const IconShare = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -75,14 +22,115 @@ const IconShare = () => (
   </svg>
 );
 
+const normalizeTeamRows = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.members)) return raw.members;
+  if (Array.isArray(raw?.team)) return raw.team;
+  if (Array.isArray(raw?.data)) return raw.data;
+  return [];
+};
+
 export default function TeamTab({ userData }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'invested' | 'uninvested'
+  const [teamRows, setTeamRows] = useState(() => normalizeTeamRows(userData?.team));
+  const [loadingTeam, setLoadingTeam] = useState(false);
 
-  const userId = userData?.id || '8968109534';
-  const botUsername = 'ProfitCoreBot'; // Cámbialo por el @usuario real de tu bot sin el @
-  const inviteLink = `https://t.me/${botUsername}?start=${userId}`;
-  const totalEarned = userData?.referral_earnings ?? 342.5;
+  const userId = userData?.id || userData?.telegram_id || '';
+  const botUsername = WebApp.initDataUnsafe?.bot_username || 'ProfitCoreBot';
+  const inviteLink = userId
+    ? `https://t.me/${botUsername}?start=${userId}`
+    : `https://t.me/${botUsername}`;
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchRealTeam() {
+      if (!userId) return;
+      setLoadingTeam(true);
+      try {
+        const res = await botApi.getTeamStats(userId);
+        if (!mounted) return;
+        const rows = normalizeTeamRows(res);
+        setTeamRows(rows);
+      } catch (e) {
+        if (mounted && Array.isArray(userData?.team)) {
+          setTeamRows(normalizeTeamRows(userData.team));
+        }
+      } finally {
+        if (mounted) setLoadingTeam(false);
+      }
+    }
+
+    fetchRealTeam();
+    return () => {
+      mounted = false;
+    };
+  }, [userId, userData?.team]);
+
+  const statsByLevel = useMemo(() => {
+    const map = {};
+
+    LEVEL_CONFIG.forEach((cfg) => {
+      const membersInLevel = teamRows
+        .filter((row) => Number(row.lvl ?? row.level) === cfg.level)
+        .map((row, idx) => {
+          const invested = Number(
+            row.active_investments ?? row.invested ?? row.total_invested ?? 0
+          );
+          const isActive =
+            typeof row.active === 'boolean' ? row.active : invested > 0;
+          const handle = row.username
+            ? row.username.startsWith('@')
+              ? row.username
+              : `@${row.username}`
+            : row.first_name || `ID ${row.telegram_id || row.id || idx + 1}`;
+          const avatar =
+            row.photo_url ||
+            row.avatar ||
+            `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+              String(row.telegram_id || row.id || handle)
+            )}`;
+          const bonus =
+            row.bonus_earned !== undefined
+              ? Number(row.bonus_earned)
+              : (invested * cfg.commission) / 100;
+
+          return {
+            id: row.telegram_id || row.id || `${cfg.level}-${idx}`,
+            handle,
+            invested,
+            active: isActive,
+            avatar,
+            bonus
+          };
+        });
+
+      const totalInvested = membersInLevel.reduce((acc, m) => acc + m.invested, 0);
+      const myEarnings =
+        teamRows.length > 0
+          ? membersInLevel.reduce((acc, m) => acc + m.bonus, 0)
+          : Number(userData?.[`level_${cfg.level}_earnings`] ?? 0);
+
+      map[cfg.level] = {
+        totalCount: membersInLevel.length,
+        activeCount: membersInLevel.filter((m) => m.active && m.invested > 0).length,
+        earned: myEarnings,
+        totalInvested,
+        myEarnings,
+        members: membersInLevel
+      };
+    });
+
+    return map;
+  }, [teamRows, userData]);
+
+  const totalEarned = useMemo(() => {
+    if (userData?.referral_earnings !== undefined && userData?.referral_earnings !== null) {
+      return Number(userData.referral_earnings);
+    }
+    return Object.values(statsByLevel).reduce((sum, lvl) => sum + Number(lvl.myEarnings || 0), 0);
+  }, [userData?.referral_earnings, statsByLevel]);
 
   const safeHaptic = (style = 'light') => {
     try {
@@ -113,7 +161,14 @@ export default function TeamTab({ userData }) {
   // --- VISTA DETALLE DE NIVEL ---
   if (selectedLevel !== null) {
     const cfg = LEVEL_CONFIG.find((item) => item.level === selectedLevel) || LEVEL_CONFIG[0];
-    const levelData = MOCK_BY_LEVEL[cfg.level] || MOCK_BY_LEVEL[1];
+    const levelData = statsByLevel[cfg.level] || {
+      totalCount: 0,
+      activeCount: 0,
+      earned: 0,
+      totalInvested: 0,
+      myEarnings: 0,
+      members: []
+    };
 
     const allMembers = levelData.members;
     const investedMembers = allMembers.filter((m) => m.active && m.invested > 0);
@@ -130,6 +185,7 @@ export default function TeamTab({ userData }) {
       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
+            type="button"
             onClick={() => {
               safeHaptic('light');
               setSelectedLevel(null);
@@ -154,9 +210,10 @@ export default function TeamTab({ userData }) {
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
           {LEVEL_CONFIG.map((item) => {
             const isActiveTab = item.level === cfg.level;
-            const count = MOCK_BY_LEVEL[item.level]?.activeCount ?? 0;
+            const count = statsByLevel[item.level]?.totalCount ?? 0;
             return (
               <button
+                type="button"
                 key={item.level}
                 onClick={() => {
                   safeHaptic('light');
@@ -207,6 +264,7 @@ export default function TeamTab({ userData }) {
         {/* Filtros */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', overflowX: 'auto' }}>
           <button
+            type="button"
             onClick={() => setFilterMode('all')}
             style={{
               backgroundColor: filterMode === 'all' ? '#1E293B' : 'transparent',
@@ -220,10 +278,11 @@ export default function TeamTab({ userData }) {
               whiteSpace: 'nowrap'
             }}
           >
-            Todos ({levelData.activeCount})
+            Todos ({allMembers.length})
           </button>
 
           <button
+            type="button"
             onClick={() => setFilterMode('invested')}
             style={{
               backgroundColor: filterMode === 'invested' ? '#0891B2' : '#111C2E',
@@ -241,6 +300,7 @@ export default function TeamTab({ userData }) {
           </button>
 
           <button
+            type="button"
             onClick={() => setFilterMode('uninvested')}
             style={{
               backgroundColor: filterMode === 'uninvested' ? '#1E293B' : '#111C2E',
@@ -254,19 +314,23 @@ export default function TeamTab({ userData }) {
               whiteSpace: 'nowrap'
             }}
           >
-            Sin Inversión
+            Sin Inversión ({uninvestedMembers.length})
           </button>
         </div>
 
         {/* Lista de referidos */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {visibleMembers.length === 0 ? (
+          {loadingTeam ? (
             <div style={{ ...s.card, textAlign: 'center', padding: '20px' }}>
-              <p style={{ ...s.textMuted, margin: 0 }}>No hay usuarios en este filtro.</p>
+              <p style={{ ...s.textMuted, margin: 0 }}>Cargando referidos...</p>
+            </div>
+          ) : visibleMembers.length === 0 ? (
+            <div style={{ ...s.card, textAlign: 'center', padding: '20px' }}>
+              <p style={{ ...s.textMuted, margin: 0 }}>No hay referidos en este filtro.</p>
             </div>
           ) : (
             visibleMembers.map((member) => {
-              const bonusAmount = (member.invested * cfg.commission) / 100;
+              const bonusAmount = Number(member.bonus ?? (member.invested * cfg.commission) / 100);
               return (
                 <div
                   key={member.id}
@@ -399,6 +463,7 @@ export default function TeamTab({ userData }) {
             </span>
 
             <button
+              type="button"
               onClick={handleCopy}
               style={{
                 backgroundColor: '#06B6D4',
@@ -417,6 +482,7 @@ export default function TeamTab({ userData }) {
           </div>
 
           <button
+            type="button"
             onClick={handleShare}
             aria-label="Compartir enlace"
             style={{
@@ -461,7 +527,7 @@ export default function TeamTab({ userData }) {
         {/* Fila 1: L1, L2, L3 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px' }}>
           {LEVEL_CONFIG.slice(0, 3).map((item) => {
-            const info = MOCK_BY_LEVEL[item.level];
+            const info = statsByLevel[item.level];
             return (
               <div
                 key={item.level}
@@ -497,9 +563,11 @@ export default function TeamTab({ userData }) {
                 </div>
 
                 <div style={{ fontSize: '18px', fontWeight: '800', color: '#FFFFFF', lineHeight: '1.1' }}>
-                  {info.activeCount}
+                  {info.totalCount}
                 </div>
-                <div style={{ fontSize: '11px', color: '#CBD5E1', marginBottom: '4px' }}>Activos</div>
+                <div style={{ fontSize: '11px', color: '#CBD5E1', marginBottom: '4px' }}>
+                  Referidos ({info.activeCount} activos)
+                </div>
                 <div style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8' }}>
                   ${info.earned.toFixed(2)} USD
                 </div>
@@ -511,7 +579,7 @@ export default function TeamTab({ userData }) {
         {/* Fila 2: L4, L5 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
           {LEVEL_CONFIG.slice(3, 5).map((item) => {
-            const info = MOCK_BY_LEVEL[item.level];
+            const info = statsByLevel[item.level];
             return (
               <div
                 key={item.level}
@@ -547,9 +615,11 @@ export default function TeamTab({ userData }) {
                 </div>
 
                 <div style={{ fontSize: '18px', fontWeight: '800', color: '#FFFFFF', lineHeight: '1.1' }}>
-                  {info.activeCount}
+                  {info.totalCount}
                 </div>
-                <div style={{ fontSize: '11px', color: '#CBD5E1', marginBottom: '4px' }}>Activos</div>
+                <div style={{ fontSize: '11px', color: '#CBD5E1', marginBottom: '4px' }}>
+                  Referidos ({info.activeCount} activos)
+                </div>
                 <div style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8' }}>
                   ${info.earned.toFixed(2)} USD
                 </div>
